@@ -36,6 +36,17 @@
 | **F. Dashboard** | HR dashboard (vault, stream, compliance) | P0 — Must | Sprint 6 |
 | | Employee dashboard EWA live tracker | P0 — Must | Sprint 6 |
 | | External transfer ke MetaMask/EVM wallet/exchange | P1 — Should | Sprint 6 |
+| **G. Attendance & Cuti** | Clock In / Clock Out tracking | P1 — Should | Sprint 7 |
+| | Pengajuan Cuti & Unpaid Leave | P1 — Should | Sprint 7 |
+| | Auto-pause stream EWA jika Unpaid Leave | P1 — Should | Sprint 7 |
+| **H. Expense & Reimburse**| Pengajuan bon operasional karyawan | P1 — Should | Sprint 7 |
+| | HR Approval & instan payout (IDRX) | P1 — Should | Sprint 7 |
+| **I. Bonus & Bounty** | Pembuatan Task/KPI Bounty board | P2 — Nice | Sprint 8 |
+| | Peer-to-peer tipping IDRX antar karyawan | P2 — Nice | Sprint 8 |
+| **J. Off-Ramping** | Manajemen rekening bank lokal | P1 — Should | Sprint 8 |
+| | Simulasi tarik IDRX ke Rupiah (Payment Gateway) | P1 — Should | Sprint 8 |
+| **K. Sistem Notifikasi & Audit**| Activity Log (HR Jejak Audit) | P0 — Must | Sprint 8 |
+| | Notifikasi in-app alert (Lonceng) | P0 — Must | Sprint 8 |
 
 ---
 
@@ -54,15 +65,12 @@ Fitur-fitur berikut **tidak akan dikerjakan** pada MVP dan direncanakan untuk ve
 
 ## Visualisasi Timeline
 
-```
-Sprint 1   Sprint 2   Sprint 3   Sprint 4   Sprint 5   Sprint 6
-─────────  ─────────  ─────────  ─────────  ─────────  ─────────
-Core       Compliance Work ID    Cliff      Koperasi   Dashboard
-Payroll    & PHK      & Auth     Vesting    & Pool     & Launch
-(3 minggu) (3 minggu) (2 minggu) (2 minggu) (3 minggu) (4 minggu)
-    │          │          │          │          │          │
-    └──────────┴──────────┴──────────┴──────────┴──────────┘
-                        ~17 minggu total
+```text
+Sprint 1-2: Core Payroll, Compliance & PHK
+Sprint 3-4: Work ID, Auth, Cliff Vesting
+Sprint 5-6: Koperasi, Dashboard & Launch
+Sprint 7: Attendance, Cuti, Expense & Reimburse
+Sprint 8: Bonus, Bounty, Off-Ramping, Audit Log
 ```
 
 ---

@@ -18,9 +18,9 @@
 
 **Flow:**
 ```
-HR buka dashboard
+HR buka dashboard → login (embedded wallet — klik tombol, atau email OTP di prod)
 → Isi nama perusahaan, NPWP, email PIC
-→ Login via Privy EVM (HR Smart Account dibuat otomatis = authority address)
+→ Work ID HR terbentuk otomatis = authority address on-chain
 → initializeVault() (atomic: companies + vaultBalances + complianceVaults setup)
 → Deposit IDRX ERC-20 ke contract vault (min = total gaji 1 bulan)
 → setCompanyConfig() (bpjsBps, pph21Bps, severanceBps, lowBalanceAlert)
@@ -42,7 +42,7 @@ HR buka dashboard
 **Data yang Diperlukan HR:**
 | Field | Keterangan |
 |---|---|
-| Email karyawan | Untuk Privy Work ID creation |
+| Email karyawan | Untuk undangan onboarding + Work ID creation |
 | Gaji bulanan (IDRX) | Dikonversi ke flow_rate per detik |
 | Tanggal mulai kerja | Untuk tenure_months (severance) |
 | Persentase split custom | Opsional — override default 93/5/2 |

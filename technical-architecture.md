@@ -4,49 +4,58 @@
 
 ## Tech Stack
 
-| Layer | Teknologi | Alasan |
-|---|---|---|
-| **Smart Contract** | Solidity + Foundry (2 contracts) | Mature ecosystem, tooling lengkap, audit community besar |
-| **Network** | Base Sepolia (Ethereum L2 testnet) | ~2s finality, EVM-compatible — skripsi scope: testnet only |
-| **Stablecoin** | IDRX (ERC-20) | Rupiah-pegged, familiar pengguna Indonesia |
-| **Work ID / WaaS** | Privy (EVM mode) | Email login, embedded Smart Account (ERC-4337), no seed phrase |
-| **Gas Sponsor** | Faucet ETH (testnet) | Gas gratis di Base Sepolia — ERC-4337 Paymaster untuk mainnet (out of scope) |
-| **Multi-Sig PHK** | OpenZeppelin AccessControl (HR_ROLE + LEGAL_ROLE) | On-chain role-based multi-sig — no external dependency, audit-ready, simpler than Gnosis Safe for 2-of-2 flow |
-| **Frontend** | Next.js 16.2.4 + Tailwind v4 + Shadcn/UI | SSR, performa mobile baik |
-| **Web3 Adapter** | wagmi + viem + @privy-io/react-auth | Standard library EVM, type-safe |
-| **Indexer** | Ponder | Real-time event indexing, type-safe SQL, self-hosted |
-| **Backend** | Node.js + PostgreSQL | Bundler relay, off-chain data, compliance reporting |
-| **Testing** | Foundry (forge test) + Anvil | Unit test + fork simulation |
-| **Monitoring** | Ponder logs + Alchemy webhooks | Event indexing + on-chain monitoring |
+| Layer | Teknologi | Status | Alasan |
+|---|---|---|---|
+| **Smart Contract** | Solidity + Foundry | ✅ Deployed | Mature ecosystem, tooling lengkap, audit community besar |
+| **Network** | Base Sepolia (dev) / Base Mainnet (prod) | ✅ Running | ~2s finality, EVM-compatible, biaya rendah |
+| **Stablecoin** | IDRX (ERC-20) | ✅ Configured | Rupiah-pegged, familiar pengguna Indonesia |
+| **Work ID — Dev** | Self-hosted embedded wallet (viem) | ✅ Working | EOA key di localStorage, EIP-191 auth, zero dependency |
+| **Work ID — Prod** | ERC-4337 Smart Account + encrypted key | 📋 Planned | Stable address, key rotation, gasless native |
+| **Gas Sponsor — Dev** | Faucet ETH (testnet) | ✅ Working | Gratis di Base Sepolia |
+| **Gas Sponsor — Prod** | ERC-4337 Paymaster (Pimlico / Alchemy Gas Manager) | 📋 Planned | Sponsor gas untuk karyawan — zero ETH required |
+| **Multi-Sig PHK** | OpenZeppelin AccessControl (HR_ROLE + LEGAL_ROLE) | ✅ Deployed | On-chain role-based — no external dependency, audit-ready |
+| **Frontend** | Next.js + Tailwind v4 + Shadcn/UI | ✅ Running | SSR, performa mobile baik |
+| **Web3 Adapter** | wagmi + viem | ✅ Running | Standard library EVM, type-safe |
+| **Indexer** | Ponder | ✅ Running | Real-time event indexing, type-safe SQL, self-hosted |
+| **Backend** | Node.js + PostgreSQL | ✅ Running | Bundler relay, off-chain data, compliance reporting |
+| **Auth** | EIP-191 signature + JWT (15min/7d) | ✅ Working | Stateless, verifiable, no DB lookup per request |
+| **Testing** | Foundry (forge test) + Anvil | ✅ Done | Unit test + fork simulation |
+| **KYC — Prod** | Verihubs / Dukcapil API | 📋 Planned | eKYC NIK binding per UU PDP 2022 |
+| **Monitoring** | Ponder logs + Alchemy webhooks | ✅ Running | Event indexing + on-chain monitoring |
 
 ---
 
 ## Contract Structure
 
-Platform terdiri dari **2 Solidity contracts** terpisah yang berinteraksi via external call:
+Platform terdiri dari **3 Solidity contracts** terpisah yang berinteraksi dalam ekosistem *Multi-Tenant* (Factory Pattern):
 
 | Contract | Storage yang Dikelola | Fungsi Utama |
 |---|---|---|
-| `PayrollContract` | companies, vaults, employeeStreams, severanceVaults, complianceVaults, cliffVests, terminations | initializeVault, registerEmployee, claimSalary, proposeTermination, approveTermination, executeTermination, createCliffVest |
-| `EmployeeLiquidityContract` | pools, lenderDeposits, loanRecords | initializePool, depositToPool, borrowFromPool, repayLoan, withdrawDeposit |
+| `PayrollFactory` | companyVaults (mapping), allVaults | deployVault, emergencyFreezeAll |
+| `CompanyVault` | (Isolated per Tenant): employeeStreams, severanceVaults, complianceVaults, cliffVests, terminations | fundVault, startStream, claimSalary, proposeTermination, executeTermination, createCliffVest |
+| `EmployeeLiquidityContract` | pools, lenderDeposits, loanRecords, totalProtocolFee | initializePool, depositToPool, borrowFromPool, repayLoan, claimProtocolFee |
 
 ---
 
-## Diagram Arsitektur Storage
+## Diagram Arsitektur Storage (Factory Pattern)
 
 ```mermaid
 graph TD
-  PC["PayrollContract\nSolidity — logic + state"]
+  FCT["PayrollFactory\nSolidity — Deployer"]
+  PC["CompanyVault (Instance)\nSolidity — logic + state"]
 
-  subgraph Core["Core Storage"]
-    CS["companies mapping\nkey: hr_address\ntreasury, status, params"]
-    VT["vaultBalances mapping\nERC-20 IDRX balance\nowned by contract"]
+  subgraph Factory["SaaS Admin Layer"]
+    CV["companyVaults mapping\nkey: hr_address"]
+  end
+
+  subgraph Core["Core Storage (Per Tenant)"]
+    VT["vaultBalance\nERC-20 IDRX balance\nowned by vault"]
     ES["employeeStreams mapping\nkey: employee_address\nflowRate, startTs, withdrawn"]
   end
 
   subgraph Compliance["Compliance Storage"]
     SV["severanceVaults mapping\nkey: employee_address\nLocked | Returned | Released"]
-    CV["complianceVaults mapping\nkey: company_address\nbpjsBps, pph21Bps"]
+    CP["complianceBalance\nbpjsBps, pph21Bps"]
     CF["cliffVests mapping\nkey: employee_address + vestId\ncliffTs, amount, VestStatus"]
   end
 
@@ -57,11 +66,13 @@ graph TD
     PR["Privy WaaS (EVM)\nEmail → Smart Account"]
   end
 
-  PC -->|reads / writes| CS
+  FCT -->|Deploys & Tracks| CV
+  FCT -.->|Creates| PC
+
   PC -->|reads / writes| VT
   PC -->|reads / writes| ES
   PC -.->|reads / writes| SV
-  PC -.->|reads / writes| CV
+  PC -.->|reads / writes| CP
   PC -.->|reads / writes| CF
 
   VT -->|holds| IDRX
@@ -101,14 +112,19 @@ graph TD
                    ▼
 ┌─────────────────────────────────────────────────────────┐
 │              BASE BLOCKCHAIN (Ethereum L2)                │
-│  ┌────────────────────┐  ┌──────────────────────────┐   │
-│  │  PayrollContract   │  │EmployeeLiquidityContract  │   │
-│  │  - companies       │  │  - pools                  │   │
-│  │  - vaultBalances   │◄─┤  - loanRecords (call)     │   │
-│  │  - employeeStreams  │  │  - lenderDeposits         │   │
-│  │  - severanceVaults │  └──────────────────────────┘   │
-│  │  - complianceVaults│                                  │
-│  │  - cliffVests      │  ┌──────────────────────────┐   │
+│  ┌───────────────────┐                                   │
+│  │  PayrollFactory   │ (Owner SaaS)                      │
+│  │  - companyVaults  │─────────────┐                     │
+│  └───────────────────┘             ▼                     │
+│  ┌────────────────────┐  ┌──────────────────────────┐    │
+│  │  CompanyVault(s)   │  │EmployeeLiquidityContract │    │
+│  │  [Isolated state]  │  │  - pools                 │    │
+│  │  - vaultBalance    │◄─┤  - loanRecords (call)    │    │
+│  │  - employeeStreams │  │  - lenderDeposits        │    │
+│  │  - severanceVaults │  │  - totalProtocolFee      │    │
+│  │  - complianceBal   │  └──────────────────────────┘    │
+│  │  - cliffVests      │                                  │
+│  └────────────────────┘  ┌──────────────────────────┐    │
 │  └────────────────────┘  │  External Protocols       │   │
 │                           │  - Privy WaaS (EVM)       │   │
 │                           │  - AccessControl PHK      │   │
@@ -165,17 +181,18 @@ graph TD
 
 ## Storage Mapping Reference
 
-| Storage | Key | Uniqueness |
-|---|---|---|
-| `companies` | `hr_authority address` | 1 per HR wallet |
-| `employeeStreams` | `employee address` | 1 per employee |
-| `severanceVaults` | `employee address` | 1 per employee |
-| `complianceVaults` | `company address` | 1 per company |
-| `cliffVests` | `employee address + vestId` | Multiple per employee |
-| `terminations` | `employee address` | 1 per active proposal |
-| `pools` | `company address` | 1 per company |
-| `lenderDeposits` | `lender address` | 1 per lender |
-| `loanRecords` | `borrower address` | 1 active per borrower |
+| Storage | Lokasi Kontrak | Key | Uniqueness |
+|---|---|---|---|
+| `companyVaults` | `PayrollFactory` | `hr_authority address` | 1 per HR wallet |
+| `vaultBalance` | `CompanyVault` | (State variable) | 1 per company vault |
+| `employeeStreams` | `CompanyVault` | `employee address` | 1 per employee (per company) |
+| `severanceVaults` | `CompanyVault` | `employee address` | 1 per employee (per company) |
+| `complianceBalance`| `CompanyVault` | (State variable) | 1 per company vault |
+| `cliffVests` | `CompanyVault` | `employee address + vestId` | Multiple per employee |
+| `terminations` | `CompanyVault` | `employee address` | 1 per active proposal |
+| `pools` | `EmployeeLiquidityContract`| `company address` | 1 per company |
+| `lenderDeposits` | `EmployeeLiquidityContract`| `lender address` | 1 per lender |
+| `loanRecords` | `EmployeeLiquidityContract`| `borrower address` | 1 active per borrower |
 
 ---
 
@@ -230,8 +247,8 @@ forge script script/Deploy.s.sol --rpc-url $BASE_SEPOLIA_RPC_URL --broadcast
 payroll-saas/
 ├── finley-payroll/                     # Foundry — Solidity contracts + tests
 │   ├── src/
-│   │   ├── PayrollContract.sol
-│   │   │   ├── initializeVault()
+│   │   ├── PayrollFactory.sol          # Deploys isolated CompanyVaults
+│   │   ├── CompanyVault.sol            # Single-tenant isolated vault
 │   │   │   ├── fundVault() / withdrawVault()
 │   │   │   ├── startStream() / pauseStream() / resumeStream() / cancelStream()
 │   │   │   ├── claimSalary()           # 93/5/2 auto-split
@@ -243,8 +260,9 @@ payroll-saas/
 │   │   │   ├── initializePool()
 │   │   │   ├── depositToPool() / withdrawDeposit()
 │   │   │   ├── borrowFromPool() / repayLoanManual()
-│   │   │   ├── autoRepay()             # called by PayrollContract
-│   │   │   └── liquidateLoan()         # called by backend ops wallet
+│   │   │   ├── autoRepay()             # called by CompanyVault
+│   │   │   ├── liquidateLoan()         
+│   │   │   └── claimProtocolFee()      # 1% Yield cut for SuperAdmin
 │   │   ├── EmploymentSBT.sol           # ERC-5192 soulbound token (FR-B03)
 │   │   ├── interfaces/
 │   │   │   ├── IPayroll.sol

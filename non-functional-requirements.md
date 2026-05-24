@@ -34,9 +34,14 @@
 
 ### Wallet & Key Security
 
-- **[MUST]** Privy **2-of-2 MPC** — private key tidak pernah terbentuk utuh di satu tempat
+- **[MUST — Dev]** Private key EOA disimpan di localStorage — hanya untuk testnet/dev; tidak untuk production
+- **[MUST — Prod]** Private key HARUS dienkripsi dengan **AES-256-GCM** menggunakan kunci turunan dari PIN/password user via PBKDF2 (minimum 100.000 iterasi) sebelum disimpan di localStorage
+- **[MUST — Prod]** System HARUS menggunakan **ERC-4337 Smart Account** agar address stabil meski signing key dirotasi
+- **[MUST — Prod]** Paymaster private key disimpan di **HSM atau secret manager** (AWS Secrets Manager / GCP Secret Manager) — bukan plaintext .env
 - **[MUST]** ERC-4337 Bundler HARUS **rate-limited**: max 10 claim/jam per karyawan (enforced di backend sebelum submit UserOperation)
-- **[MUST]** Paymaster private key disimpan di HSM atau secret manager (bukan plaintext .env di production)
+- **[MUST — Prod]** System HARUS menyediakan **mekanisme recovery Work ID** — email OTP + backup code saat pertama setup
+- **[MUST — Prod]** Refresh token HARUS disimpan di **HttpOnly cookie** — bukan localStorage (XSS protection)
+- **[MUST — Prod]** System HARUS menerapkan **nonce per challenge** untuk auth — setiap nonce hanya bisa dipakai sekali (tracked di Redis)
 
 ### API & Transport Security
 
@@ -55,11 +60,12 @@
 | Sprint | Security Action |
 |---|---|
 | Sprint 1 | Modifier-based access control audit — semua fungsi; Checks-Effects-Interactions pattern |
-| Sprint 2 | Multi-sig Safe logic review — tidak ada unilateral access; reentrancy guard test |
-| Sprint 3 | ERC-4337 Bundler rate limiting test, Privy MPC verification, Paymaster abuse prevention |
+| Sprint 2 | Multi-sig logic review — tidak ada unilateral access; reentrancy guard test |
+| Sprint 3 | ERC-4337 Bundler rate limiting test, key encryption verification, Paymaster abuse prevention |
 | Sprint 4 | Cliff vest forfeit — pastikan tidak bisa diclaim sebelum cliff_ts |
 | Sprint 5 | Koperasi — pastikan closed-loop, no external access; integer overflow check |
 | Sprint 6 | Full security audit oleh firma eksternal (Slither + Mythril + manual review) |
+| Production | Key encryption audit, KYC flow penetration test, session revocation test, CSP header audit |
 
 ---
 

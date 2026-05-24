@@ -186,7 +186,7 @@ function cancelStream(address employee) external onlyHR;
 flowchart TD
   subgraph F1["Fase 1 — Registrasi off-chain"]
     A["HR buka dashboard\nisi nama perusahaan, NPWP, email PIC"]
-    B["Login HR via Privy EVM\nHR Smart Account dibuat — ini authority address"]
+    B["Login HR via embedded wallet\nWork ID (EOA atau Smart Account) = authority address"]
   end
   subgraph F2["Fase 2 — Vault initialization on-chain"]
     C["initializeVault()\nHR sign via UserOperation — Paymaster bayar ETH gas"]

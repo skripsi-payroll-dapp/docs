@@ -245,6 +245,220 @@ Update frequency: ___
 
 ---
 
+---
+
+### OQ-007 · Provider eKYC untuk Verifikasi NIK
+
+| Property | Value |
+|---|---|
+| **Kategori** | Tech / Legal |
+| **Owner** | Tech Lead + Legal |
+| **Deadline** | Production Phase — sebelum onboarding user nyata |
+| **Status** | ⬜ Open |
+
+**Pertanyaan:**
+> Provider eKYC mana yang digunakan untuk verifikasi NIK karyawan? Verihubs, Privy.id (layanan KYC terpisah dari Privy WaaS), atau integrasi langsung ke Dukcapil API?
+
+**Konteks:**
+Per UU PDP No. 27/2022 dan regulasi ketenagakerjaan, identitas karyawan harus terverifikasi sebelum stream gaji aktif. Platform menyimpan PII off-chain, namun verifikasi harus dilakukan oleh lembaga terpercaya.
+
+**Opsi:**
+| Provider | Pro | Kon | Estimasi Cost |
+|---|---|---|---|
+| Verihubs | Terintegrasi dengan Dukcapil, local support | Biaya per verifikasi ~Rp 2.000–5.000 | ~$0.15/user |
+| Privy.id | Sudah punya nama di Indonesia, tanda tangan digital | Berbeda dari Privy WaaS — jangan tertukar | ~$0.20/user |
+| Dukcapil API langsung | Paling akurat, official | Proses partnership panjang, butuh MoU | Gratis setelah MoU |
+| Manual KTP upload | Cepat implementasi | Tidak terverifikasi real-time, fraud risk | Gratis |
+
+**Dampak Jika Tidak Resolved:**
+Tidak bisa onboarding user nyata — platform tidak compliant UU PDP.
+
+**Keputusan:**
+```
+[ Diisi saat resolved ]
+Tanggal: ___
+Provider dipilih: ___
+Estimasi cost per user: ___
+Timeline integrasi: ___
+```
+
+---
+
+### OQ-008 · Smart Account Standard: SimpleAccount atau Kernel
+
+| Property | Value |
+|---|---|
+| **Kategori** | Tech |
+| **Owner** | Tech Lead |
+| **Deadline** | Production Phase — sebelum Smart Account deployment |
+| **Status** | ⬜ Open |
+
+**Pertanyaan:**
+> Standard ERC-4337 Smart Account mana yang digunakan: OpenZeppelin SimpleAccount, ZeroDev Kernel, atau Biconomy Smart Account v3?
+
+**Konteks:**
+Pilihan Smart Account menentukan kompatibilitas dengan Paymaster, kemudahan upgrade, dan fitur seperti session key (untuk silent signing tanpa expose private key).
+
+**Opsi:**
+| Standard | Pro | Kon |
+|---|---|---|
+| SimpleAccount (OZ) | Minimal, audit lengkap, easy to understand | Tidak ada session key built-in |
+| ZeroDev Kernel | Modular, session key support, active development | Lebih complex, dependency baru |
+| Biconomy Smart Account v3 | Full stack (Bundler + Paymaster terintegrasi) | Vendor lock-in |
+| Safe (Gnosis) | Battle-tested, multi-sig native | Berat untuk use case sederhana |
+
+**Dampak Jika Tidak Resolved:**
+Contract factory dan frontend integration tidak bisa dimulai.
+
+**Keputusan:**
+```
+[ Diisi saat resolved ]
+Tanggal: ___
+Standard dipilih: ___
+Factory address: ___
+Alasan: ___
+```
+
+---
+
+### OQ-009 · JWT Revocation: Redis Blocklist atau Server-Side Session
+
+| Property | Value |
+|---|---|
+| **Kategori** | Tech |
+| **Owner** | Tech Lead |
+| **Deadline** | Production Phase — sebelum auth hardening |
+| **Status** | ⬜ Open |
+
+**Pertanyaan:**
+> Untuk mendukung session revocation (logout paksa, compromised device), apakah menggunakan Redis token blocklist atau beralih ke server-side session (PostgreSQL)?
+
+**Konteks:**
+JWT saat ini stateless — sekali diterbitkan tidak bisa di-invalidasi sebelum expiry. Ini adalah celah keamanan jika karyawan melaporkan device hilang atau akun compromised.
+
+**Opsi:**
+| Pendekatan | Pro | Kon |
+|---|---|---|
+| Redis blocklist | Tetap stateless di happy path, revocation O(1) | Redis sebagai new dependency |
+| Server-side session (DB) | Revocation mudah, audit lengkap | Setiap request = DB lookup |
+| Hybrid: short-lived AT + refresh rotation | Access token pendek (5 menit), refresh rotation per-use | Kompleksitas lebih tinggi di frontend |
+
+**Dampak Jika Tidak Resolved:**
+Tidak bisa revoke session saat karyawan lapor device hilang.
+
+**Keputusan:**
+```
+[ Diisi saat resolved ]
+Tanggal: ___
+Pendekatan dipilih: ___
+Implementation notes: ___
+```
+
+---
+
+### OQ-010 · Multi-Device Key Sync: iCloud Keychain atau MPC Provider
+
+| Property | Value |
+|---|---|
+| **Kategori** | Tech |
+| **Owner** | Tech Lead |
+| **Deadline** | Production Phase v2 |
+| **Status** | ⬜ Open |
+
+**Pertanyaan:**
+> Untuk mendukung login dari multiple device (HP baru, laptop kantor), bagaimana encrypted key di-sync? Via platform keychain (iCloud/Google) atau MPC key sharding via provider (Lit Protocol, Web3Auth)?
+
+**Konteks:**
+Saat ini jika user ganti device, Work ID hilang karena key hanya ada di localStorage browser lama. Untuk produksi, user harus bisa login dari device baru tanpa kehilangan address.
+
+**Opsi:**
+| Pendekatan | Pro | Kon |
+|---|---|---|
+| iCloud / Google Keychain | Native, zero infrastructure cost, user familiar | iOS-only atau Android-only, tidak cross-platform |
+| MPC (Lit Protocol / Web3Auth) | Cross-platform, key tidak pernah utuh di satu tempat | External dependency, cost per user |
+| Server-side encrypted backup | Platform kontrol, cross-platform | Perlu trust ke platform (key di server) |
+| QR code transfer | Sederhana, no infrastructure | Manual, UX kurang mulus |
+
+**Dampak Jika Tidak Resolved:**
+User yang ganti HP kehilangan Work ID — masalah besar untuk produksi.
+
+**Keputusan:**
+```
+[ Diisi saat resolved ]
+Tanggal: ___
+Pendekatan dipilih: ___
+```
+
+---
+
+### OQ-011 · Enkripsi PII: Field-Level atau DB-Level Encryption
+
+| Property | Value |
+|---|---|
+| **Kategori** | Tech / Legal |
+| **Owner** | Tech Lead + Legal |
+| **Deadline** | Production Phase — sebelum onboarding data nyata |
+| **Status** | ⬜ Open |
+
+**Pertanyaan:**
+> Per UU PDP No. 27/2022, PII karyawan (nama, NIK, email, nomor HP) harus terenkripsi at rest. Apakah menggunakan field-level encryption di aplikasi atau DB-level transparent encryption?
+
+**Opsi:**
+| Pendekatan | Pro | Kon |
+|---|---|---|
+| Field-level (aplikasi) | Kontrol granular, query enkripsi per kolom, audit per field | Kompleksitas lebih tinggi, tidak bisa query plaintext |
+| DB Transparent Data Encryption (TDE) | Transparan untuk aplikasi, mudah setup | Seluruh DB terenkripsi — bukan per-field |
+| Kombinasi | TDE untuk storage + field-level untuk kolom ultra-sensitif (NIK) | Best of both worlds | Dua layer kompleksitas |
+
+**Regulasi Referensi:**
+- UU PDP No. 27/2022 Pasal 32 — kewajiban melindungi data pribadi
+- Rekomendasi BSSN: enkripsi AES-256 untuk data sensitif
+
+**Keputusan:**
+```
+[ Diisi saat resolved ]
+Tanggal: ___
+Pendekatan dipilih: ___
+Kolom yang di-field-encrypt: ___
+```
+
+---
+
+### OQ-012 · Legal Role Detection: On-Chain atau Backend Cache
+
+| Property | Value |
+|---|---|
+| **Kategori** | Tech |
+| **Owner** | Tech Lead |
+| **Deadline** | Sprint 3 fix — segera |
+| **Status** | ⬜ Open |
+
+**Pertanyaan:**
+> Bug: `useRole()` saat ini tidak mendeteksi `LEGAL_ROLE` — legal officer selalu jatuh ke "employee" role. Fix ini dilakukan dengan tambahkan check on-chain, atau caching role di JWT saat login?
+
+**Konteks:**
+Legal role perlu bisa approve PHK dari mobile. Saat ini halaman `/legal` tidak bisa diakses karena role resolution salah. Ini adalah bug blocking untuk demo PHK flow.
+
+**Opsi:**
+| Pendekatan | Pro | Kon |
+|---|---|---|
+| Tambahkan LEGAL_ROLE check di `useRole.ts` | Quick fix, on-chain authoritative | Extra RPC call saat load |
+| Embed role di JWT payload (backend lookup saat login) | No RPC call saat load, faster UX | Stale role jika HR grant/revoke role saat user sudah login |
+| Kombinasi: JWT + on-chain revalidasi setiap 5 menit | Best UX + freshness | Sedikit lebih complex |
+
+**Dampak Jika Tidak Resolved:**
+Legal officer tidak bisa approve PHK via UI — PHK flow blocked.
+
+**Keputusan:**
+```
+[ Diisi saat resolved ]
+Tanggal: ___
+Fix yang dipilih: ___
+File yang diubah: ___
+```
+
+---
+
 ## Dashboard View (Notion)
 
 > Salin tabel ini ke Notion sebagai Database dengan filter dan grouping:
@@ -276,3 +490,9 @@ Views:
 | OQ-004 | — | — | — |
 | OQ-005 | — | — | — |
 | OQ-006 | — | — | — |
+| OQ-007 | — | — | — |
+| OQ-008 | — | — | — |
+| OQ-009 | — | — | — |
+| OQ-010 | — | — | — |
+| OQ-011 | — | — | — |
+| OQ-012 | — | — | — |

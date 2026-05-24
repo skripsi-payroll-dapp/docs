@@ -8,28 +8,42 @@
 
 ## US-EMP-01 · Aktivasi Work ID
 
-> *"Sebagai karyawan baru, saya ingin mengaktifkan akun saya hanya dengan login email tanpa harus install MetaMask atau menyimpan seed phrase."*
+> *"Sebagai karyawan baru, saya ingin mengaktifkan akun saya dengan mudah tanpa harus install MetaMask atau menyimpan seed phrase."*
 
 **Acceptance Criteria:**
-- [ ] Login email berhasil (Email OTP, Google SSO, atau SMS OTP)
-- [ ] Work ID (Ethereum address) terbuat otomatis oleh Privy (embedded Smart Account ERC-4337)
+- [ ] Work ID (Ethereum address) terbuat otomatis saat pertama login — karyawan tidak perlu memahami konsep wallet
 - [ ] Dashboard menampilkan saldo EWA yang sudah terakru sejak stream diaktifkan HR
 - [ ] Karyawan tidak perlu memahami konsep wallet, private key, atau blockchain
+- [ ] **(Dev)** Klik tombol → key dibuat di browser → login dengan signature
+- [ ] **(Prod)** Login email OTP / Google SSO → key dibuat otomatis → Work ID aktif
 
-**Flow Aktivasi:**
+**Flow Aktivasi — Dev Build (Current):**
 ```
-Karyawan terima email onboarding dari HR
-→ Klik link aktivasi
-→ Login via Email OTP / Google SSO / SMS
-→ Privy buat embedded Smart Account (address = Work ID)
+Karyawan buka /login
+→ Klik "Buat Akun & Masuk"
+→ Browser generate EOA key → simpan di localStorage
+→ Sign EIP-191 challenge → POST /auth/login
+→ Role terdeteksi on-chain
 → Dashboard tampil: saldo EWA terakru sejak stream aktif
 → ✓ Work ID aktif
 ```
 
+**Flow Aktivasi — Production Target:**
+```
+HR kirim link aktivasi ke email karyawan
+→ Karyawan buka link → klik "Masuk dengan Email"
+→ Masuk OTP 6 digit via email
+→ Sistem buat encrypted key di browser (PIN-protected)
+→ ERC-4337 Smart Account di-deploy (lazy, saat tx pertama)
+→ eKYC: input nama + NIK + foto KTP → verifikasi via Verihubs
+→ Dashboard tampil: saldo EWA terakru sejak stream aktif
+→ ✓ Work ID aktif, NIK bound ke Work ID address
+```
+
 **Prinsip UX:**
-- Zero Web3 jargon di tampilan UI
-- Tidak ada prompt "approve transaction" — semua silent via Privy
-- Recovery Work ID bisa dilakukan via email yang sama jika ganti device
+- Zero Web3 jargon di tampilan UI ("Work ID", bukan "wallet")
+- Tidak ada prompt "approve transaction" — semua silent
+- **(Prod)** Recovery Work ID via email jika device hilang
 
 ---
 
