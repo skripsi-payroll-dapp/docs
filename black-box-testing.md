@@ -1,9 +1,12 @@
-# Black Box Testing — Finley Payroll
+# Black Box Testing — Payana Payroll Web3
 
-> **Versi Dokumen:** v1.0  
-> **Tanggal:** 19 April 2026  
-> **Network:** Base Sepolia Testnet (Chain ID: 84532)  
+> **Versi Dokumen:** v3.0
+> **Tanggal:** 27 Mei 2026
+> **Network:** Base Sepolia Testnet (Chain ID: 84532)
 > **Metodologi:** Black Box Testing — pengujian dilakukan dari sisi pengguna tanpa melihat implementasi internal smart contract atau kode frontend.
+> **Catatan Revisi:**
+> - v2.0 — Menambahkan Modul Auth & Onboarding (TC-AUTH-01 s.d. TC-AUTH-06) dan Modul Owner SaaS (TC-OWN-01 s.d. TC-OWN-06).
+> - v3.0 — Penataan ulang seluruh test case ke format ID terstandar (TC-HR, TC-PHK, TC-EWA, TC-KOP, TC-VEST). Penambahan test case PHK Multi-Sig dan EWA sesuai fitur terbaru.
 
 ---
 
@@ -18,6 +21,14 @@ Setiap test case dikategorikan ke salah satu dari dua jenis:
 | **Happy Path** | Input valid, kondisi normal — sistem harus berhasil |
 | **Bad Path** | Input tidak valid, kondisi edge case, atau aksi tidak diizinkan — sistem harus gagal dengan pesan yang tepat |
 
+### Skala Prioritas
+
+| Prioritas | Arti |
+|---|---|
+| **P0** | Kritikal — kegagalan memblokir fungsi utama sistem |
+| **P1** | Tinggi — kegagalan berdampak signifikan terhadap pengguna |
+| **P2** | Sedang — kegagalan berdampak minor atau bisa di-workaround |
+
 ### Skala Status
 
 | Status | Arti |
@@ -30,941 +41,1059 @@ Setiap test case dikategorikan ke salah satu dari dua jenis:
 
 ## Daftar Test Cases
 
-| ID | Modul | Skenario | Tipe | Status |
-|---|---|---|---|---|
-| TC-A01 | Core Payroll | Inisialisasi vault berhasil | Happy | ⏳ |
-| TC-A02 | Core Payroll | Inisialisasi vault duplikat | Bad | ⏳ |
-| TC-A03 | Core Payroll | Fund vault berhasil | Happy | ⏳ |
-| TC-A04 | Core Payroll | Fund vault tanpa approval IDRX | Bad | ⏳ |
-| TC-A05 | Core Payroll | Mulai stream gaji karyawan | Happy | ⏳ |
-| TC-A06 | Core Payroll | Mulai stream oleh non-HR | Bad | ⏳ |
-| TC-A07 | Core Payroll | Klaim gaji (EWA) berhasil | Happy | ⏳ |
-| TC-A08 | Core Payroll | Klaim gaji saat stream dijeda | Bad | ⏳ |
-| TC-A09 | Core Payroll | Klaim gaji saldo vault tidak cukup | Bad | ⏳ |
-| TC-A10 | Core Payroll | Jeda & lanjutkan stream | Happy | ⏳ |
-| TC-A11 | Core Payroll | Update flow rate karyawan | Happy | ⏳ |
-| TC-A12 | Core Payroll | Tarik dana vault | Happy | ⏳ |
-| TC-A13 | Core Payroll | Jeda & bekukan vault | Happy | ⏳ |
-| TC-B01 | Auth & Onboarding | Registrasi HR via wizard (company onboarding) | Happy | ⏳ |
-| TC-B02 | Auth & Onboarding | HR akses dashboard employee (salah role) | Bad | ⏳ |
-| TC-B03 | Auth & Onboarding | Employee join via invite link valid | Happy | ⏳ |
-| TC-B04 | Auth & Onboarding | Employee buka invite link perusahaan tidak ada | Bad | ⏳ |
-| TC-B05 | Auth & Onboarding | Employee akses dashboard sebelum stream aktif | Bad | ⏳ |
-| TC-C01 | Compliance & PHK | Ajukan PHK oleh HR | Happy | ⏳ |
-| TC-C02 | Compliance & PHK | Eksekusi PHK sebelum Legal setujui | Bad | ⏳ |
-| TC-C03 | Compliance & PHK | Eksekusi PHK setelah semua setujui | Happy | ⏳ |
-| TC-C04 | Compliance & PHK | PHK oleh non-HR | Bad | ⏳ |
-| TC-C05 | Compliance & PHK | Export laporan compliance (BPJS/PPh21) | Happy | ⏳ |
-| TC-C06 | Compliance & PHK | Export laporan bulan tanpa transaksi | Bad | ⏳ |
-| TC-D01 | Cliff Vesting | Buat cliff vest oleh HR | Happy | ⏳ |
-| TC-D02 | Cliff Vesting | Klaim vest sebelum cliff date | Bad | ⏳ |
-| TC-D03 | Cliff Vesting | Klaim vest setelah cliff date | Happy | ⏳ |
-| TC-D04 | Cliff Vesting | Batal vest oleh HR | Happy | ⏳ |
-| TC-D05 | Cliff Vesting | Klaim vest yang sudah dibatalkan | Bad | ⏳ |
-| TC-E01 | Koperasi | Deposit ke pool koperasi | Happy | ⏳ |
-| TC-E02 | Koperasi | Deposit tanpa approval IDRX | Bad | ⏳ |
-| TC-E03 | Koperasi | Pinjam dari pool | Happy | ⏳ |
-| TC-E04 | Koperasi | Pinjam melebihi batas maksimum | Bad | ⏳ |
-| TC-E05 | Koperasi | Pinjam saat masih ada pinjaman aktif | Bad | ⏳ |
-| TC-E06 | Koperasi | Bayar pinjaman manual | Happy | ⏳ |
-| TC-E07 | Koperasi | Auto-repay saat klaim gaji | Happy | ⏳ |
-| TC-E08 | Koperasi | Tarik simpanan koperasi | Happy | ⏳ |
+| TC-ID | Modul | Nama Test | Tipe | Prioritas | Status |
+|---|---|---|---|---|---|
+| TC-AUTH-01 | Auth & Onboarding | Login dengan Privy (Email OTP) berhasil | Happy | P0 | ⏳ |
+| TC-AUTH-02 | Auth & Onboarding | Deteksi role dan redirect sesuai peran | Happy | P0 | ⏳ |
+| TC-AUTH-03 | Auth & Onboarding | Validasi form onboarding: input tidak valid | Bad | P0 | ⏳ |
+| TC-AUTH-04 | Auth & Onboarding | Submit pendaftaran → status "pending" | Happy | P0 | ⏳ |
+| TC-AUTH-05 | Auth & Onboarding | Login ulang setelah approved → tidak redirect ke /onboarding | Happy | P0 | ⏳ |
+| TC-AUTH-06 | Auth & Onboarding | Login ulang setelah rejected → tampilkan state rejected | Bad | P1 | ⏳ |
+| TC-OWN-01 | Owner SaaS | Akses /owner berhasil untuk OWNER_ADDRESS | Happy | P0 | ⏳ |
+| TC-OWN-02 | Owner SaaS | Akses /owner diblokir untuk non-owner | Bad | P0 | ⏳ |
+| TC-OWN-03 | Owner SaaS | Lihat daftar pending registrations | Happy | P0 | ⏳ |
+| TC-OWN-04 | Owner SaaS | Approve registrasi → status berubah ke "approved" | Happy | P0 | ⏳ |
+| TC-OWN-05 | Owner SaaS | Tolak registrasi → status berubah ke "rejected" | Happy | P0 | ⏳ |
+| TC-OWN-06 | Owner SaaS | Tab filter Pending/Approved/Rejected berfungsi | Happy | P1 | ⏳ |
+| TC-HR-01 | HR — Vault | Deploy vault baru (HR baru) | Happy | P0 | ⏳ |
+| TC-HR-02 | HR — Vault | Top up vault dengan IDRX | Happy | P0 | ⏳ |
+| TC-HR-03 | HR — Vault | Saldo vault terupdate setelah top up | Happy | P0 | ⏳ |
+| TC-HR-04 | HR — Karyawan | Tambah karyawan → startStream on-chain | Happy | P0 | ⏳ |
+| TC-HR-05 | HR — Karyawan | Pause stream karyawan | Happy | P1 | ⏳ |
+| TC-HR-06 | HR — Karyawan | Resume stream karyawan | Happy | P1 | ⏳ |
+| TC-HR-07 | HR — Karyawan | Lihat detail karyawan | Happy | P2 | ⏳ |
+| TC-HR-08 | HR — Karyawan | Propose PHK oleh HR | Happy | P0 | ⏳ |
+| TC-HR-09 | HR — Karyawan | Akses halaman HR diblokir untuk non-HR | Bad | P0 | ⏳ |
+| TC-PHK-01 | PHK Multi-Sig | Propose PHK → status "Menunggu Legal" | Happy | P0 | ⏳ |
+| TC-PHK-02 | PHK Multi-Sig | Approve oleh Legal → status "Siap Dieksekusi" | Happy | P0 | ⏳ |
+| TC-PHK-03 | PHK Multi-Sig | Execute PHK → stream dibatalkan, severance dirilis | Happy | P0 | ⏳ |
+| TC-PHK-04 | PHK Multi-Sig | Proposal PHK expire setelah 7 hari | Bad | P1 | ⏳ |
+| TC-EWA-01 | EWA — Karyawan | Saldo EWA terakru real-time (naik setiap detik) | Happy | P0 | ⏳ |
+| TC-EWA-02 | EWA — Karyawan | Klaim EWA berhasil → saldo reset ke 0 | Happy | P0 | ⏳ |
+| TC-EWA-03 | EWA — Karyawan | Rate limit: maksimal 10 klaim per jam | Bad | P1 | ⏳ |
+| TC-KOP-01 | Koperasi | Pinjam IDRX dari pool (max 80% gaji) | Happy | P1 | ⏳ |
+| TC-KOP-02 | Koperasi | Auto-repay saat klaim EWA berikutnya | Happy | P1 | ⏳ |
+| TC-VEST-01 | Cliff Vesting | Buat cliff vest oleh HR | Happy | P1 | ⏳ |
+| TC-VEST-02 | Cliff Vesting | Tombol klaim disabled sebelum cliff date | Bad | P1 | ⏳ |
+| TC-VEST-03 | Cliff Vesting | Klaim vest berhasil setelah cliff date | Happy | P1 | ⏳ |
 
 ---
 
-## Modul A — Core Payroll
+## Modul AUTH — Autentikasi & Onboarding
 
-### TC-A01 — Inisialisasi Vault Berhasil
+Modul ini mencakup alur login berbasis Privy (email OTP), mekanisme deteksi peran pengguna, validasi form pendaftaran, serta siklus status registrasi (pending → approved/rejected). Modul ini merupakan gerbang utama yang harus dilewati semua pengguna sebelum dapat mengakses fitur inti platform.
+
+---
+
+### TC-AUTH-01 — Login dengan Privy (Email OTP) Berhasil
 
 | Field | Detail |
 |---|---|
 | **Tipe** | Happy Path |
-| **Aktor** | HR / Company Admin |
-| **Precondition** | Akun HR sudah login via Privy (email). Belum pernah inisialisasi vault. |
+| **Prioritas** | P0 |
+| **Aktor** | Pengguna baru / pengguna terdaftar |
+| **Pre-kondisi** | Pengguna memiliki alamat email aktif. Jaringan internet tersedia. |
 
-**Langkah Uji:**
-1. Buka `https://finley.app/onboarding/company`
-2. Isi nama perusahaan: `"PT Test Indonesia"`
-3. Klik **Lanjut**
-4. Atur BPJS = 300 bps (3%), PPh21 = 200 bps (2%), threshold alert = 2000 bps
-5. Klik **Inisialisasi Vault On-Chain** → setujui transaksi di Privy
-6. Tunggu konfirmasi Base Sepolia (~2 detik)
+**Langkah Pengujian:**
+1. Buka `https://payana.app` (atau `http://localhost:3000`)
+2. Klik tombol **Masuk / Login**
+3. Pilih metode login: **Email**
+4. Masukkan alamat email yang valid, misal `penguji@example.com`
+5. Buka kotak masuk email, salin kode OTP 6 digit
+6. Masukkan kode OTP di halaman Privy
+7. Tunggu proses autentikasi selesai
 
-**Expected Result:**
-- Transaksi berhasil (status `success`)
-- Link ke BaseScan muncul
-- Wizard otomatis pindah ke Step 3 (Fund Vault)
-- Event `VaultInitialized` muncul di BaseScan
+**Input:** Email `penguji@example.com`, kode OTP 6 digit valid
 
-**Actual Result:** _(isi saat pengujian)_  
+**Expected Output:**
+- Privy memverifikasi OTP dalam waktu < 5 detik
+- Wallet tertanam (embedded wallet) dibuat atau dimuat secara otomatis oleh Privy
+- Pengguna dinyatakan terautentikasi — sesi aktif
+- Sistem membaca data profil dari database backend untuk menentukan peran
+
+**Actual Result:** _(isi saat pengujian)_
 **Status:** ⏳
 
 ---
 
-### TC-A02 — Inisialisasi Vault Duplikat
+### TC-AUTH-02 — Deteksi Role dan Redirect Sesuai Peran
+
+| Field | Detail |
+|---|---|
+| **Tipe** | Happy Path |
+| **Prioritas** | P0 |
+| **Aktor** | Pengguna dengan berbagai peran (HR, Karyawan, Legal, Null) |
+| **Pre-kondisi** | Pengguna sudah terdaftar dan berstatus "approved" di database |
+
+**Langkah Pengujian:**
+1. Skenario A — Login sebagai **HR Manager** (role = `hr`): login via Privy, amati redirect
+2. Skenario B — Login sebagai **Karyawan** (role = `employee`): login via Privy, amati redirect
+3. Skenario C — Login sebagai **Legal Officer** (role = `legal`): login via Privy, amati redirect
+4. Skenario D — Login dengan akun **belum terdaftar** (role = `null`): login via Privy, amati redirect
+
+**Input:** Akun dengan masing-masing peran (hr / employee / legal / null)
+
+**Expected Output:**
+- Skenario A: Redirect ke `/hr/vault`
+- Skenario B: Redirect ke `/employee/ewa`
+- Skenario C: Redirect ke `/hr/phk`
+- Skenario D: Redirect ke `/onboarding`
+
+**Actual Result:** _(isi saat pengujian)_
+**Status:** ⏳
+
+---
+
+### TC-AUTH-03 — Validasi Form Onboarding: Input Tidak Valid
 
 | Field | Detail |
 |---|---|
 | **Tipe** | Bad Path |
-| **Aktor** | HR yang sudah punya vault aktif |
-| **Precondition** | Vault sudah diinisialisasi (TC-A01 sudah berhasil) |
+| **Prioritas** | P0 |
+| **Aktor** | Pengguna baru yang belum terdaftar |
+| **Pre-kondisi** | Pengguna sudah login via Privy dan diarahkan ke `/onboarding` |
 
-**Langkah Uji:**
-1. Buka `/onboarding/company` dengan akun HR yang sama
-2. Isi nama perusahaan: `"PT Duplikat"`
-3. Klik **Inisialisasi Vault On-Chain** → setujui transaksi
+**Langkah Pengujian:**
+1. Buka `/onboarding`
+2. **Skenario A** — Nama kosong: biarkan field nama kosong, isi NIK dan HP valid, klik **Daftar**
+3. **Skenario B** — NIK kurang dari 16 digit: isi NIK = `123456789` (9 digit), klik **Daftar**
+4. **Skenario C** — NIK lebih dari 16 digit: isi NIK = `12345678901234567` (17 digit), klik **Daftar**
+5. **Skenario D** — Nomor HP kosong: isi nama dan NIK valid, HP kosong, klik **Daftar**
 
-**Expected Result:**
-- Transaksi **gagal** (reverted oleh smart contract)
-- Pesan error muncul di TxButton: `"Transaction failed"`
-- Vault lama tidak berubah
+**Input:**
+- Skenario A: Nama = `""`, NIK = `3201010101010001`, HP = `08123456789`
+- Skenario B: Nama = `"Budi"`, NIK = `123456789`, HP = `08123456789`
+- Skenario C: Nama = `"Budi"`, NIK = `12345678901234567`, HP = `08123456789`
+- Skenario D: Nama = `"Budi"`, NIK = `3201010101010001`, HP = `""`
 
-**Actual Result:** _(isi saat pengujian)_  
+**Expected Output:**
+- Skenario A: Pesan validasi "Nama wajib diisi" muncul; form tidak disubmit
+- Skenario B: Pesan validasi "NIK harus 16 digit" muncul; form tidak disubmit
+- Skenario C: Pesan validasi "NIK harus 16 digit" muncul; form tidak disubmit
+- Skenario D: Pesan validasi "Nomor HP wajib diisi" muncul; form tidak disubmit
+- Tidak ada request ke API yang dikirim dalam kondisi form tidak valid
+
+**Actual Result:** _(isi saat pengujian)_
 **Status:** ⏳
 
 ---
 
-### TC-A03 — Fund Vault Berhasil
+### TC-AUTH-04 — Submit Pendaftaran → Status "Pending"
 
 | Field | Detail |
 |---|---|
 | **Tipe** | Happy Path |
-| **Aktor** | HR |
-| **Precondition** | Vault sudah diinisialisasi. HR punya saldo IDRX di dompet (≥ jumlah yang akan di-deposit). |
+| **Prioritas** | P0 |
+| **Aktor** | Pengguna baru yang belum terdaftar |
+| **Pre-kondisi** | Pengguna sudah login via Privy dan berada di halaman `/onboarding` |
 
-**Langkah Uji:**
+**Langkah Pengujian:**
+1. Buka `/onboarding`
+2. Isi nama lengkap, NIK 16 digit, dan nomor HP
+3. Pilih peran yang diinginkan (jika tersedia)
+4. Klik tombol **Daftar** / **Submit**
+5. Tunggu respons dari server
+
+**Input:** Nama = `"Budi Santoso"`, NIK = `3201010101010001`, HP = `08123456789`
+
+**Expected Output:**
+- Request API berhasil dikirim ke backend
+- Data tersimpan di database dengan status `pending`
+- Halaman menampilkan pesan konfirmasi: _"Pendaftaran berhasil. Menunggu persetujuan admin."_
+- Pengguna tidak dapat mengakses fitur utama selama status `pending`
+- Data muncul di dashboard Owner SaaS dengan status "Pending"
+
+**Actual Result:** _(isi saat pengujian)_
+**Status:** ⏳
+
+---
+
+### TC-AUTH-05 — Login Ulang Setelah Approved: Tidak Redirect ke /onboarding
+
+| Field | Detail |
+|---|---|
+| **Tipe** | Happy Path |
+| **Prioritas** | P0 |
+| **Aktor** | Pengguna yang sudah diapprove oleh Owner |
+| **Pre-kondisi** | Pengguna sudah submit pendaftaran (TC-AUTH-04) dan Owner sudah approve (TC-OWN-04). Status = `approved`. |
+
+**Langkah Pengujian:**
+1. Logout dari sesi saat ini
+2. Login kembali menggunakan akun yang sama via Privy
+3. Amati halaman tujuan setelah login
+
+**Input:** Akun dengan status `approved` di database
+
+**Expected Output:**
+- Sistem membaca status = `approved` dari database
+- Pengguna **tidak** diarahkan ke `/onboarding`
+- Pengguna langsung diarahkan ke dashboard sesuai perannya: HR → `/hr/vault`, Karyawan → `/employee/ewa`, Legal → `/hr/phk`
+
+**Actual Result:** _(isi saat pengujian)_
+**Status:** ⏳
+
+---
+
+### TC-AUTH-06 — Login Ulang Setelah Rejected: Tampilkan State Rejected
+
+| Field | Detail |
+|---|---|
+| **Tipe** | Bad Path |
+| **Prioritas** | P1 |
+| **Aktor** | Pengguna yang pendaftarannya ditolak oleh Owner |
+| **Pre-kondisi** | Pengguna sudah submit pendaftaran (TC-AUTH-04) dan Owner sudah menolak (TC-OWN-05). Status = `rejected`. |
+
+**Langkah Pengujian:**
+1. Logout dari sesi saat ini
+2. Login kembali menggunakan akun yang sama via Privy
+3. Amati tampilan halaman setelah login
+
+**Input:** Akun dengan status `rejected` di database
+
+**Expected Output:**
+- Sistem membaca status = `rejected` dari database
+- Halaman menampilkan state "Pendaftaran Ditolak" dengan keterangan yang sesuai
+- Pengguna **tidak** dapat mengakses fitur utama manapun
+- Pengguna **tidak** diarahkan kembali ke form `/onboarding` (sudah pernah mendaftar)
+- Tersedia opsi untuk menghubungi admin
+
+**Actual Result:** _(isi saat pengujian)_
+**Status:** ⏳
+
+---
+
+## Modul OWN — Owner SaaS
+
+Modul ini mencakup fungsi administrator platform (Owner SaaS) dalam mengelola pendaftaran perusahaan/pengguna baru. Akses ke modul ini dibatasi secara ketat hanya untuk alamat wallet `OWNER_ADDRESS` yang telah dikonfigurasi di environment variabel backend.
+
+---
+
+### TC-OWN-01 — Akses /owner Berhasil untuk OWNER_ADDRESS
+
+| Field | Detail |
+|---|---|
+| **Tipe** | Happy Path |
+| **Prioritas** | P0 |
+| **Aktor** | Owner SaaS (wallet address = `OWNER_ADDRESS`) |
+| **Pre-kondisi** | Pengguna login menggunakan wallet yang alamatnya cocok dengan `OWNER_ADDRESS` di konfigurasi backend |
+
+**Langkah Pengujian:**
+1. Login via Privy menggunakan akun Owner (alamat wallet = `OWNER_ADDRESS`)
+2. Navigasi ke `https://payana.app/owner`
+3. Amati apakah halaman dashboard Owner ditampilkan
+
+**Input:** Login dengan wallet `OWNER_ADDRESS`, akses URL `/owner`
+
+**Expected Output:**
+- Halaman `/owner` berhasil dimuat
+- Dashboard Owner menampilkan daftar registrasi pengguna
+- Tidak ada redirect atau pesan error akses
+- Navbar/sidebar menampilkan menu khusus Owner
+
+**Actual Result:** _(isi saat pengujian)_
+**Status:** ⏳
+
+---
+
+### TC-OWN-02 — Akses /owner Diblokir untuk Non-Owner
+
+| Field | Detail |
+|---|---|
+| **Tipe** | Bad Path |
+| **Prioritas** | P0 |
+| **Aktor** | Pengguna biasa (HR, Karyawan, atau Legal) |
+| **Pre-kondisi** | Pengguna login dengan akun yang alamatnya **bukan** `OWNER_ADDRESS` |
+
+**Langkah Pengujian:**
+1. Login via Privy dengan akun HR atau karyawan biasa
+2. Coba akses langsung: `https://payana.app/owner` via address bar browser
+3. Amati respons sistem
+
+**Input:** Login dengan akun non-owner, akses URL `/owner`
+
+**Expected Output:**
+- Sistem memverifikasi bahwa alamat wallet pengguna !== `OWNER_ADDRESS`
+- Pengguna **tidak dapat** mengakses halaman `/owner`
+- Sistem melakukan redirect ke halaman dashboard sesuai peran, atau menampilkan halaman "403 Akses Ditolak"
+- Tidak ada data registrasi yang terekspos
+
+**Actual Result:** _(isi saat pengujian)_
+**Status:** ⏳
+
+---
+
+### TC-OWN-03 — Lihat Daftar Pending Registrations
+
+| Field | Detail |
+|---|---|
+| **Tipe** | Happy Path |
+| **Prioritas** | P0 |
+| **Aktor** | Owner SaaS |
+| **Pre-kondisi** | Sudah ada minimal 1 pendaftaran dengan status `pending` di database (TC-AUTH-04 sudah dijalankan) |
+
+**Langkah Pengujian:**
+1. Login sebagai Owner, buka `/owner`
+2. Amati daftar registrasi yang tampil
+3. Pastikan tab "Pending" aktif secara default
+4. Periksa detail data yang ditampilkan per registrasi
+
+**Input:** Akses halaman `/owner` sebagai OWNER_ADDRESS
+
+**Expected Output:**
+- Daftar registrasi dengan status `pending` ditampilkan
+- Setiap entri menampilkan: nama, NIK, nomor HP, alamat email, peran yang diminta, dan waktu pendaftaran
+- Tombol **Approve** dan **Tolak** tersedia untuk setiap entri
+
+**Actual Result:** _(isi saat pengujian)_
+**Status:** ⏳
+
+---
+
+### TC-OWN-04 — Approve Registrasi → Status Berubah ke "Approved"
+
+| Field | Detail |
+|---|---|
+| **Tipe** | Happy Path |
+| **Prioritas** | P0 |
+| **Aktor** | Owner SaaS |
+| **Pre-kondisi** | Ada registrasi dengan status `pending` (TC-AUTH-04 sudah dijalankan). Owner sudah login. |
+
+**Langkah Pengujian:**
+1. Login sebagai Owner, buka `/owner`
+2. Cari registrasi milik pengguna target (misal `Budi Santoso`) dengan status `pending`
+3. Klik tombol **Approve** pada entri tersebut
+4. Konfirmasi aksi jika ada dialog konfirmasi
+5. Amati perubahan status pada antarmuka
+
+**Input:** Klik tombol Approve pada registrasi `Budi Santoso`
+
+**Expected Output:**
+- Status registrasi berubah dari `pending` menjadi `approved` di database
+- Entri berpindah dari tab "Pending" ke tab "Approved" di UI
+- Pengguna yang bersangkutan kini dapat login dan mengakses dashboard sesuai perannya
+- Tidak ada entri duplikat yang terbuat
+
+**Actual Result:** _(isi saat pengujian)_
+**Status:** ⏳
+
+---
+
+### TC-OWN-05 — Tolak Registrasi → Status Berubah ke "Rejected"
+
+| Field | Detail |
+|---|---|
+| **Tipe** | Happy Path |
+| **Prioritas** | P0 |
+| **Aktor** | Owner SaaS |
+| **Pre-kondisi** | Ada registrasi dengan status `pending` di database. Owner sudah login. |
+
+**Langkah Pengujian:**
+1. Login sebagai Owner, buka `/owner`
+2. Cari registrasi target dengan status `pending`
+3. Klik tombol **Tolak** pada entri tersebut
+4. Isi alasan penolakan jika form tersedia (opsional)
+5. Konfirmasi aksi
+6. Amati perubahan status pada antarmuka
+
+**Input:** Klik tombol Tolak pada registrasi target
+
+**Expected Output:**
+- Status registrasi berubah dari `pending` menjadi `rejected` di database
+- Entri berpindah dari tab "Pending" ke tab "Rejected" di UI
+- Pengguna yang bersangkutan akan melihat state "rejected" saat login ulang (sesuai TC-AUTH-06)
+
+**Actual Result:** _(isi saat pengujian)_
+**Status:** ⏳
+
+---
+
+### TC-OWN-06 — Tab Filter Pending/Approved/Rejected Berfungsi
+
+| Field | Detail |
+|---|---|
+| **Tipe** | Happy Path |
+| **Prioritas** | P1 |
+| **Aktor** | Owner SaaS |
+| **Pre-kondisi** | Ada data registrasi dengan ketiga status: `pending`, `approved`, dan `rejected` di database |
+
+**Langkah Pengujian:**
+1. Login sebagai Owner, buka `/owner`
+2. Klik tab **Pending** — amati daftar yang tampil
+3. Klik tab **Approved** — amati daftar yang tampil
+4. Klik tab **Rejected** — amati daftar yang tampil
+5. Verifikasi data di masing-masing tab sesuai statusnya
+
+**Input:** Klik tab Pending, Approved, Rejected secara bergantian
+
+**Expected Output:**
+- Tab **Pending**: hanya menampilkan registrasi dengan status `pending`
+- Tab **Approved**: hanya menampilkan registrasi dengan status `approved`
+- Tab **Rejected**: hanya menampilkan registrasi dengan status `rejected`
+- Jumlah badge/counter di setiap tab sesuai jumlah data
+
+**Actual Result:** _(isi saat pengujian)_
+**Status:** ⏳
+
+---
+
+## Modul HR — Vault & Manajemen Karyawan
+
+Modul ini mencakup pengelolaan vault payroll oleh HR Manager, termasuk deployment vault baru, top up saldo, serta manajemen stream gaji karyawan. Semua operasi vault berinteraksi langsung dengan smart contract di Base Sepolia.
+
+---
+
+### TC-HR-01 — Deploy Vault Baru (HR Baru)
+
+| Field | Detail |
+|---|---|
+| **Tipe** | Happy Path |
+| **Prioritas** | P0 |
+| **Aktor** | HR Manager |
+| **Pre-kondisi** | Pengguna sudah login sebagai HR dan berstatus `approved`. Belum pernah menginisialisasi vault. |
+
+**Langkah Pengujian:**
+1. Buka `/hr/vault`
+2. Klik tombol **Inisialisasi Vault Baru**
+3. Isi nama perusahaan: `"PT Test Indonesia"`
+4. Atur parameter split (BPJS = 300 bps, PPh21 = 200 bps)
+5. Klik **Inisialisasi Vault On-Chain** → setujui transaksi di Privy
+6. Tunggu konfirmasi dari Base Sepolia (~2 detik)
+
+**Input:** Nama perusahaan `"PT Test Indonesia"`, BPJS = 300 bps, PPh21 = 200 bps
+
+**Expected Output:**
+- Transaksi berhasil (status `success`)
+- Vault terdaftar on-chain dengan alamat kontrak baru
+- Event `VaultInitialized` muncul di BaseScan
+- Halaman `/hr/vault` menampilkan kartu vault dengan saldo 0 IDRX
+- HR mendapatkan `HR_ROLE` on-chain
+
+**Actual Result:** _(isi saat pengujian)_
+**Status:** ⏳
+
+---
+
+### TC-HR-02 — Top Up Vault dengan IDRX
+
+| Field | Detail |
+|---|---|
+| **Tipe** | Happy Path |
+| **Prioritas** | P0 |
+| **Aktor** | HR Manager |
+| **Pre-kondisi** | Vault sudah diinisialisasi (TC-HR-01). HR memiliki saldo IDRX di dompet ≥ jumlah yang akan di-deposit. |
+
+**Langkah Pengujian:**
 1. Buka `/hr/vault`
 2. Isi jumlah deposit: `1000000` IDRX
 3. Klik **1. Approve IDRX** → setujui di Privy
 4. Tunggu konfirmasi approval
 5. Klik **2. Deposit ke Vault** → setujui di Privy
-6. Tunggu konfirmasi
+6. Tunggu konfirmasi transaksi
 
-**Expected Result:**
-- Approval berhasil (step 1 ✅)
-- Deposit berhasil (step 2 ✅)
-- Saldo vault bertambah 1.000.000 IDRX
-- Angka di kartu vault terupdate
+**Input:** Jumlah deposit = `1000000` IDRX
 
-**Actual Result:** _(isi saat pengujian)_  
+**Expected Output:**
+- Approval IDRX berhasil (step 1 selesai)
+- Deposit berhasil (step 2 selesai)
+- Transaksi tercatat di BaseScan
+- Event `VaultFunded` atau `Deposit` muncul di BaseScan
+
+**Actual Result:** _(isi saat pengujian)_
 **Status:** ⏳
 
 ---
 
-### TC-A04 — Fund Vault Tanpa Approval IDRX
-
-| Field | Detail |
-|---|---|
-| **Tipe** | Bad Path |
-| **Aktor** | HR |
-| **Precondition** | Vault sudah diinisialisasi. Tombol deposit langsung diklik tanpa approval terlebih dahulu. |
-
-**Langkah Uji:**
-1. Buka `/hr/vault`
-2. Isi jumlah: `500000` IDRX
-3. Langsung klik **2. Deposit ke Vault** (tanpa klik Approve dulu)
-
-**Expected Result:**
-- Tombol **2. Deposit ke Vault** disabled (tidak bisa diklik) — UI mencegah aksi ini
-- Tidak ada transaksi yang dikirim
-
-**Actual Result:** _(isi saat pengujian)_  
-**Status:** ⏳
-
----
-
-### TC-A05 — Mulai Stream Gaji Karyawan
+### TC-HR-03 — Saldo Vault Terupdate Setelah Top Up
 
 | Field | Detail |
 |---|---|
 | **Tipe** | Happy Path |
-| **Aktor** | HR |
-| **Precondition** | Vault aktif dan bersaldo cukup. Alamat karyawan diketahui (Work ID). |
+| **Prioritas** | P0 |
+| **Aktor** | HR Manager |
+| **Pre-kondisi** | Top up vault berhasil dilakukan (TC-HR-02) |
 
-**Langkah Uji:**
+**Langkah Pengujian:**
+1. Setelah TC-HR-02 selesai, amati kartu saldo vault di `/hr/vault`
+2. Bandingkan saldo sebelum dan sesudah top up
+3. Verifikasi angka saldo sesuai dengan jumlah yang dideposit
+
+**Input:** Saldo awal vault (dicatat sebelum TC-HR-02), jumlah deposit = `1000000` IDRX
+
+**Expected Output:**
+- Saldo vault bertambah sebesar jumlah yang dideposit: saldo baru = saldo lama + 1.000.000 IDRX
+- Angka di kartu vault terupdate secara real-time tanpa perlu reload halaman
+- Tidak ada selisih antara nilai on-chain dan nilai yang ditampilkan di UI
+
+**Actual Result:** _(isi saat pengujian)_
+**Status:** ⏳
+
+---
+
+### TC-HR-04 — Tambah Karyawan → startStream On-Chain
+
+| Field | Detail |
+|---|---|
+| **Tipe** | Happy Path |
+| **Prioritas** | P0 |
+| **Aktor** | HR Manager |
+| **Pre-kondisi** | Vault aktif dan bersaldo cukup. Alamat wallet karyawan (Work ID) sudah diketahui. |
+
+**Langkah Pengujian:**
 1. Buka `/hr/employees`
-2. Klik **Tambah Karyawan**
-3. Isi alamat karyawan: `0xABC...` (Work ID dari EmployeeWelcome)
+2. Klik tombol **Tambah Karyawan**
+3. Isi alamat karyawan (Work ID): `0xABC...`
 4. Isi gaji bulanan: `5000000` IDRX
-5. Split: 9300 / 500 / 200 bps (default)
-6. Klik **Mulai Stream** → setujui di Privy
+5. Atur split: 9300 / 500 / 200 bps (default)
+6. Klik **Mulai Stream** → setujui transaksi di Privy
+7. Tunggu konfirmasi
 
-**Expected Result:**
+**Input:** Work ID karyawan = `0xABC...`, gaji = `5000000` IDRX/bulan
+
+**Expected Output:**
 - Transaksi berhasil
 - Karyawan muncul di tabel dengan status `Active`
 - Event `StreamCreated` muncul di BaseScan
-- Employee bisa klaim gaji di `/employee`
+- Karyawan dapat klaim gaji di `/employee/ewa`
 
-**Actual Result:** _(isi saat pengujian)_  
+**Actual Result:** _(isi saat pengujian)_
 **Status:** ⏳
 
 ---
 
-### TC-A06 — Mulai Stream oleh Non-HR
-
-| Field | Detail |
-|---|---|
-| **Tipe** | Bad Path |
-| **Aktor** | Karyawan (tidak punya HR_ROLE) |
-| **Precondition** | Akun employee sudah login |
-
-**Langkah Uji:**
-1. Login sebagai employee
-2. Coba akses `/hr/employees` langsung via URL bar
-
-**Expected Result:**
-- Halaman **tidak dapat diakses** — AuthGuard redirect ke `/employee`
-- Tidak ada cara untuk memanggil `startStream()` dari UI employee
-
-**Actual Result:** _(isi saat pengujian)_  
-**Status:** ⏳
-
----
-
-### TC-A07 — Klaim Gaji (EWA) Berhasil
+### TC-HR-05 — Pause Stream Karyawan
 
 | Field | Detail |
 |---|---|
 | **Tipe** | Happy Path |
-| **Aktor** | Karyawan |
-| **Precondition** | Stream aktif. Sudah ada waktu berjalan (minim 60 detik sejak stream dibuat/klaim terakhir). |
+| **Prioritas** | P1 |
+| **Aktor** | HR Manager |
+| **Pre-kondisi** | Stream karyawan berstatus `Active` (TC-HR-04 sudah dijalankan) |
 
-**Langkah Uji:**
-1. Login sebagai employee, buka `/employee`
-2. Amati live counter EWA bertambah setiap detik
-3. Klik **Klaim Gaji — Gasless ⚡**
-4. Setujui transaksi di Privy (silent sign)
-5. Tunggu konfirmasi
+**Langkah Pengujian:**
+1. Buka `/hr/employees`
+2. Klik **Kelola** pada karyawan target
+3. Klik tombol **Jeda** (Pause)
+4. Setujui transaksi di Privy
+5. Tunggu konfirmasi dan amati perubahan status
 
-**Expected Result:**
-- Counter EWA reset ke 0 setelah klaim berhasil
-- Dompet employee menerima 93% dari total accrued dalam IDRX
-- ComplianceVault HR bertambah 5%
-- SeveranceVault employee bertambah 2%
-- Event `SalaryClaimed` muncul di BaseScan dengan nilai `netToEmployee`, `toCompliance`, `toSeverance`
+**Input:** Klik Pause pada stream karyawan aktif
 
-**Actual Result:** _(isi saat pengujian)_  
+**Expected Output:**
+- Transaksi berhasil
+- Status stream karyawan berubah dari `Active` menjadi `Paused`
+- Event `StreamPaused` muncul di BaseScan
+- Karyawan tidak dapat klaim gaji baru selama stream dijeda
+
+**Actual Result:** _(isi saat pengujian)_
 **Status:** ⏳
 
 ---
 
-### TC-A08 — Klaim Gaji Saat Stream Dijeda
-
-| Field | Detail |
-|---|---|
-| **Tipe** | Bad Path |
-| **Aktor** | Karyawan |
-| **Precondition** | Stream ada tapi status `Paused` (HR sudah menjeda) |
-
-**Langkah Uji:**
-1. HR jeda stream di `/hr/employees` → Kelola → Jeda
-2. Login sebagai employee, buka `/employee`
-3. Klik **Klaim Gaji**
-
-**Expected Result:**
-- Tombol **disabled** — UI mendeteksi status `Paused` dan menonaktifkan klaim
-- Jika tombol berhasil diklik (bypass UI), transaksi contract revert
-
-**Actual Result:** _(isi saat pengujian)_  
-**Status:** ⏳
-
----
-
-### TC-A09 — Klaim Gaji Saldo Vault Tidak Cukup
-
-| Field | Detail |
-|---|---|
-| **Tipe** | Bad Path |
-| **Aktor** | Karyawan |
-| **Precondition** | Stream aktif, tapi saldo vault HR sudah habis / di bawah accrued amount |
-
-**Langkah Uji:**
-1. HR tarik seluruh dana vault hingga saldo = 0
-2. Tunggu beberapa detik agar accrued > 0
-3. Employee klik **Klaim Gaji**
-
-**Expected Result:**
-- Transaksi **gagal** (contract revert karena `vaultBalance < accrued`)
-- Pesan error muncul di TxButton
-- Alert saldo rendah (`LowVaultBalance` event) sudah di-emit sebelumnya
-
-**Actual Result:** _(isi saat pengujian)_  
-**Status:** ⏳
-
----
-
-### TC-A10 — Jeda & Lanjutkan Stream
+### TC-HR-06 — Resume Stream Karyawan
 
 | Field | Detail |
 |---|---|
 | **Tipe** | Happy Path |
-| **Aktor** | HR |
-| **Precondition** | Stream karyawan status `Active` |
+| **Prioritas** | P1 |
+| **Aktor** | HR Manager |
+| **Pre-kondisi** | Stream karyawan berstatus `Paused` (TC-HR-05 sudah dijalankan) |
 
-**Langkah Uji:**
-1. Buka `/hr/employees` → klik **Kelola** pada karyawan
-2. Klik **Jeda** → setujui transaksi
-3. Verifikasi status berubah jadi `Paused`
-4. Klik **Lanjutkan** → setujui transaksi
-5. Verifikasi status berubah kembali jadi `Active`
+**Langkah Pengujian:**
+1. Buka `/hr/employees`
+2. Klik **Kelola** pada karyawan target yang berstatus `Paused`
+3. Klik tombol **Lanjutkan** (Resume)
+4. Setujui transaksi di Privy
+5. Tunggu konfirmasi dan amati perubahan status
 
-**Expected Result:**
-- Status berubah `Active` → `Paused` → `Active`
-- Settled balance terakumulasi selama jeda (waktu jeda tidak hilang)
-- Setelah dilanjutkan, employee bisa klaim kembali
+**Input:** Klik Resume pada stream karyawan yang dijeda
 
-**Actual Result:** _(isi saat pengujian)_  
+**Expected Output:**
+- Transaksi berhasil
+- Status stream karyawan berubah dari `Paused` menjadi `Active`
+- Event `StreamResumed` muncul di BaseScan
+- Karyawan dapat kembali klaim gaji
+- Settled balance yang terakumulasi selama jeda tidak hilang
+
+**Actual Result:** _(isi saat pengujian)_
 **Status:** ⏳
 
 ---
 
-### TC-A11 — Update Flow Rate Karyawan
+### TC-HR-07 — Lihat Detail Karyawan
 
 | Field | Detail |
 |---|---|
 | **Tipe** | Happy Path |
-| **Aktor** | HR |
-| **Precondition** | Stream karyawan status `Active` |
+| **Prioritas** | P2 |
+| **Aktor** | HR Manager |
+| **Pre-kondisi** | Ada karyawan yang sudah terdaftar dengan stream aktif |
 
-**Langkah Uji:**
-1. Buka `/hr/employees` → Kelola karyawan target
-2. Isi gaji baru: `6000000` IDRX/bulan di field Update
-3. Klik **Update** → setujui transaksi
+**Langkah Pengujian:**
+1. Buka `/hr/employees`
+2. Klik pada nama karyawan atau tombol **Detail**
+3. Amati informasi yang ditampilkan di halaman detail
 
-**Expected Result:**
-- Flow rate karyawan berubah sesuai gaji baru
-- Live counter di dashboard employee menggunakan flow rate baru
-- Event `FlowRateUpdated` muncul di BaseScan
+**Input:** Klik detail pada karyawan yang sudah terdaftar
 
-**Actual Result:** _(isi saat pengujian)_  
+**Expected Output:**
+- Halaman detail menampilkan: nama karyawan, alamat wallet (Work ID), status stream, gaji bulanan, total yang sudah diklaim, tanggal mulai stream
+- Data sesuai dengan yang tersimpan on-chain
+- Tidak ada error atau halaman kosong
+
+**Actual Result:** _(isi saat pengujian)_
 **Status:** ⏳
 
 ---
 
-### TC-A12 — Tarik Dana Vault
+### TC-HR-08 — Propose PHK oleh HR
 
 | Field | Detail |
 |---|---|
 | **Tipe** | Happy Path |
-| **Aktor** | HR |
-| **Precondition** | Vault bersaldo > jumlah yang akan ditarik |
+| **Prioritas** | P0 |
+| **Aktor** | HR Manager |
+| **Pre-kondisi** | Karyawan memiliki stream aktif. HR sudah login. |
 
-**Langkah Uji:**
-1. Buka `/hr/vault`
-2. Isi jumlah tarik: `100000` IDRX
-3. Isi alamat tujuan: alamat dompet HR sendiri
-4. Klik **Tarik Dana** → setujui transaksi
+**Langkah Pengujian:**
+1. Buka `/hr/phk`
+2. Isi alamat karyawan yang akan di-PHK
+3. Klik tombol **Ajukan Terminasi**
+4. Setujui transaksi di Privy
+5. Tunggu konfirmasi dan amati status proposal
 
-**Expected Result:**
-- Saldo vault berkurang 100.000 IDRX
-- Alamat tujuan menerima 100.000 IDRX
-- Event `VaultWithdrawn` muncul di BaseScan
+**Input:** Alamat wallet karyawan target
 
-**Actual Result:** _(isi saat pengujian)_  
-**Status:** ⏳
-
----
-
-### TC-A13 — Jeda & Bekukan Vault
-
-| Field | Detail |
-|---|---|
-| **Tipe** | Happy Path |
-| **Aktor** | HR |
-| **Precondition** | Vault status `Active` |
-
-**Langkah Uji:**
-1. Buka `/hr/vault`
-2. Klik **Jeda Vault** → setujui → verifikasi status `Paused`
-3. Klik **Lanjutkan Vault** → setujui → verifikasi status `Active`
-4. Klik **Bekukan Vault** → setujui → verifikasi status `Frozen`
-
-**Expected Result:**
-- Vault `Paused`: semua klaim stream baru tidak bisa diproses
-- Vault `Active`: normal kembali
-- Vault `Frozen`: tidak bisa dijeda atau dilanjutkan lagi tanpa admin
-
-**Actual Result:** _(isi saat pengujian)_  
-**Status:** ⏳
-
----
-
-## Modul B — Auth & Onboarding
-
-### TC-B01 — Registrasi HR via Company Wizard
-
-| Field | Detail |
-|---|---|
-| **Tipe** | Happy Path |
-| **Aktor** | Pengguna baru (belum punya akun) |
-| **Precondition** | Pengguna belum pernah login ke Finley |
-
-**Langkah Uji:**
-1. Buka `https://finley.app/onboarding/company`
-2. Klik **Masuk dengan Email / Google** → login via Privy
-3. Wizard muncul di Step 1
-4. Isi nama perusahaan → Lanjut
-5. Atur split config → Inisialisasi Vault (TC-A01)
-6. Fund vault (TC-A03)
-7. Salin link undangan karyawan
-
-**Expected Result:**
-- Dompet kripto (Work ID) dibuat otomatis oleh Privy — pengguna tidak perlu tahu seed phrase
-- Setelah `initializeVault()` berhasil, akun mendapat `HR_ROLE` on-chain
-- Wizard selesai di Step 4 dengan link undangan yang valid
-
-**Actual Result:** _(isi saat pengujian)_  
-**Status:** ⏳
-
----
-
-### TC-B02 — HR Coba Akses Dashboard Employee
-
-| Field | Detail |
-|---|---|
-| **Tipe** | Bad Path |
-| **Aktor** | HR (punya HR_ROLE) |
-| **Precondition** | HR sudah login dan punya vault aktif |
-
-**Langkah Uji:**
-1. Login sebagai HR
-2. Ketik langsung di URL: `https://finley.app/employee`
-
-**Expected Result:**
-- AuthGuard mendeteksi role = `"hr"`
-- Redirect otomatis ke `/hr`
-- Halaman employee **tidak ditampilkan**
-
-**Actual Result:** _(isi saat pengujian)_  
-**Status:** ⏳
-
----
-
-### TC-B03 — Employee Join via Invite Link Valid
-
-| Field | Detail |
-|---|---|
-| **Tipe** | Happy Path |
-| **Aktor** | Karyawan baru |
-| **Precondition** | HR sudah buat link undangan. Karyawan belum pernah login. |
-
-**Langkah Uji:**
-1. Buka link: `https://finley.app/onboarding/employee?company=0x05b1...`
-2. Halaman menampilkan nama perusahaan HR
-3. Klik **Masuk dengan Email / Google** → login via Privy
-4. Halaman berubah ke **Menunggu aktivasi** dengan Work ID
-
-**Expected Result:**
-- Company terverifikasi on-chain (`VaultStatus != Uninitialized`)
-- Dompet karyawan dibuat otomatis (Work ID)
-- Work ID ditampilkan dengan tombol salin
-- Halaman polling setiap 10 detik menunggu HR aktifkan stream
-
-**Actual Result:** _(isi saat pengujian)_  
-**Status:** ⏳
-
----
-
-### TC-B04 — Employee Buka Invite Link Perusahaan Tidak Ada
-
-| Field | Detail |
-|---|---|
-| **Tipe** | Bad Path |
-| **Aktor** | Siapa saja |
-| **Precondition** | URL menggunakan alamat company yang tidak valid / belum diinisialisasi |
-
-**Langkah Uji:**
-1. Buka: `https://finley.app/onboarding/employee?company=0x0000000000000000000000000000000000000001`
-
-**Expected Result:**
-- Halaman menampilkan **"Link Tidak Valid"**
-- Pesan: `"Perusahaan tidak ditemukan. Hubungi HR Anda untuk mendapatkan link undangan yang benar."`
-- Tidak ada tombol login
-
-**Actual Result:** _(isi saat pengujian)_  
-**Status:** ⏳
-
----
-
-### TC-B05 — Employee Akses Dashboard Sebelum Stream Aktif
-
-| Field | Detail |
-|---|---|
-| **Tipe** | Bad Path |
-| **Aktor** | Karyawan yang sudah login tapi stream belum diaktifkan HR |
-| **Precondition** | Employee sudah join via invite link, tapi HR belum panggil `startStream()` |
-
-**Langkah Uji:**
-1. Employee login via invite link (TC-B03)
-2. Coba akses langsung: `https://finley.app/employee`
-
-**Expected Result:**
-- `employeeStreams[address].status` = `Inactive` (0)
-- EmployeeWelcome tetap tampilkan **WaitingView** dan polling
-- Dashboard `/employee` tidak redirect masuk — atau jika stream status `Inactive`, tampil empty state dengan pesan "Stream belum aktif"
-
-**Actual Result:** _(isi saat pengujian)_  
-**Status:** ⏳
-
----
-
-## Modul C — Compliance & PHK
-
-### TC-C01 — Ajukan PHK oleh HR
-
-| Field | Detail |
-|---|---|
-| **Tipe** | Happy Path |
-| **Aktor** | HR |
-| **Precondition** | Karyawan memiliki stream aktif |
-
-**Langkah Uji:**
-1. Buka `/hr/termination`
-2. Isi alamat karyawan di kolom "Ajukan PHK"
-3. Klik **Ajukan Terminasi** → setujui transaksi
-
-**Expected Result:**
+**Expected Output:**
 - Proposal PHK terdaftar on-chain
 - Event `TerminationProposed` muncul di BaseScan
-- Status proposal: `hrApproved = false`, `legalApproved = false`
-- Proposal bisa ditemukan via fitur "Cari Proposal PHK"
+- Status proposal: menunggu persetujuan Legal Officer
+- Proposal dapat ditemukan di daftar proposal PHK
 
-**Actual Result:** _(isi saat pengujian)_  
+**Actual Result:** _(isi saat pengujian)_
 **Status:** ⏳
 
 ---
 
-### TC-C02 — Eksekusi PHK Sebelum Legal Setujui
+### TC-HR-09 — Akses Halaman HR Diblokir untuk Non-HR
 
 | Field | Detail |
 |---|---|
 | **Tipe** | Bad Path |
-| **Aktor** | HR |
-| **Precondition** | Proposal PHK sudah dibuat, tapi Legal belum `approveTermination()` |
+| **Prioritas** | P0 |
+| **Aktor** | Karyawan (tidak memiliki HR_ROLE) |
+| **Pre-kondisi** | Pengguna login sebagai karyawan biasa |
 
-**Langkah Uji:**
-1. Setelah TC-C01 berhasil (proposal ada)
-2. Cari proposal di `/hr/termination`
-3. Coba klik **Eksekusi PHK** (jika tombol muncul)
+**Langkah Pengujian:**
+1. Login sebagai karyawan
+2. Coba akses langsung via URL: `https://payana.app/hr/employees`
+3. Amati respons sistem
 
-**Expected Result:**
-- Tombol **Eksekusi PHK** tidak muncul di UI karena `legalApproved = false`
-- Jika dipaksa via contract call langsung, transaksi **revert** dengan error `"Both HR and Legal must approve"`
+**Input:** Akses URL `/hr/employees` sebagai non-HR
 
-**Actual Result:** _(isi saat pengujian)_  
+**Expected Output:**
+- AuthGuard mendeteksi role = `employee`
+- Redirect otomatis ke `/employee/ewa`
+- Halaman HR tidak ditampilkan
+- Tidak ada data HR yang terekspos
+
+**Actual Result:** _(isi saat pengujian)_
 **Status:** ⏳
 
 ---
 
-### TC-C03 — Eksekusi PHK Setelah Semua Menyetujui
+## Modul PHK — Multi-Sig Pemutusan Hubungan Kerja
+
+Modul ini mencakup alur pemutusan hubungan kerja (PHK) yang menggunakan mekanisme multi-signature: memerlukan persetujuan dari HR Manager dan Legal Officer sebelum dapat dieksekusi. Hal ini memastikan kepatuhan prosedur PHK sesuai regulasi ketenagakerjaan.
+
+---
+
+### TC-PHK-01 — Propose PHK → Status "Menunggu Legal"
 
 | Field | Detail |
 |---|---|
 | **Tipe** | Happy Path |
-| **Aktor** | HR (setelah Legal juga setujui) |
-| **Precondition** | Proposal PHK sudah di-approve oleh HR dan Legal (`hrApproved = true`, `legalApproved = true`). Belum expired. |
+| **Prioritas** | P0 |
+| **Aktor** | HR Manager |
+| **Pre-kondisi** | Karyawan memiliki stream aktif. HR sudah login dan berstatus approved. |
 
-**Langkah Uji:**
-1. HR approve via `approveTermination()` (TC-C01)
-2. Akun Legal approve via `approveTermination()` (off-screen — gunakan cast atau direct contract call)
-3. Buka `/hr/termination` → cari proposal
-4. Klik **Eksekusi PHK & Cairkan Pesangon** → setujui transaksi
+**Langkah Pengujian:**
+1. Buka `/hr/phk`
+2. Isi alamat karyawan yang akan di-PHK: `0xEMP...`
+3. Klik tombol **Ajukan Proposal PHK**
+4. Setujui transaksi di Privy
+5. Tunggu konfirmasi blockchain
+6. Amati status proposal yang baru dibuat
 
-**Expected Result:**
-- Stream karyawan dibatalkan (`StreamStatus.Cancelled`)
-- SeveranceVault karyawan dicairkan ke dompet karyawan (`SeveranceState.Released`)
+**Input:** Alamat karyawan `0xEMP...`
+
+**Expected Output:**
+- Proposal PHK terdaftar on-chain dengan `hrApproved = true`, `legalApproved = false`
+- Status proposal ditampilkan sebagai **"Menunggu Persetujuan Legal"**
+- Event `TerminationProposed` muncul di BaseScan
+- Proposal muncul di antrian Legal Officer untuk ditinjau
+
+**Actual Result:** _(isi saat pengujian)_
+**Status:** ⏳
+
+---
+
+### TC-PHK-02 — Approve oleh Legal → Status "Siap Dieksekusi"
+
+| Field | Detail |
+|---|---|
+| **Tipe** | Happy Path |
+| **Prioritas** | P0 |
+| **Aktor** | Legal Officer |
+| **Pre-kondisi** | Proposal PHK sudah dibuat oleh HR (TC-PHK-01). Status `hrApproved = true`, `legalApproved = false`. |
+
+**Langkah Pengujian:**
+1. Login sebagai Legal Officer, buka `/hr/phk`
+2. Temukan proposal PHK yang menunggu persetujuan
+3. Tinjau detail proposal (nama karyawan, alasan PHK)
+4. Klik tombol **Setujui Proposal**
+5. Setujui transaksi di Privy
+6. Amati perubahan status proposal
+
+**Input:** Klik Setujui pada proposal PHK yang berstatus "Menunggu Legal"
+
+**Expected Output:**
+- Status on-chain berubah: `hrApproved = true`, `legalApproved = true`
+- Status proposal di UI berubah menjadi **"Siap Dieksekusi"**
+- Event `TerminationApproved` muncul di BaseScan
+- Tombol **Eksekusi PHK** menjadi aktif (dapat diklik oleh HR)
+
+**Actual Result:** _(isi saat pengujian)_
+**Status:** ⏳
+
+---
+
+### TC-PHK-03 — Execute PHK → Stream Dibatalkan, Severance Dirilis
+
+| Field | Detail |
+|---|---|
+| **Tipe** | Happy Path |
+| **Prioritas** | P0 |
+| **Aktor** | HR Manager |
+| **Pre-kondisi** | Proposal PHK sudah disetujui oleh HR dan Legal (`hrApproved = true`, `legalApproved = true`). Belum expired (< 7 hari sejak proposal). |
+
+**Langkah Pengujian:**
+1. Login sebagai HR, buka `/hr/phk`
+2. Temukan proposal dengan status "Siap Dieksekusi"
+3. Klik tombol **Eksekusi PHK & Cairkan Pesangon**
+4. Setujui transaksi di Privy
+5. Tunggu konfirmasi blockchain
+6. Verifikasi status karyawan dan saldo severance
+
+**Input:** Klik Eksekusi pada proposal yang sudah diapprove dua pihak
+
+**Expected Output:**
+- Stream karyawan dibatalkan (status = `Cancelled`)
+- SeveranceVault karyawan dicairkan ke dompet karyawan
 - EmploymentSBT karyawan di-revoke
 - Event `TerminationExecuted` dan `SeveranceReleased` muncul di BaseScan
+- Karyawan tidak lagi muncul sebagai karyawan aktif di tabel HR
 
-**Actual Result:** _(isi saat pengujian)_  
+**Actual Result:** _(isi saat pengujian)_
 **Status:** ⏳
 
 ---
 
-### TC-C04 — PHK oleh Non-HR
+### TC-PHK-04 — Proposal PHK Expire Setelah 7 Hari
 
 | Field | Detail |
 |---|---|
 | **Tipe** | Bad Path |
-| **Aktor** | Karyawan (tidak punya HR_ROLE) |
-| **Precondition** | Karyawan sudah login |
+| **Prioritas** | P1 |
+| **Aktor** | HR Manager |
+| **Pre-kondisi** | Proposal PHK sudah dibuat namun tidak dieksekusi dalam 7 hari. |
 
-**Langkah Uji:**
-1. Login sebagai employee
-2. Coba akses `/hr/termination` via URL langsung
+**Langkah Pengujian:**
+1. Buat proposal PHK (TC-PHK-01)
+2. Tunggu lebih dari 7 hari (atau gunakan mekanisme time manipulation di testnet)
+3. Login sebagai HR, buka `/hr/phk`
+4. Temukan proposal yang sudah melewati batas waktu
+5. Amati status proposal dan coba eksekusi
 
-**Expected Result:**
-- AuthGuard redirect ke `/employee` — halaman tidak bisa diakses
-- Tidak ada cara memanggil `proposeTermination()` dari UI employee
+**Input:** Proposal PHK yang sudah melewati batas waktu 7 hari
 
-**Actual Result:** _(isi saat pengujian)_  
+**Expected Output:**
+- Status proposal berubah menjadi **"Expired"** secara otomatis
+- Tombol **Eksekusi PHK** tidak aktif atau tidak tampil
+- Jika dipaksa via contract langsung, transaksi revert dengan error `"Proposal expired"`
+- Stream karyawan tetap aktif (tidak dibatalkan)
+
+**Actual Result:** _(isi saat pengujian)_
 **Status:** ⏳
 
 ---
 
-### TC-C05 — Export Laporan Compliance (BPJS/PPh21)
+## Modul EWA — Earned Wage Access (Karyawan)
+
+Modul ini mencakup kemampuan karyawan untuk mengakses gaji yang sudah terakumulasi (Earned Wage Access) secara real-time. Saldo EWA bertambah setiap detik sesuai flow rate gaji, dan karyawan dapat melakukan klaim kapan saja dengan batas rate limit.
+
+---
+
+### TC-EWA-01 — Saldo EWA Terakru Real-Time (Naik Setiap Detik)
 
 | Field | Detail |
 |---|---|
 | **Tipe** | Happy Path |
-| **Aktor** | HR |
-| **Precondition** | Ada minimal 1 klaim gaji pada bulan yang dipilih |
-
-**Langkah Uji:**
-1. Buka `/hr/compliance`
-2. Pilih bulan: `2026-04`
-3. Klik **Lihat Ringkasan** → tabel karyawan muncul
-4. Klik **Export CSV** → file ter-download
-
-**Expected Result:**
-- Tabel menampilkan per-karyawan: jumlah klaim, total accrued, total compliance, total severance
-- File CSV ter-download dengan nama `compliance_2026-04.csv`
-- Data CSV sesuai dengan tabel ringkasan
-
-**Actual Result:** _(isi saat pengujian)_  
-**Status:** ⏳
-
----
-
-### TC-C06 — Export Laporan Bulan Tanpa Transaksi
-
-| Field | Detail |
-|---|---|
-| **Tipe** | Bad Path |
-| **Aktor** | HR |
-| **Precondition** | Tidak ada klaim gaji pada bulan yang dipilih |
-
-**Langkah Uji:**
-1. Buka `/hr/compliance`
-2. Pilih bulan jauh di masa depan: `2030-01`
-3. Klik **Lihat Ringkasan**
-
-**Expected Result:**
-- Tabel tampil kosong dengan pesan `"Tidak ada klaim pada bulan ini."`
-- Export CSV tetap bisa dilakukan (file kosong / hanya header)
-- Tidak ada error crash
-
-**Actual Result:** _(isi saat pengujian)_  
-**Status:** ⏳
-
----
-
-## Modul D — Cliff Vesting
-
-### TC-D01 — Buat Cliff Vest oleh HR
-
-| Field | Detail |
-|---|---|
-| **Tipe** | Happy Path |
-| **Aktor** | HR |
-| **Precondition** | Vault aktif. Karyawan terdaftar. |
-
-**Langkah Uji:**
-1. Buka `/hr/vesting` → klik **Buat Vest Baru**
-2. Isi alamat karyawan, jumlah: `10000000` IDRX, cliff date: 1 bulan ke depan
-3. Pilih tipe: **Retensi**
-4. Klik **Buat Cliff Vest** → setujui transaksi
-
-**Expected Result:**
-- Vest terdaftar on-chain dengan status `Locked`
-- Vest muncul saat dicari via alamat karyawan
-- Event `CliffVestCreated` muncul di BaseScan
-- Karyawan melihat vest di `/employee/vesting` dengan countdown hari
-
-**Actual Result:** _(isi saat pengujian)_  
-**Status:** ⏳
-
----
-
-### TC-D02 — Klaim Vest Sebelum Cliff Date
-
-| Field | Detail |
-|---|---|
-| **Tipe** | Bad Path |
+| **Prioritas** | P0 |
 | **Aktor** | Karyawan |
-| **Precondition** | Vest ada dengan cliff date di masa depan. Status `Locked`. |
+| **Pre-kondisi** | Stream karyawan berstatus `Active`. Karyawan sudah login. |
 
-**Langkah Uji:**
-1. Login sebagai karyawan, buka `/employee/vesting`
-2. Lihat vest dengan status `Locked` dan cliff belum tercapai
-3. Coba klik tombol **Klaim Vest**
+**Langkah Pengujian:**
+1. Login sebagai karyawan, buka `/employee/ewa`
+2. Amati angka saldo EWA yang tampil
+3. Tunggu 5–10 detik
+4. Amati kembali angka saldo EWA
+5. Bandingkan nilai sebelum dan sesudah menunggu
 
-**Expected Result:**
-- Tombol **Klaim Vest** tidak muncul di UI — hanya tampil countdown "Tersedia dalam X hari"
-- Jika dipaksa via contract langsung, transaksi revert dengan `"Cliff not reached"`
+**Input:** Tunggu 10 detik tanpa melakukan aksi apapun
 
-**Actual Result:** _(isi saat pengujian)_  
+**Expected Output:**
+- Angka saldo EWA bertambah secara berkelanjutan setiap detik
+- Pertambahan saldo sesuai dengan flow rate gaji per detik: `flowRate = gajiBulanan / (30 * 24 * 3600)` IDRX/detik
+- Live counter berjalan tanpa perlu reload halaman
+- Nilai yang ditampilkan konsisten dengan nilai on-chain
+
+**Actual Result:** _(isi saat pengujian)_
 **Status:** ⏳
 
 ---
 
-### TC-D03 — Klaim Vest Setelah Cliff Date
+### TC-EWA-02 — Klaim EWA Berhasil → Saldo Reset ke 0
 
 | Field | Detail |
 |---|---|
 | **Tipe** | Happy Path |
+| **Prioritas** | P0 |
 | **Aktor** | Karyawan |
-| **Precondition** | Vest ada dengan cliff date yang sudah terlewati. Status `Locked`. |
+| **Pre-kondisi** | Stream aktif. Sudah ada saldo EWA yang terakumulasi (minimal > 0). Vault HR bersaldo cukup. |
 
-**Langkah Uji:**
-1. Login sebagai karyawan, buka `/employee/vesting`
-2. Lihat vest dengan countdown "0 hari" / cliff date sudah lewat
-3. Klik **Klaim Vest** → setujui transaksi
+**Langkah Pengujian:**
+1. Login sebagai karyawan, buka `/employee/ewa`
+2. Catat saldo EWA saat ini (misal: 10.000 IDRX)
+3. Klik tombol **Klaim Gaji — Gasless**
+4. Setujui transaksi di Privy (silent sign)
+5. Tunggu konfirmasi
+6. Amati saldo EWA setelah klaim
 
-**Expected Result:**
-- Vest status berubah jadi `Claimed`
-- Karyawan menerima jumlah IDRX vest ke dompetnya
-- Event `CliffVestClaimed` muncul di BaseScan
+**Input:** Klik tombol Klaim Gaji dengan saldo EWA > 0
 
-**Actual Result:** _(isi saat pengujian)_  
+**Expected Output:**
+- Saldo EWA direset ke 0 setelah klaim berhasil
+- Dompet karyawan menerima 93% dari total accrued dalam IDRX
+- ComplianceVault HR bertambah 5%
+- SeveranceVault karyawan bertambah 2%
+- Event `SalaryClaimed` muncul di BaseScan
+- Counter EWA mulai berjalan kembali dari 0
+
+**Actual Result:** _(isi saat pengujian)_
 **Status:** ⏳
 
 ---
 
-### TC-D04 — Batalkan Vest oleh HR
-
-| Field | Detail |
-|---|---|
-| **Tipe** | Happy Path |
-| **Aktor** | HR |
-| **Precondition** | Vest status `Locked` (belum diklaim) |
-
-**Langkah Uji:**
-1. Buka `/hr/vesting`
-2. Cari vest karyawan target
-3. Klik **Batalkan Vest** → setujui transaksi
-
-**Expected Result:**
-- Vest status berubah jadi `Forfeited`
-- Dana vest kembali ke vault HR
-- Event `CliffVestForfeited` muncul di BaseScan
-
-**Actual Result:** _(isi saat pengujian)_  
-**Status:** ⏳
-
----
-
-### TC-D05 — Klaim Vest yang Sudah Dibatalkan
+### TC-EWA-03 — Rate Limit: Maksimal 10 Klaim per Jam
 
 | Field | Detail |
 |---|---|
 | **Tipe** | Bad Path |
+| **Prioritas** | P1 |
 | **Aktor** | Karyawan |
-| **Precondition** | Vest status `Forfeited` (sudah dibatalkan HR) |
+| **Pre-kondisi** | Karyawan sudah melakukan 10 klaim dalam satu jam terakhir. Stream masih aktif. |
 
-**Langkah Uji:**
-1. Login sebagai karyawan, buka `/employee/vesting`
-2. Lihat vest dengan status `Forfeited`
-3. Coba klik klaim
+**Langkah Pengujian:**
+1. Login sebagai karyawan, buka `/employee/ewa`
+2. Lakukan klaim EWA sebanyak 10 kali berturut-turut dalam satu jam (setiap ada saldo > 0)
+3. Pada percobaan klaim ke-11, amati respons sistem
 
-**Expected Result:**
-- Tidak ada tombol klaim untuk vest `Forfeited`
-- Jika dipaksa via contract langsung, transaksi revert
+**Input:** Percobaan klaim ke-11 dalam satu jam yang sama
 
-**Actual Result:** _(isi saat pengujian)_  
+**Expected Output:**
+- Tombol klaim **dinonaktifkan** dengan pesan seperti: _"Batas klaim tercapai. Coba lagi dalam X menit."_
+- Jika dipaksa via contract langsung, transaksi revert dengan error rate limit
+- Klaim ke-11 tidak diproses; saldo EWA tetap terakumulasi
+- Setelah jendela 1 jam berlalu, klaim dapat dilakukan kembali
+
+**Actual Result:** _(isi saat pengujian)_
 **Status:** ⏳
 
 ---
 
-## Modul E — Koperasi Digital
+## Modul KOP — Koperasi Digital
 
-### TC-E01 — Deposit ke Pool Koperasi
+Modul ini menyediakan layanan pinjaman berbasis gaji karyawan menggunakan pool likuiditas bersama. Batas pinjaman dihitung berdasarkan persentase gaji bulanan karyawan, dan pembayaran kembali dilakukan secara otomatis saat karyawan melakukan klaim EWA.
+
+---
+
+### TC-KOP-01 — Pinjam IDRX dari Pool (Maksimal 80% Gaji)
 
 | Field | Detail |
 |---|---|
 | **Tipe** | Happy Path |
-| **Aktor** | Karyawan (sebagai penyimpan/lender) |
-| **Precondition** | Stream aktif. Karyawan punya saldo IDRX. |
+| **Prioritas** | P1 |
+| **Aktor** | Karyawan |
+| **Pre-kondisi** | Stream aktif. Pool koperasi memiliki likuiditas cukup. Tidak ada pinjaman aktif. Gaji bulanan = 5.000.000 IDRX (maks pinjam = 4.000.000 IDRX). |
 
-**Langkah Uji:**
+**Langkah Pengujian:**
 1. Buka `/employee/koperasi`
-2. Isi jumlah deposit: `500000` IDRX
-3. Klik **Approve** → setujui transaksi
-4. Klik **Simpan** → setujui transaksi
-
-**Expected Result:**
-- Approval berhasil
-- Deposit berhasil — saldo simpanan muncul di kartu "Simpanan Saya"
-- Total pool perusahaan bertambah
-- Event `Deposited` muncul di BaseScan
-
-**Actual Result:** _(isi saat pengujian)_  
-**Status:** ⏳
-
----
-
-### TC-E02 — Deposit Tanpa Approval IDRX
-
-| Field | Detail |
-|---|---|
-| **Tipe** | Bad Path |
-| **Aktor** | Karyawan |
-| **Precondition** | Karyawan belum approve IDRX ke contract |
-
-**Langkah Uji:**
-1. Buka `/employee/koperasi`
-2. Isi jumlah deposit: `100000`
-3. Langsung klik **Simpan** (tanpa approve dulu)
-
-**Expected Result:**
-- Tombol **Simpan** disabled karena approve belum berhasil
-- Tidak ada transaksi yang dikirim
-
-**Actual Result:** _(isi saat pengujian)_  
-**Status:** ⏳
-
----
-
-### TC-E03 — Pinjam dari Pool Koperasi
-
-| Field | Detail |
-|---|---|
-| **Tipe** | Happy Path |
-| **Aktor** | Karyawan |
-| **Precondition** | Stream aktif. Pool memiliki likuiditas cukup. Tidak ada pinjaman aktif. |
-
-**Langkah Uji:**
-1. Buka `/employee/koperasi`
-2. Isi jumlah pinjam: `500000` IDRX
-3. Klik **1. Approve** → setujui
+2. Isi jumlah pinjam: `3000000` IDRX (60% gaji — dalam batas maksimal 80%)
+3. Klik **1. Approve** → setujui transaksi
 4. Klik **2. Pinjam** → setujui transaksi
+5. Amati status pinjaman setelah transaksi berhasil
 
-**Expected Result:**
-- Pinjaman aktif muncul di kartu "Pinjaman" dengan status `Active`
-- Karyawan menerima IDRX pinjaman di dompetnya
+**Input:** Jumlah pinjam = `3000000` IDRX (60% dari gaji bulanan 5.000.000 IDRX)
+
+**Expected Output:**
+- Pinjaman aktif muncul di kartu "Pinjaman Saya" dengan status `Active`
+- Karyawan menerima 3.000.000 IDRX di dompetnya
 - Pool likuiditas tersedia berkurang
 - Event `LoanCreated` muncul di BaseScan
+- Formulir pinjaman diganti dengan tampilan "Lunasi Pinjaman"
 
-**Actual Result:** _(isi saat pengujian)_  
+**Actual Result:** _(isi saat pengujian)_
 **Status:** ⏳
 
 ---
 
-### TC-E04 — Pinjam Melebihi Batas Maksimum
-
-| Field | Detail |
-|---|---|
-| **Tipe** | Bad Path |
-| **Aktor** | Karyawan |
-| **Precondition** | Stream aktif. Gaji bulanan = 5.000.000 IDRX. Batas maks = 50% gaji (MAX_LOAN_BPS = 5000). |
-
-**Langkah Uji:**
-1. Buka `/employee/koperasi`
-2. Isi jumlah pinjam: `3000000` IDRX (60% gaji — melebihi batas 50%)
-3. Klik **1. Approve** → setujui
-4. Klik **2. Pinjam** → setujui transaksi
-
-**Expected Result:**
-- Transaksi **gagal** (contract revert: `"Exceeds max loan amount"`)
-- Pesan error muncul di UI
-- Pinjaman tidak terbuat
-
-**Actual Result:** _(isi saat pengujian)_  
-**Status:** ⏳
-
----
-
-### TC-E05 — Pinjam Saat Masih Ada Pinjaman Aktif
-
-| Field | Detail |
-|---|---|
-| **Tipe** | Bad Path |
-| **Aktor** | Karyawan |
-| **Precondition** | Sudah ada pinjaman aktif dari TC-E03 |
-
-**Langkah Uji:**
-1. Buka `/employee/koperasi`
-2. Coba pinjam lagi: `100000` IDRX
-
-**Expected Result:**
-- Tombol pinjam **tidak muncul** di UI — digantikan form **Bayar Pinjaman**
-- Jika dipaksa via contract langsung, transaksi revert dengan `"Active loan exists"`
-
-**Actual Result:** _(isi saat pengujian)_  
-**Status:** ⏳
-
----
-
-### TC-E06 — Bayar Pinjaman Manual
+### TC-KOP-02 — Auto-Repay Saat Klaim EWA Berikutnya
 
 | Field | Detail |
 |---|---|
 | **Tipe** | Happy Path |
+| **Prioritas** | P1 |
 | **Aktor** | Karyawan |
-| **Precondition** | Ada pinjaman aktif |
+| **Pre-kondisi** | Ada pinjaman aktif dari koperasi (TC-KOP-01). Stream aktif dan ada saldo EWA yang terakumulasi. |
 
-**Langkah Uji:**
-1. Buka `/employee/koperasi`
-2. Isi jumlah bayar: `200000` IDRX
-3. Klik **Bayar Pinjaman** → setujui transaksi
+**Langkah Pengujian:**
+1. Pastikan ada pinjaman aktif (TC-KOP-01)
+2. Catat sisa pinjaman sebelum klaim
+3. Login sebagai karyawan, buka `/employee/ewa`
+4. Klik **Klaim Gaji — Gasless** → setujui transaksi
+5. Amati sisa pinjaman setelah klaim
 
-**Expected Result:**
-- Sisa pinjaman berkurang 200.000 IDRX
-- Jika sisa = 0, status pinjaman berubah jadi `Repaid`
-- Event `LoanRepaid` muncul di BaseScan
+**Input:** Klik Klaim Gaji saat ada pinjaman koperasi aktif
 
-**Actual Result:** _(isi saat pengujian)_  
-**Status:** ⏳
-
----
-
-### TC-E07 — Auto-Repay Saat Klaim Gaji
-
-| Field | Detail |
-|---|---|
-| **Tipe** | Happy Path |
-| **Aktor** | Karyawan |
-| **Precondition** | Ada pinjaman aktif. Stream aktif. Ada accrued salary. |
-
-**Langkah Uji:**
-1. Pastikan ada pinjaman aktif (TC-E03)
-2. Login sebagai employee, buka `/employee`
-3. Klik **Klaim Gaji** → setujui transaksi
-
-**Expected Result:**
-- Saat `claimSalary()` dieksekusi, contract memanggil `autoRepay()` di EmployeeLiquidityContract terlebih dahulu
-- Sebagian accrued dipotong untuk cicilan pinjaman (sesuai `REPAY_FRACTION_BPS`)
-- Sisa accrued dibagi 93/5/2
+**Expected Output:**
+- Saat `claimSalary()` dieksekusi, contract memanggil `autoRepay()` secara otomatis
+- Sebagian accrued EWA dipotong untuk cicilan pinjaman sesuai `REPAY_FRACTION_BPS`
 - Saldo pinjaman berkurang secara otomatis
+- Sisa accrued (setelah auto-repay) dibagi sesuai skema 93/5/2
+- Event `LoanRepaid` dan `SalaryClaimed` muncul di BaseScan
 
-**Actual Result:** _(isi saat pengujian)_  
+**Actual Result:** _(isi saat pengujian)_
 **Status:** ⏳
 
 ---
 
-### TC-E08 — Tarik Simpanan Koperasi
+## Modul VEST — Cliff Vesting
+
+Modul ini menyediakan mekanisme pemberian token/gaji dengan periode penguncian (cliff). HR dapat membuat paket vesting untuk karyawan, dan karyawan hanya dapat mengklaim setelah tanggal cliff tercapai.
+
+---
+
+### TC-VEST-01 — Buat Cliff Vest oleh HR
 
 | Field | Detail |
 |---|---|
 | **Tipe** | Happy Path |
-| **Aktor** | Karyawan (penyimpan) |
-| **Precondition** | Ada simpanan di pool (TC-E01). Pool punya cukup likuiditas. Tidak dalam masa lock. |
+| **Prioritas** | P1 |
+| **Aktor** | HR Manager |
+| **Pre-kondisi** | Vault aktif dan bersaldo cukup. Karyawan terdaftar di sistem. |
 
-**Langkah Uji:**
-1. Buka `/employee/koperasi`
-2. Isi jumlah tarik: `250000` IDRX
-3. Klik **Tarik Simpanan** → setujui transaksi
+**Langkah Pengujian:**
+1. Buka `/hr/vesting`
+2. Klik tombol **Buat Vest Baru**
+3. Isi alamat karyawan, jumlah: `10000000` IDRX
+4. Tentukan cliff date: 1 bulan ke depan
+5. Pilih tipe vesting: **Retensi**
+6. Klik **Buat Cliff Vest** → setujui transaksi di Privy
+7. Tunggu konfirmasi
 
-**Expected Result:**
-- Simpanan berkurang 250.000 IDRX
-- Dompet karyawan menerima 250.000 + yield yang sudah earned
-- Pool total berkurang
+**Input:** Karyawan = `0xEMP...`, jumlah = `10000000` IDRX, cliff date = 1 bulan ke depan, tipe = Retensi
 
-**Actual Result:** _(isi saat pengujian)_  
+**Expected Output:**
+- Vest terdaftar on-chain dengan status `Locked`
+- Event `CliffVestCreated` muncul di BaseScan
+- Karyawan dapat melihat vest di `/employee/vesting` dengan countdown hari
+- Saldo vault HR berkurang sebesar jumlah vest yang dialokasikan
+
+**Actual Result:** _(isi saat pengujian)_
+**Status:** ⏳
+
+---
+
+### TC-VEST-02 — Tombol Klaim Disabled Sebelum Cliff Date
+
+| Field | Detail |
+|---|---|
+| **Tipe** | Bad Path |
+| **Prioritas** | P1 |
+| **Aktor** | Karyawan |
+| **Pre-kondisi** | Vest sudah dibuat (TC-VEST-01). Cliff date belum tercapai (masih di masa depan). |
+
+**Langkah Pengujian:**
+1. Login sebagai karyawan, buka `/employee/vesting`
+2. Temukan vest dengan status `Locked` dan cliff belum tercapai
+3. Amati tombol klaim yang tersedia
+4. Jika tombol ada, coba klik
+
+**Input:** Coba klaim vest dengan cliff date di masa depan
+
+**Expected Output:**
+- Tombol **Klaim Vest** tidak aktif (disabled) atau tidak tampil
+- UI menampilkan countdown: _"Tersedia dalam X hari"_
+- Jika dipaksa via contract langsung, transaksi revert dengan error `"Cliff not reached"`
+- Tidak ada transfer IDRX yang terjadi
+
+**Actual Result:** _(isi saat pengujian)_
+**Status:** ⏳
+
+---
+
+### TC-VEST-03 — Klaim Vest Berhasil Setelah Cliff Date
+
+| Field | Detail |
+|---|---|
+| **Tipe** | Happy Path |
+| **Prioritas** | P1 |
+| **Aktor** | Karyawan |
+| **Pre-kondisi** | Vest sudah dibuat (TC-VEST-01). Cliff date sudah terlewati. Status vest masih `Locked` (belum diklaim). |
+
+**Langkah Pengujian:**
+1. Login sebagai karyawan, buka `/employee/vesting`
+2. Temukan vest dengan countdown "0 hari" atau cliff date sudah lewat
+3. Klik tombol **Klaim Vest**
+4. Setujui transaksi di Privy
+5. Tunggu konfirmasi dan amati perubahan status
+
+**Input:** Klik Klaim Vest setelah cliff date tercapai
+
+**Expected Output:**
+- Transaksi berhasil
+- Status vest berubah dari `Locked` menjadi `Claimed`
+- Karyawan menerima jumlah IDRX vest di dompetnya
+- Event `CliffVestClaimed` muncul di BaseScan
+- Tombol klaim tidak lagi tampil (vest sudah diklaim)
+
+**Actual Result:** _(isi saat pengujian)_
 **Status:** ⏳
 
 ---
 
 ## Ringkasan Hasil Pengujian
 
-| Modul | Total TC | Pass | Fail | Pending |
-|---|---|---|---|---|
-| A — Core Payroll | 13 | — | — | 13 |
-| B — Auth & Onboarding | 5 | — | — | 5 |
-| C — Compliance & PHK | 6 | — | — | 6 |
-| D — Cliff Vesting | 5 | — | — | 5 |
-| E — Koperasi | 8 | — | — | 8 |
-| **Total** | **37** | **—** | **—** | **37** |
+| Modul | Total TC | P0 | P1 | P2 | Pass | Fail | Pending |
+|---|---|---|---|---|---|---|---|
+| AUTH — Auth & Onboarding | 6 | 5 | 1 | 0 | — | — | 6 |
+| OWN — Owner SaaS | 6 | 5 | 1 | 0 | — | — | 6 |
+| HR — Vault & Karyawan | 9 | 5 | 3 | 1 | — | — | 9 |
+| PHK — Multi-Sig PHK | 4 | 3 | 1 | 0 | — | — | 4 |
+| EWA — Earned Wage Access | 3 | 2 | 1 | 0 | — | — | 3 |
+| KOP — Koperasi Digital | 2 | 0 | 2 | 0 | — | — | 2 |
+| VEST — Cliff Vesting | 3 | 0 | 3 | 0 | — | — | 3 |
+| **Total** | **33** | **20** | **12** | **1** | **—** | **—** | **33** |
 
 ---
 
@@ -990,4 +1119,5 @@ Setiap test case dikategorikan ke salah satu dari dua jenis:
 | Backend | `http://localhost:3001` |
 | Ponder Indexer | `http://localhost:42069` |
 | Browser | Chrome / Firefox (versi terbaru) |
+| Device | Desktop (1920x1080) dan Mobile (375x812) |
 | Token | IDRX (Base Sepolia testnet faucet) |

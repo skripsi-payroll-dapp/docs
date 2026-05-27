@@ -9,7 +9,7 @@
 | **Smart Contract** | Solidity + Foundry | ✅ Deployed | Mature ecosystem, tooling lengkap, audit community besar |
 | **Network** | Base Sepolia (dev) / Base Mainnet (prod) | ✅ Running | ~2s finality, EVM-compatible, biaya rendah |
 | **Stablecoin** | IDRX (ERC-20) | ✅ Configured | Rupiah-pegged, familiar pengguna Indonesia |
-| **Work ID — Dev** | Self-hosted embedded wallet (viem) | ✅ Working | EOA key di localStorage, EIP-191 auth, zero dependency |
+| **Work ID — Dev** | Privy WaaS (EVM embedded wallet) | ✅ Working | Email → EOA/Smart Account, EIP-191 auth, UX seamless |
 | **Work ID — Prod** | ERC-4337 Smart Account + encrypted key | 📋 Planned | Stable address, key rotation, gasless native |
 | **Gas Sponsor — Dev** | Faucet ETH (testnet) | ✅ Working | Gratis di Base Sepolia |
 | **Gas Sponsor — Prod** | ERC-4337 Paymaster (Pimlico / Alchemy Gas Manager) | 📋 Planned | Sponsor gas untuk karyawan — zero ETH required |
@@ -27,13 +27,14 @@
 
 ## Contract Structure
 
-Platform terdiri dari **3 Solidity contracts** terpisah yang berinteraksi dalam ekosistem *Multi-Tenant* (Factory Pattern):
+Platform terdiri dari **4 Solidity contracts** terpisah yang berinteraksi dalam ekosistem *Multi-Tenant* (Factory Pattern):
 
 | Contract | Storage yang Dikelola | Fungsi Utama |
 |---|---|---|
 | `PayrollFactory` | companyVaults (mapping), allVaults | deployVault, emergencyFreezeAll |
 | `CompanyVault` | (Isolated per Tenant): employeeStreams, severanceVaults, complianceVaults, cliffVests, terminations | fundVault, startStream, claimSalary, proposeTermination, executeTermination, createCliffVest |
 | `EmployeeLiquidityContract` | pools, lenderDeposits, loanRecords, totalProtocolFee | initializePool, depositToPool, borrowFromPool, repayLoan, claimProtocolFee |
+| `EmploymentSBT` | tokenIdCounter, ownerOf, tokenURI | mintSBT, burnSBT (ERC-5192 soulbound) |
 
 ---
 
@@ -86,53 +87,147 @@ graph TD
 ## Arsitektur Sistem End-to-End
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    FRONTEND (Next.js 16)                  │
-│  HR Dashboard          │        Employee Dashboard        │
-│  - Vault management    │        - EWA live tracker        │
-│  - Employee list       │        - Severance balance       │
-│  - Compliance report   │        - Koperasi (pinjam/bayar) │
-└──────────────┬─────────┴──────────────┬──────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                  OWNER SAAS (Platform Admin)                  │
+│  - Approve/reject registrasi HR baru                          │
+│  - Address dikonfirmasi via env OWNER_ADDRESS                 │
+│  - Akses: GET /registration/pending, PATCH /approve, DELETE   │
+└─────────────────────────┬────────────────────────────────────┘
+                          │ Bearer JWT (requireOwner middleware)
+                          ▼
+┌──────────────────────────────────────────────────────────────┐
+│                    FRONTEND (Next.js 16)                       │
+│  HR Dashboard          │        Employee Dashboard             │
+│  - Vault management    │        - EWA live tracker             │
+│  - Employee list       │        - Severance balance            │
+│  - Compliance report   │        - Koperasi (pinjam/bayar)      │
+│                        │                                       │
+│  /onboarding           │        Legal Dashboard                │
+│  - Registrasi HR baru  │        - Approve PHK proposal         │
+│  - Deteksi role otomatis│                                      │
+└──────────────┬─────────┴──────────────┬─────────────────────┘
                │ HTTPS + JWT            │ HTTPS + JWT
                ▼                        ▼
-┌─────────────────────────────────────────────────────────┐
-│                  BACKEND (Node.js)                        │
-│  ┌─────────────┐  ┌──────────────┐  ┌────────────────┐  │
-│  │  Bundler    │  │  Off-chain   │  │  Alchemy       │  │
-│  │  Relay      │  │  Data API    │  │  Webhook       │  │
-│  │ (ERC-4337)  │  │ (PII, audit) │  │  Processor     │  │
-│  └──────┬──────┘  └──────┬───────┘  └───────┬────────┘  │
-│         │                │                   │           │
-│  ┌──────▼──────────────────────────────────────────────┐ │
-│  │              PostgreSQL Database                     │ │
-│  │  employees | companies | transactions | audit_logs  │ │
-│  └─────────────────────────────────────────────────────┘ │
-└──────────────────┬──────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                  BACKEND (Node.js / Express)                   │
+│  ┌─────────────┐  ┌──────────────┐  ┌────────────────────┐   │
+│  │  Bundler    │  │  Off-chain   │  │  Alchemy           │   │
+│  │  Relay      │  │  Data API    │  │  Webhook           │   │
+│  │ (ERC-4337)  │  │ (PII, audit) │  │  Processor         │   │
+│  └──────┬──────┘  └──────┬───────┘  └───────┬────────────┘   │
+│         │                │                   │                │
+│  ┌──────▼──────────────────────────────────────────────────┐  │
+│  │              PostgreSQL Database                         │  │
+│  │  employees | companies | transactions | audit_logs      │  │
+│  │  registration_requests | refresh_tokens                 │  │
+│  └──────────────────────────────────────────────────────────┘ │
+└──────────────────┬───────────────────────────────────────────┘
                    │ RPC (Alchemy)
                    ▼
-┌─────────────────────────────────────────────────────────┐
-│              BASE BLOCKCHAIN (Ethereum L2)                │
-│  ┌───────────────────┐                                   │
-│  │  PayrollFactory   │ (Owner SaaS)                      │
-│  │  - companyVaults  │─────────────┐                     │
-│  └───────────────────┘             ▼                     │
-│  ┌────────────────────┐  ┌──────────────────────────┐    │
-│  │  CompanyVault(s)   │  │EmployeeLiquidityContract │    │
-│  │  [Isolated state]  │  │  - pools                 │    │
-│  │  - vaultBalance    │◄─┤  - loanRecords (call)    │    │
-│  │  - employeeStreams │  │  - lenderDeposits        │    │
-│  │  - severanceVaults │  │  - totalProtocolFee      │    │
-│  │  - complianceBal   │  └──────────────────────────┘    │
-│  │  - cliffVests      │                                  │
-│  └────────────────────┘  ┌──────────────────────────┐    │
-│  └────────────────────┘  │  External Protocols       │   │
-│                           │  - Privy WaaS (EVM)       │   │
-│                           │  - AccessControl PHK      │   │
-│                           │  - IDRX ERC-20 Token      │   │
-│                           │  - ERC-4337 EntryPoint    │   │
-│                           └──────────────────────────┘   │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│              BASE BLOCKCHAIN (Ethereum L2)                     │
+│  ┌───────────────────┐                                        │
+│  │  PayrollFactory   │ (Owner SaaS)                           │
+│  │  - companyVaults  │─────────────┐                          │
+│  └───────────────────┘             ▼                          │
+│  ┌────────────────────┐  ┌──────────────────────────────┐     │
+│  │  CompanyVault(s)   │  │EmployeeLiquidityContract     │     │
+│  │  [Isolated state]  │  │  - pools                     │     │
+│  │  - vaultBalance    │◄─┤  - loanRecords (call)        │     │
+│  │  - employeeStreams │  │  - lenderDeposits             │     │
+│  │  - severanceVaults │  │  - totalProtocolFee           │     │
+│  │  - complianceBal   │  └──────────────────────────────┘     │
+│  │  - cliffVests      │                                       │
+│  └────────────────────┘  ┌──────────────────────────────┐     │
+│                           │  EmploymentSBT               │    │
+│                           │  - ERC-5192 soulbound token  │    │
+│                           │  - Employment certificate    │    │
+│                           └──────────────────────────────┘    │
+│                           ┌──────────────────────────────┐    │
+│                           │  External Protocols           │   │
+│                           │  - Privy WaaS (EVM)           │   │
+│                           │  - AccessControl PHK          │   │
+│                           │  - IDRX ERC-20 Token          │   │
+│                           │  - ERC-4337 EntryPoint        │   │
+│                           └──────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Auth Flow (EIP-191 + JWT + Role Detection)
+
+Sistem autentikasi Payana menggunakan pendekatan *wallet-native* berbasis tanda tangan kriptografi, tanpa menyimpan password di server.
+
+### 1. Login Flow (EIP-191 Signature)
+
+```
+1. Frontend (Privy embedded wallet):
+   - Generate unix timestamp saat ini (detik)
+   - Buat pesan: "Sign in to Payana\nTimestamp: {unix_seconds}"
+   - Request personal_sign (EIP-191) ke Privy wallet
+         │
+         ▼
+2. Backend POST /auth/login:
+   - Terima: { address, message, signature, timestamp }
+   - Verifikasi signature menggunakan viem (recoverMessageAddress)
+   - Cek: recovered address === address yang dikirim
+   - Cek replay protection: |now - timestamp| ≤ 300 detik (5 menit)
+   - Issue: accessToken (JWT, expire 15 menit)
+   - Issue: refreshToken (JWT, expire 7 hari, disimpan di DB)
+         │
+         ▼
+3. Frontend simpan token:
+   - accessToken → memory / state
+   - refreshToken → httpOnly cookie atau localStorage
+```
+
+### 2. Token Refresh Flow
+
+```
+POST /auth/refresh
+- Body: { refreshToken }
+- Backend validasi refreshToken dari DB
+- Issue accessToken baru (15 menit)
+```
+
+### 3. Role Detection (Client-side via useRole.ts)
+
+Setelah login berhasil, frontend mendeteksi peran pengguna secara on-chain:
+
+| Urutan Cek | Kondisi | Role yang Ditetapkan |
+|---|---|---|
+| 1 | `address === OWNER_ADDRESS` (env) | `owner` |
+| 2 | `PayrollFactory.companyVaults(address) !== address(0)` | `hr` |
+| 3 | `Ponder /stream/{address}` mengembalikan stream aktif | `employee` |
+| 4 | `CompanyVault.hasRole(LEGAL_ROLE, address)` === true (per vault) | `legal` |
+| 5 | Tidak ada kondisi di atas yang terpenuhi | `null` → redirect `/onboarding` |
+
+### 4. Onboarding Flow (HR Baru)
+
+```
+/onboarding → POST /registration/request
+   - HR calon kirim: { address, email, name }
+   - Status awal: "pending"
+         │
+         ▼
+Owner SaaS review di dashboard admin:
+   GET /registration/pending
+         │
+   PATCH /registration/:address/approve  ── Disetujui
+   DELETE /registration/:address         ── Ditolak
+         │
+         ▼
+HR yang disetujui dapat deploy CompanyVault
+via PayrollFactory.deployVault()
+```
+
+### 5. Authorization Middleware (Backend)
+
+| Middleware | Kondisi | Digunakan Pada |
+|---|---|---|
+| `requireAuth` | JWT valid + tidak expired | Semua endpoint terproteksi |
+| `requireOwner` | JWT valid + `req.address === OWNER_ADDRESS` | `/registration/*` (admin) |
 
 ---
 
@@ -211,7 +306,7 @@ graph TD
 | **Pimlico / Biconomy** | ERC-4337 Paymaster — sponsor gas fee karyawan | Stackup / self-hosted Bundler |
 | **IDRX** | Rupiah stablecoin ERC-20 | USDC sebagai fallback MVP (Open Question #1) |
 | **OpenZeppelin AccessControl** | HR_ROLE + LEGAL_ROLE multi-sig PHK guard | Built into PayrollContract — tidak butuh external protocol; Safe Protocol dipertimbangkan tapi tidak dipakai karena menambah dependency eksternal tanpa manfaat signifikan untuk 2-of-2 flow |
-| **The Graph** | Subgraph indexing untuk query historis | Alchemy Transfers API |
+| **Azure App Service** | Hosting backend Node.js + Ponder di Indonesia Central | Railway / Render sebagai fallback |
 | **Datadog** | APM + monitoring | Grafana + Prometheus self-hosted |
 
 ---
@@ -285,9 +380,10 @@ payroll-saas/
 ├── backend/                            # Node.js — bundler relay, compliance, webhook
 │   └── src/
 │       ├── routes/
+│       │   ├── auth.ts                 # POST /auth/login, /refresh, /logout, /profile
+│       │   ├── registration.ts         # HR onboarding flow
 │       │   ├── bundler.ts              # POST /bundler/relay (ERC-4337)
-│       │   ├── compliance.ts           # GET /compliance/export/:hr
-│       │   ├── auth.ts
+│       │   ├── compliance.ts           # GET /compliance/summary/:hr
 │       │   └── webhook.ts              # Alchemy webhook receiver
 │       └── services/
 │           ├── rateLimiter.ts          # max 10 claims/hour (FR-B02)
@@ -298,7 +394,11 @@ payroll-saas/
         ├── app/
         │   ├── hr/                     # HR dashboard
         │   ├── employee/               # Employee EWA dashboard
+        │   ├── legal/                  # Legal dashboard (PHK approval)
+        │   ├── onboarding/             # Registrasi HR baru
         │   └── login/
+        ├── hooks/
+        │   └── useRole.ts              # On-chain role detection
         └── components/
 ```
 
@@ -308,22 +408,77 @@ payroll-saas/
 
 > Network: **Base Sepolia** (Chain ID: 84532)
 > Explorer: https://sepolia.basescan.org
+> Redeployed: 26 Mei 2026
 
 | Contract | Address |
 |---|---|
-| `PayrollContract` | `0x05b1DF6d82356CC256D1265cD185B4222E4745b3` |
-| `EmployeeLiquidityContract` | `0x872af14287370BAFC883237EF390E367d38a8A33` |
-| `EmploymentSBT` | `0xCB5118AF36907165496Dc028b441ad9152D2D264` |
+| `PayrollFactory` | `0x0B4BDD8fF3f9a76CA67bD16d3b25A0922A3D1Fb5` |
+| `EmployeeLiquidityContract` | `0x50fcAc62A081a6212BF947298a18BdC6d1BFde4A` |
+| `EmploymentSBT` | `0x009a7A5E0aFC42BE1b28d5b1907F6A32b1602e3E` |
+| `IDRX (Mock)` | `0x18Bc5bcC660cf2B9cE3cd51a404aFe1a0cBD3C22` |
 
 **BaseScan links:**
-- PayrollContract: https://sepolia.basescan.org/address/0x05b1DF6d82356CC256D1265cD185B4222E4745b3
-- EmployeeLiquidityContract: https://sepolia.basescan.org/address/0x872af14287370BAFC883237EF390E367d38a8A33
-- EmploymentSBT: https://sepolia.basescan.org/address/0xCB5118AF36907165496Dc028b441ad9152D2D264
+- PayrollFactory: https://sepolia.basescan.org/address/0x0B4BDD8fF3f9a76CA67bD16d3b25A0922A3D1Fb5
+- EmployeeLiquidityContract: https://sepolia.basescan.org/address/0x50fcAc62A081a6212BF947298a18BdC6d1BFde4A
+- EmploymentSBT: https://sepolia.basescan.org/address/0x009a7A5E0aFC42BE1b28d5b1907F6A32b1602e3E
+- IDRX (Mock): https://sepolia.basescan.org/address/0x18Bc5bcC660cf2B9cE3cd51a404aFe1a0cBD3C22
 
 **Frontend env vars (`.env.local`):**
 ```bash
-NEXT_PUBLIC_PAYROLL_CONTRACT_ADDRESS=0x05b1DF6d82356CC256D1265cD185B4222E4745b3
-NEXT_PUBLIC_LIQUIDITY_CONTRACT_ADDRESS=0x872af14287370BAFC883237EF390E367d38a8A33
-NEXT_PUBLIC_SBT_CONTRACT_ADDRESS=0xCB5118AF36907165496Dc028b441ad9152D2D264
+NEXT_PUBLIC_FACTORY_ADDRESS=0x0B4BDD8fF3f9a76CA67bD16d3b25A0922A3D1Fb5
+NEXT_PUBLIC_LIQUIDITY_CONTRACT_ADDRESS=0x50fcAc62A081a6212BF947298a18BdC6d1BFde4A
+NEXT_PUBLIC_SBT_CONTRACT_ADDRESS=0x009a7A5E0aFC42BE1b28d5b1907F6A32b1602e3E
+NEXT_PUBLIC_IDRX_ADDRESS=0x18Bc5bcC660cf2B9cE3cd51a404aFe1a0cBD3C22
 NEXT_PUBLIC_CHAIN_ID=84532
+```
+
+---
+
+## Deployment (Azure App Service — Indonesia Central)
+
+Platform Payana di-deploy pada Azure App Service di region **Indonesia Central** untuk memastikan latensi rendah bagi pengguna Indonesia.
+
+### Layanan yang Di-deploy
+
+| Layanan | URL | Deskripsi |
+|---|---|---|
+| **Backend (Node.js/Express)** | `https://backend-payroll-g4b0b3e2akbjbxf3.indonesiacentral-01.azurewebsites.net` | REST API: auth, bundler relay, compliance, webhook |
+| **Ponder (Indexer/Hono)** | `https://ponder-payroll-aucxhrb3hmhfd3fh.indonesiacentral-01.azurewebsites.net` | Event indexer REST API + Swagger UI |
+
+### Konfigurasi Azure
+
+```
+Runtime: Node.js 20 LTS
+SKU: B1 (Basic) — dapat di-upgrade ke P1v3 untuk production
+Region: Indonesia Central (Jakarta)
+Database: PostgreSQL Flexible Server (Azure Database)
+```
+
+### Environment Variables (Azure App Service — Application Settings)
+
+```bash
+# Backend
+DATABASE_URL=postgresql://...
+JWT_SECRET=...
+REFRESH_TOKEN_SECRET=...
+ALCHEMY_API_KEY=...
+ALCHEMY_WEBHOOK_SIGNING_KEY=...
+OWNER_ADDRESS=0x...
+AES_ENCRYPTION_KEY=...
+
+# Ponder
+PONDER_RPC_URL_84532=https://base-sepolia.g.alchemy.com/v2/...
+DATABASE_URL=postgresql://...
+```
+
+### Swagger UI (Ponder)
+
+Dokumentasi interaktif endpoint Ponder tersedia di:
+```
+https://ponder-payroll-aucxhrb3hmhfd3fh.indonesiacentral-01.azurewebsites.net/api-docs
+```
+
+OpenAPI JSON schema:
+```
+https://ponder-payroll-aucxhrb3hmhfd3fh.indonesiacentral-01.azurewebsites.net/openapi.json
 ```
