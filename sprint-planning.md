@@ -12,8 +12,9 @@
 | **Sprint 4** | Cliff vesting: cliffVests mapping, create/claim/forfeit, 3 tipe vest | 2 minggu | Cliff vesting on Base Sepolia |
 | **Sprint 5** | Koperasi: EmployeeLiquidityContract, pool/loan/external call auto-repayment, liquidation logic | 3 minggu | Koperasi on Base Sepolia |
 | **Sprint 6** | Dashboard HR + Employee, frontend integration, QA E2E, security audit | 4 minggu | Demo-ready on Base Sepolia |
+| **Sprint 7** | Confidential Payroll: Inco FHE encrypted salary, viewing key, frontend integration | 3 minggu | Salary privacy on Base Sepolia |
 
-**Total estimasi:** ~17 minggu (~4 bulan)
+**Total estimasi:** ~20 minggu (~5 bulan)
 
 ---
 
@@ -34,8 +35,11 @@ Sprint 1 (Core Payroll)
     ├──► Sprint 5 (Koperasi)  ◄── Sprint 3 juga required
     │        claim_salary harus gasless sebelum auto-repayment external call bisa ditest
     │
-    └──► Sprint 6 (Dashboard & Launch) ◄── Sprint 1–5 semua selesai
-             Dashboard tidak bisa diintegrasikan tanpa semua smart contract selesai
+    ├──► Sprint 6 (Dashboard & Launch) ◄── Sprint 1–5 semua selesai
+    │        Dashboard tidak bisa diintegrasikan tanpa semua smart contract selesai
+    │
+    └──► Sprint 7 (Confidential Payroll) ◄── Sprint 6 selesai
+             FHE hanya bisa diintegrasikan ke frontend setelah dashboard base selesai
 ```
 
 | Sprint | Depends On | Blocker Jika Tidak Selesai |
@@ -46,6 +50,7 @@ Sprint 1 (Core Payroll)
 | Sprint 4 | Sprint 1 | Tidak ada cliff vesting |
 | Sprint 5 | Sprint 1 + Sprint 3 | Auto-repayment external call tidak bisa ditest |
 | Sprint 6 | Sprint 1–5 semua | Dashboard tidak bisa diintegrasikan |
+| Sprint 7 | Sprint 6 | FHE UI tidak bisa diintegrasikan tanpa base dashboard |
 
 ---
 
@@ -207,6 +212,47 @@ Dashboard HR dan Employee live di Base Sepolia. QA E2E selesai. Siap demo untuk 
 
 ---
 
+## Sprint 7 — Confidential Payroll: Salary Privacy (3 minggu)
+
+### Goal
+Gaji karyawan tersimpan sebagai ciphertext terenkripsi on-chain. Employee hanya bisa lihat gaji sendiri. Employee lain yang query contract hanya mendapat ciphertext acak — salary amount tidak bisa diintip meski tahu wallet address rekannya.
+
+### Konteks: Threat yang Diselesaikan
+Base adalah public blockchain. Tanpa proteksi, siapapun yang tahu Work ID (wallet address) karyawan lain bisa membaca `employeeStreams[address].flowRate` dan menghitung gaji bulanannya. Sprint ini menutup celah tersebut menggunakan **Inco Lightning FHE** (Fully Homomorphic Encryption co-processor, live di Base Sepolia).
+
+### Tasks
+
+| # | Task | Komponen | Estimasi |
+|---|---|---|---|
+| 7.1 | Setup `@inco/lightning` dependency di Foundry project | Infrastructure | 0.5 hari |
+| 7.2 | Buat `ConfidentialCompanyVault.sol` — ekstensi dari `CompanyVault` | Smart Contract | 2 hari |
+| 7.3 | Implementasi `encryptedSalaries: mapping(address => euint64)` | Smart Contract | 1 hari |
+| 7.4 | Implementasi `setSalaryConfidential(address, euint64)` — HR only | Smart Contract | 1 hari |
+| 7.5 | Implementasi `getMySalary()` — self-read dengan viewing key | Smart Contract | 1 hari |
+| 7.6 | Implementasi `getAggregatePayroll()` — homomorphic sum untuk HR | Smart Contract | 1 hari |
+| 7.7 | Setup delegated decryption key untuk compliance/auditor | Smart Contract + Backend | 2 hari |
+| 7.8 | Unit tests: verify employee A tidak bisa decrypt salary employee B | Testing | 2 hari |
+| 7.9 | Deploy `ConfidentialCompanyVault` ke Base Sepolia | Deployment | 0.5 hari |
+| 7.10 | Frontend: update HR salary input — enkripsi client-side sebelum kirim tx | Frontend | 2 hari |
+| 7.11 | Frontend: update Employee dashboard — decrypt + tampilkan gaji sendiri | Frontend | 2 hari |
+| 7.12 | QA: tes semua skenario akses (HR, employee, employee lain, auditor) | QA | 2 hari |
+
+### Definition of Done Sprint 7
+- [ ] `setSalaryConfidential()` berhasil menyimpan gaji sebagai ciphertext — tidak ada plaintext di storage atau event
+- [ ] `getMySalary()` mengembalikan nilai yang bisa didecrypt oleh employee yang bersangkutan
+- [ ] Employee B tidak bisa membaca salary employee A (test dengan dua wallet berbeda)
+- [ ] HR bisa melihat aggregate payroll via `getAggregatePayroll()` tanpa reveal individual salary
+- [ ] Gas overhead terukur dan terdokumentasi (target: < 5x gas vs plaintext)
+- [ ] Frontend HR dan Employee dashboard terintegrasi dengan FHE flow
+- [ ] `CompanyVault` existing tetap berjalan tanpa perubahan (FHE adalah ekstensi, bukan replacement)
+
+### Catatan Arsitektur
+- `ConfidentialCompanyVault` adalah **ekstensi opsional** — core payroll (streaming, claim, split 93/5/2) tidak berubah
+- `flowRate` di `employeeStreams` masih plaintext (streaming mechanic perlu flowRate untuk kalkulasi accrual) — ini didokumentasikan sebagai **known limitation**, masuk scope OQ-013
+- Deployment `ConfidentialCompanyVault` menggunakan `PayrollFactory` yang sama via upgrade pattern
+
+---
+
 ## Risiko & Mitigasi
 
 | Risiko | Probabilitas | Dampak | Mitigasi |
@@ -219,19 +265,22 @@ Dashboard HR dan Employee live di Base Sepolia. QA E2E selesai. Siap demo untuk 
 | Base L2 network congestion / RPC outage | Rendah | Sedang | Implement retry logic + gas tip di Bundler; fallback ke secondary RPC |
 | Paymaster kehabisan ETH | Sedang | Tinggi | Monitor ETH balance Paymaster wallet; alert jika < threshold; auto top-up |
 | Reentrancy attack pada contract | Rendah | Sangat Tinggi | Gunakan OpenZeppelin ReentrancyGuard; Checks-Effects-Interactions pattern |
+| Inco co-processor downtime/kompromis | Rendah | Sedang | FHE adalah lapisan opsional — fallback ke `CompanyVault` plaintext jika Inco unavailable; dokumentasikan trust assumption di skripsi |
+| `flowRate` masih bocor sebagian informasi | Tinggi (known) | Rendah | Didokumentasikan sebagai known limitation; full fix butuh private streaming (post-MVP) |
 
 ---
 
 ## Timeline Visual
 
 ```
-     Minggu:  1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16 17
+     Minggu:  1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16 17 18 19 20
 Sprint 1:     [═══════════]
 Sprint 2:              [═══════════]
 Sprint 3:                       [══════]
 Sprint 4:                             [══════]
 Sprint 5:                                   [═══════════]
 Sprint 6:                                            [════════════]
-                                                               │
-                                                          LAUNCH 🚀
+Sprint 7:                                                         [═══════════]
+                                                                              │
+                                                                         LAUNCH 🚀
 ```

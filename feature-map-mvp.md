@@ -47,6 +47,10 @@
 | | Simulasi tarik IDRX ke Rupiah (Payment Gateway) | P1 — Should | Sprint 8 |
 | **K. Sistem Notifikasi & Audit**| Activity Log (HR Jejak Audit) | P0 — Must | Sprint 8 |
 | | Notifikasi in-app alert (Lonceng) | P0 — Must | Sprint 8 |
+| **L. Salary Privacy** | Encrypted salary storage via Inco FHE (`euint64`) | P1 — Should | Sprint 7 |
+| | Employee self-decrypt: lihat gaji sendiri | P1 — Should | Sprint 7 |
+| | HR aggregate view: total payroll homomorphic | P1 — Should | Sprint 7 |
+| | Compliance delegated decryption key | P2 — Nice | Sprint 7 |
 
 ---
 
@@ -60,6 +64,8 @@ Fitur-fitur berikut **tidak akan dikerjakan** pada MVP dan direncanakan untuk ve
 - Fiat on/off ramp langsung (beli IDRX dalam platform)
 - Bridge IDRX antar chain (Base ↔ Ethereum mainnet)
 - Notifikasi push mobile native (cukup email untuk MVP)
+- **Stealth addresses** (EIP-5564) untuk menyembunyikan identitas penerima transfer — direncanakan post-MVP
+- **Private streaming rate** (hide `flowRate` on-chain) — memerlukan migrasi penuh ke Inco FHE untuk `employeeStreams`
 
 ---
 
@@ -69,7 +75,7 @@ Fitur-fitur berikut **tidak akan dikerjakan** pada MVP dan direncanakan untuk ve
 Sprint 1-2: Core Payroll, Compliance & PHK
 Sprint 3-4: Work ID, Auth, Cliff Vesting
 Sprint 5-6: Koperasi, Dashboard & Launch
-Sprint 7: Attendance, Cuti, Expense & Reimburse
+Sprint 7: Confidential Payroll (Inco FHE) + Attendance, Cuti, Expense & Reimburse
 Sprint 8: Bonus, Bounty, Off-Ramping, Audit Log
 ```
 

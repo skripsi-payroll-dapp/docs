@@ -459,6 +459,90 @@ File yang diubah: ___
 
 ---
 
+### OQ-013 · Inco Lightning Co-Processor Trust Model
+
+| Property | Value |
+|---|---|
+| **Kategori** | Tech |
+| **Owner** | Tech Lead |
+| **Deadline** | Sprint 7 (sebelum deploy ConfidentialCompanyVault) |
+| **Status** | ⬜ Open |
+
+**Pertanyaan:**
+> Sejauh mana Inco Lightning co-processor bisa dipercaya? Apa yang terjadi jika Inco nodes dikompromis atau shutdown? Apakah ada mekanisme fallback?
+
+**Konteks:**
+Inco Lightning menggunakan FHE co-processor model — komputasi FHE berat dijalankan off-chain di Inco nodes, hasilnya (ciphertext) disimpan di Base Sepolia. Ini berarti **plaintext salary pernah ada di Inco infrastructure** saat enkripsi pertama kali. Ini bukan trustless — berbeda dari ZK proof yang trustless sepenuhnya. Pertanyaan ini penting untuk bagian threat model skripsi.
+
+**Pertanyaan Turunan:**
+1. Apakah Inco nodes memiliki akses ke plaintext saat enkripsi, atau enkripsi dilakukan sepenuhnya client-side?
+2. Apakah ada SLA / uptime guarantee dari Inco untuk Base Sepolia?
+3. Jika Inco sunset/shutdown, apakah ciphertext yang tersimpan on-chain masih bisa didecrypt?
+4. Apakah ada audit keamanan yang dipublikasikan untuk Inco co-processor?
+
+**Opsi Mitigasi:**
+| Opsi | Pro | Kon |
+|---|---|---|
+| Terima trust model Inco, dokumentasikan di skripsi | Cepat, praktis | Tidak trustless |
+| Fallback ke `CompanyVault` plaintext jika Inco down | Resilient | Dua contract path |
+| Hybrid: Inco FHE + Circom ZK commitment untuk audit trail | Defense in depth | Kompleksitas tinggi |
+
+**Dampak Jika Tidak Resolved Sebelum Sprint 7:**
+`ConfidentialCompanyVault` di-deploy dengan trust assumption yang tidak terdokumentasi → celah di bab metodologi skripsi.
+
+**Keputusan:**
+```
+[ Diisi saat resolved ]
+Tanggal: ___
+Trust model yang diterima: ___
+Dokumentasi di skripsi: ___
+```
+
+---
+
+### OQ-014 · Compliance Viewing Key: Siapa Pegang, Bagaimana Rotasi?
+
+| Property | Value |
+|---|---|
+| **Kategori** | Tech / Legal |
+| **Owner** | Tech Lead + Legal |
+| **Deadline** | Sprint 7 (sebelum go-live FHE feature) |
+| **Status** | ⬜ Open |
+
+**Pertanyaan:**
+> Siapa yang memegang compliance/auditor viewing key untuk mendecrypt gaji karyawan saat audit? Bagaimana key ini dirotasi jika auditor berganti atau ada pelanggaran?
+
+**Konteks:**
+Dengan Inco FHE, gaji terenkripsi. Untuk keperluan audit pajak (DJP), pemeriksaan BPJS, atau investigasi internal, pihak yang berwenang harus bisa mendecrypt nilai gaji. Inco mendukung delegated decryption — HR bisa grant viewing key ke pihak tertentu. Tapi siapa yang memegang key ini, dan bagaimana lifecycle-nya?
+
+**Pertanyaan Turunan:**
+1. Apakah compliance viewing key dipegang oleh: HR admin, Legal officer, atau external auditor?
+2. Apakah key ini bisa di-revoke jika auditor resign atau kontrak berakhir?
+3. Bagaimana jika HR admin yang pemegang key melakukan fraud — siapa yang bisa override?
+4. Apakah regulasi Indonesia (UU PPh, BPJS) mengizinkan data gaji hanya tersedia via encrypted viewing key?
+
+**Opsi Desain:**
+| Model | Pro | Kon |
+|---|---|---|
+| HR admin pegang semua viewing key | Sederhana | Single point of failure + abuse risk |
+| Multi-party viewing key (HR + Legal, 2-of-2) | Defense in depth | Kompleks untuk implementasi |
+| Platform (SaaS admin) sebagai key custodian | Centralized control untuk compliance | Bertentangan dengan prinsip desentralisasi |
+| Auditor minta disclosure via legal process | Tidak perlu sharing key | Tidak real-time — hanya untuk audit formal |
+
+**Dampak Jika Tidak Resolved Sebelum Sprint 7:**
+Delegated decryption diimplementasi tanpa governance yang jelas → risiko abuse atau compliance failure.
+
+**Keputusan:**
+```
+[ Diisi saat resolved ]
+Tanggal: ___
+Model yang dipilih: ___
+Key custodian: ___
+Revocation mechanism: ___
+```
+
+---
+
 ## Dashboard View (Notion)
 
 > Salin tabel ini ke Notion sebagai Database dengan filter dan grouping:
@@ -496,3 +580,5 @@ Views:
 | OQ-010 | — | — | — |
 | OQ-011 | — | — | — |
 | OQ-012 | — | — | — |
+| OQ-013 | — | — | — |
+| OQ-014 | — | — | — |

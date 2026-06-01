@@ -65,6 +65,7 @@
 | Sprint 4 | Cliff vest forfeit — pastikan tidak bisa diclaim sebelum cliff_ts |
 | Sprint 5 | Koperasi — pastikan closed-loop, no external access; integer overflow check |
 | Sprint 6 | Full security audit oleh firma eksternal (Slither + Mythril + manual review) |
+| Sprint 7 | FHE access control audit — pastikan employee B tidak bisa decrypt salary employee A |
 | Production | Key encryption audit, KYC flow penetration test, session revocation test, CSP header audit |
 
 ---
@@ -136,6 +137,36 @@
 | Bundler throughput | 100 UserOp/menit | Rate limit per karyawan 10/jam, bukan per Bundler |
 | Recovery Time Objective (RTO) | < 1 jam | Untuk incident database/backend |
 | Recovery Point Objective (RPO) | < 24 jam | Maksimal data loss yang dapat diterima |
+
+---
+
+## NFR-7: Privacy — Salary Confidentiality
+
+### Threat Model
+
+| Threat | Tanpa FHE | Dengan Inco FHE |
+|---|---|---|
+| Employee query `employeeStreams[addr].flowRate` | ✅ Gaji terbaca | ❌ flowRate masih plaintext (known limitation) |
+| Employee query `encryptedSalaries[addr]` | N/A | ✅ Hanya ciphertext — tidak bisa didecrypt |
+| Observer baca Transfer event | ✅ Jumlah terbaca | ✅ Jumlah terbaca (known limitation — future: stealth addr) |
+| HR akses gaji semua karyawan | ✅ Terbaca | ✅ Terbaca via HR viewing key |
+
+### Requirements
+
+| Requirement | Target | Status |
+|---|---|---|
+| Gaji tidak boleh tersimpan plaintext on-chain (encrypted storage) | `encryptedSalaries: mapping(address => euint64)` | 📋 Sprint 7 |
+| Employee hanya bisa decrypt gaji sendiri | Self-read dengan personal viewing key | 📋 Sprint 7 |
+| Employee lain yang query dapat ciphertext acak | Verified via unit test dengan 2 wallet berbeda | 📋 Sprint 7 |
+| HR bisa melihat aggregate total payroll | Homomorphic sum via `getAggregatePayroll()` | 📋 Sprint 7 |
+| Gas overhead FHE terdokumentasi | < 5x gas vs plaintext — masih < $0.01/tx di Base | 📋 Sprint 7 |
+| Trust assumption Inco co-processor terdokumentasi di skripsi | Section limitation di bab pembahasan | 📋 Sprint 7 |
+
+### Known Limitations (Documented, Bukan Bug)
+
+1. **`flowRate` masih plaintext** — `employeeStreams[address].flowRate` bisa dihitung menjadi estimasi gaji bulanan. Fix penuh membutuhkan private streaming (post-MVP scope). Mitigasi: `flowRate` tidak sama dengan gaji bersih (ada split 93/5/2), sehingga nilai exactnya tidak langsung terbaca.
+2. **Transfer events masih visible** — `IDRX.transfer(employee, amount)` emit event dengan jumlah plaintext. Fix: stealth addresses (EIP-5564) — post-MVP.
+3. **Trust ke Inco nodes** — FHE computation dilakukan di Inco co-processor. Jika node Inco dikompromis, ciphertext bisa didecrypt. Ini bukan trustless — harus diakui di bab threat model skripsi.
 
 ---
 

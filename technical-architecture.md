@@ -20,6 +20,7 @@
 | **Backend** | Node.js + PostgreSQL | ✅ Running | Bundler relay, off-chain data, compliance reporting |
 | **Auth** | EIP-191 signature + JWT (15min/7d) | ✅ Working | Stateless, verifiable, no DB lookup per request |
 | **Testing** | Foundry (forge test) + Anvil | ✅ Done | Unit test + fork simulation |
+| **Salary Privacy** | Inco Lightning FHE (fhEVM) | 📋 Planned | Encrypted `euint64` salary storage — mencegah employee kepo gaji rekan via on-chain query |
 | **KYC — Prod** | Verihubs / Dukcapil API | 📋 Planned | eKYC NIK binding per UU PDP 2022 |
 | **Monitoring** | Ponder logs + Alchemy webhooks | ✅ Running | Event indexing + on-chain monitoring |
 
@@ -306,8 +307,76 @@ via PayrollFactory.deployVault()
 | **Pimlico / Biconomy** | ERC-4337 Paymaster — sponsor gas fee karyawan | Stackup / self-hosted Bundler |
 | **IDRX** | Rupiah stablecoin ERC-20 | USDC sebagai fallback MVP (Open Question #1) |
 | **OpenZeppelin AccessControl** | HR_ROLE + LEGAL_ROLE multi-sig PHK guard | Built into PayrollContract — tidak butuh external protocol; Safe Protocol dipertimbangkan tapi tidak dipakai karena menambah dependency eksternal tanpa manfaat signifikan untuk 2-of-2 flow |
+| **Inco Lightning** | FHE co-processor untuk encrypted salary storage di Base Sepolia | Tidak ada fallback saat ini — fitur optional, bisa dinonaktifkan tanpa breaking core payroll |
 | **Azure App Service** | Hosting backend Node.js + Ponder di Indonesia Central | Railway / Render sebagai fallback |
 | **Datadog** | APM + monitoring | Grafana + Prometheus self-hosted |
+
+---
+
+## Privacy Architecture — Confidential Salary (Inco FHE)
+
+### Threat Model
+
+Base adalah public blockchain. Tanpa proteksi, siapapun yang tahu wallet address karyawan lain bisa:
+- Query `employeeStreams[address].flowRate` → hitung gaji per bulan
+- Baca `Transfer` events → lihat history penarikan exact
+- Query `balanceOf(address)` di IDRX contract → lihat saldo real-time
+
+Threat actor yang paling realistis: **karyawan iseng** yang tahu Work ID rekannya (bisa didapat dari event `StreamCreated` publik).
+
+### Solusi: Inco Lightning FHE
+
+Inco Lightning adalah FHE co-processor untuk Base Sepolia (live sejak April 2025). Gaji disimpan sebagai ciphertext `euint64` — tidak bisa dibaca on-chain oleh siapapun kecuali pemegang viewing key.
+
+```solidity
+import "@inco/lightning/lib.sol";
+
+// Salary stored as encrypted uint64 — on-chain hanya ciphertext
+mapping(address => euint64) private encryptedSalaries;
+
+// HR set salary — amount dienkripsi client-side sebelum tx
+function setSalaryConfidential(address employee, euint64 encryptedAmount)
+    external onlyHR
+{
+    encryptedSalaries[employee] = encryptedAmount;
+}
+
+// Employee hanya bisa decrypt miliknya sendiri
+function getMySalary() external view returns (euint64) {
+    return encryptedSalaries[msg.sender];
+}
+```
+
+### Access Control Model
+
+| Pihak | Akses | Cara |
+|---|---|---|
+| HR Admin | Baca semua gaji | HR master viewing key |
+| Employee | Baca gaji sendiri | Personal viewing key (dari Privy wallet) |
+| Employee lain | ❌ Tidak bisa baca | Hanya dapat ciphertext acak |
+| Compliance/Auditor | Baca aggregate + individual (atas request) | Delegated decryption key dari HR |
+| On-chain observer | ❌ Hanya ciphertext | Tidak ada plaintext on-chain |
+
+### Trade-off yang Diakui
+
+| Aspek | Nilai |
+|---|---|
+| Gas overhead | ~2–5x vs plaintext storage — masih murah di Base (~$0.001/tx) |
+| Trust model | Percaya Inco co-processor nodes — bukan trustless sepenuhnya |
+| Streaming rate | `flowRate` di `employeeStreams` masih plaintext — perlu migrasi terpisah ke Inco jika diperlukan |
+| Compliance audit | Diatasi dengan delegated decryption key untuk auditor |
+
+### Deployment Pattern
+
+```
+ConfidentialCompanyVault.sol (extends CompanyVault)
+  ├── encryptedSalaries: mapping(address => euint64)   ← Inco FHE
+  ├── setSalaryConfidential()                           ← HR only
+  ├── getMySalary()                                     ← self-read
+  └── getAggregatePayroll()                             ← HR only, homomorphic sum
+```
+
+`CompanyVault` existing tidak diubah — `ConfidentialCompanyVault` adalah ekstensi opsional. Core payroll (streaming, claim, split) tetap berjalan tanpa FHE.
 
 ---
 
