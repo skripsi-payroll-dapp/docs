@@ -149,10 +149,14 @@ Sistem yang berada **di luar ruang lingkup** MVP ini antara lain: integrasi HRIS
 | 13 | Privy — *Embedded Wallets Documentation* | Referensi integrasi Privy WaaS (Wallet-as-a-Service) untuk autentikasi email-to-wallet karyawan. |
 | 14 | Undang-Undang Perkoperasian No. 25 Tahun 1992 | Landasan hukum operasional koperasi karyawan (EmployeeLiquidityPool) sebagai entitas closed-loop. |
 | 15 | OJK POJK No. 77/POJK.01/2016 tentang Layanan Pinjam Meminjam Uang Berbasis Teknologi Informasi | Regulasi yang harus dihindari: koperasi Payana beroperasi sebagai closed-loop agar tidak terklasifikasikan sebagai fintech pinjol. |
-| 16 | Bonaventura Octavito — *Overview and Background: Payana Payroll SaaS* (2025) | Dokumen internal proyek: latar belakang, visi, dan proposisi nilai Payana. |
-| 17 | Bonaventura Octavito — *Feature Map MVP: Payana Payroll SaaS* (2025) | Dokumen internal proyek: peta fitur, prioritas, dan timeline sprint. |
-| 18 | Bonaventura Octavito — *Technical Architecture: Payana Payroll SaaS* (2025) | Dokumen internal proyek: stack teknologi, diagram arsitektur, alur data, dan kontrak yang di-deploy. |
-| 19 | Bonaventura Octavito — *Non-Functional Requirements: Payana Payroll SaaS* (2025) | Dokumen internal proyek: kebutuhan performa, keamanan, kepatuhan, dan skalabilitas. |
+| 16 | S. Nakamoto, *Bitcoin: A Peer-to-Peer Electronic Cash System*, 2008. [Online]. Tersedia: https://bitcoin.org/bitcoin.pdf | Whitepaper fondasi teknologi blockchain yang menjadi landasan konseptual sistem desentralisasi Payana. |
+| 17 | V. Buterin, *Ethereum: A Next-Generation Smart Contract and Decentralized Application Platform*, Ethereum Foundation, 2014. [Online]. Tersedia: https://ethereum.org/whitepaper | Whitepaper Ethereum yang mendasari penggunaan smart contract Solidity dan jaringan Base L2. |
+| 18 | G. Wood, *Ethereum: A Secure Decentralised Generalised Transaction Ledger (Yellow Paper)*, Ethereum Foundation, 2014. [Online]. Tersedia: https://ethereum.github.io/yellowpaper/paper.pdf | Spesifikasi teknis EVM yang menjadi acuan perilaku eksekusi smart contract dan mekanisme gas. |
+| 19 | C. Gentry, *A Fully Homomorphic Encryption Scheme*, Disertasi PhD, Stanford University, 2009. | Fondasi teori Fully Homomorphic Encryption (FHE) yang diimplementasikan melalui Inco Lightning pada fitur Salary Privacy. |
+| 20 | Peraturan Pemerintah No. 44 Tahun 2015 tentang Penyelenggaraan Program Jaminan Kecelakaan Kerja dan Jaminan Kematian | Dasar hukum kalkulasi iuran BPJS Ketenagakerjaan yang terakumulasi di ComplianceVault. |
+| 21 | Peraturan Pemerintah No. 84 Tahun 2013 tentang Perubahan atas PP No. 14 Tahun 1993 tentang Penyelenggaraan Jaminan Sosial Tenaga Kerja | Dasar hukum iuran BPJS Kesehatan yang menjadi komponen split payroll Payana. |
+| 22 | M. Bartoletti dan L. Pompianu, "An Empirical Analysis of Smart Contracts: Platforms, Applications, and Design Patterns," dalam *Financial Cryptography and Data Security*, Springer, 2017. | Kajian pola desain smart contract yang menjadi acuan arsitektur CompanyVault. |
+| 23 | *Foundry Book — Ethereum Development Toolkit*, Paradigm, 2023. [Online]. Tersedia: https://book.getfoundry.sh | Dokumentasi resmi framework pengembangan dan pengujian smart contract Solidity yang digunakan dalam proyek ini. |
 
 ### 1.5 Ikhtisar Dokumen
 
