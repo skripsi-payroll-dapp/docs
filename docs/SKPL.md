@@ -976,7 +976,167 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menerbitkan viewing key 
 
 ---
 
+#### Diagram Use Case — Gambaran Keseluruhan
+
+Diagram berikut menggambarkan seluruh aktor sistem Payana beserta use case yang dapat mereka lakukan.
+
+```mermaid
+graph LR
+    HR(["👤 HR Admin"])
+    EMP(["👤 Karyawan"])
+    LEGAL(["👤 Legal Officer"])
+    OWNER(["👤 Owner SaaS"])
+    THIRD(["👤 Pihak Ketiga"])
+
+    HR --> UC01["UC-01\nLogin & Autentikasi"]
+    HR --> UC02["UC-02\nOnboarding Perusahaan\n& Deploy Vault"]
+    HR --> UC03["UC-03\nDeposit IDRX\nke Vault"]
+    HR --> UC04["UC-04\nOnboarding Karyawan\n& Start Stream"]
+    HR --> UC06["UC-06\nInisiasi PHK"]
+    HR --> UC09["UC-09\nGrant Vesting\nSchedule"]
+    HR --> UC13["UC-13\nGenerate Laporan\nKepatuhan"]
+    HR --> UC16["UC-16\nDashboard Vault\n& Status Stream"]
+    HR --> UC17["UC-17\nSet Gaji\nTerenkripsi FHE"]
+    HR --> UC19["UC-19\nAgregasi Total\nPayroll FHE"]
+
+    EMP --> UC01
+    EMP --> UC05["UC-05\nKlaim Gaji EWA"]
+    EMP --> UC08["UC-08\nResign Mandiri"]
+    EMP --> UC10["UC-10\nClaim Vested\nBonus"]
+    EMP --> UC11["UC-11\nDeposit Koperasi"]
+    EMP --> UC12["UC-12\nAjukan Pinjaman\nKoperasi"]
+    EMP --> UC18["UC-18\nLihat Gaji\nvia Viewing Key"]
+
+    LEGAL --> UC01
+    LEGAL --> UC07["UC-07\nPersetujuan PHK"]
+
+    OWNER --> UC01
+    OWNER --> UC15["UC-15\nDeploy Company\nVault Baru"]
+    OWNER --> UC20["UC-20\nKonfigurasi\nPlatform Fee"]
+
+    THIRD --> UC14["UC-14\nVerifikasi SBT\nKetenagakerjaan"]
+
+    style HR fill:#dbeafe,stroke:#2563eb
+    style EMP fill:#dcfce7,stroke:#16a34a
+    style LEGAL fill:#fef9c3,stroke:#ca8a04
+    style OWNER fill:#fce7f3,stroke:#db2777
+    style THIRD fill:#f3f4f6,stroke:#6b7280
+```
+
+---
+
+#### Diagram Use Case — HR Admin
+
+```mermaid
+graph TD
+    HR(["👤 HR Admin"])
+
+    subgraph Autentikasi
+        UC01["UC-01\nLogin & Autentikasi"]
+    end
+    subgraph Vault["Manajemen Vault"]
+        UC02["UC-02\nOnboarding Perusahaan"]
+        UC03["UC-03\nDeposit IDRX"]
+        UC16["UC-16\nDashboard Vault"]
+    end
+    subgraph Karyawan["Manajemen Karyawan"]
+        UC04["UC-04\nOnboarding & Start Stream"]
+        UC06["UC-06\nInisiasi PHK"]
+        UC09["UC-09\nGrant Vesting"]
+    end
+    subgraph Kepatuhan["Kepatuhan & Privasi"]
+        UC13["UC-13\nGenerate Laporan"]
+        UC17["UC-17\nSet Gaji FHE"]
+        UC19["UC-19\nAgregasi Payroll FHE"]
+    end
+
+    HR --> UC01
+    HR --> UC02 & UC03 & UC16
+    HR --> UC04 & UC06 & UC09
+    HR --> UC13 & UC17 & UC19
+
+    style HR fill:#dbeafe,stroke:#2563eb
+```
+
+#### Diagram Use Case — Karyawan
+
+```mermaid
+graph TD
+    EMP(["👤 Karyawan"])
+
+    subgraph Autentikasi
+        UC01["UC-01\nLogin & Autentikasi"]
+    end
+    subgraph Penggajian["Penggajian & Benefit"]
+        UC05["UC-05\nKlaim Gaji EWA"]
+        UC08["UC-08\nResign Mandiri"]
+        UC10["UC-10\nClaim Vested Bonus"]
+        UC18["UC-18\nLihat Gaji via Viewing Key"]
+    end
+    subgraph Koperasi["Koperasi"]
+        UC11["UC-11\nDeposit ke Pool"]
+        UC12["UC-12\nAjukan Pinjaman"]
+    end
+
+    EMP --> UC01
+    EMP --> UC05 & UC08 & UC10 & UC18
+    EMP --> UC11 & UC12
+
+    style EMP fill:#dcfce7,stroke:#16a34a
+```
+
+#### Diagram Use Case — Legal Officer, Owner SaaS & Pihak Ketiga
+
+```mermaid
+graph TD
+    LEGAL(["👤 Legal Officer"])
+    OWNER(["👤 Owner SaaS"])
+    THIRD(["👤 Pihak Ketiga"])
+
+    UC01["UC-01\nLogin & Autentikasi"]
+    UC07["UC-07\nPersetujuan PHK"]
+    UC15["UC-15\nDeploy Vault Baru"]
+    UC20["UC-20\nKonfigurasi Platform Fee"]
+    UC14["UC-14\nVerifikasi SBT"]
+
+    LEGAL --> UC01 & UC07
+    OWNER --> UC01 & UC15 & UC20
+    THIRD --> UC14
+
+    style LEGAL fill:#fef9c3,stroke:#ca8a04
+    style OWNER fill:#fce7f3,stroke:#db2777
+    style THIRD fill:#f3f4f6,stroke:#6b7280
+```
+
+---
+
+#### Spesifikasi Use Case
+
 #### UC-01: Login dan Autentikasi
+
+```mermaid
+sequenceDiagram
+    actor User as Pengguna
+    participant FE as Frontend
+    participant Privy
+    participant BE as Backend
+    participant Base as Base Blockchain
+
+    User->>FE: Buka halaman /login
+    FE->>Privy: Inisiasi embedded wallet
+    Privy-->>FE: Alamat wallet
+    FE->>FE: Buat pesan EIP-191 + timestamp
+    FE->>Privy: signMessage(pesan)
+    Privy-->>FE: signature
+    FE->>BE: POST /auth/login {address, message, signature}
+    BE->>BE: recoverMessageAddress() — validasi EIP-191
+    BE->>BE: Cek replay protection (≤300 detik)
+    BE->>BE: Buat sesi JWT (access 15 mnt, refresh 7 hari)
+    BE-->>FE: {accessToken, refreshToken}
+    FE->>Base: companyVaults(address) — deteksi role
+    Base-->>FE: vaultAddress
+    FE-->>User: Redirect ke dashboard sesuai role
+```
 
 | | |
 |-|-|
@@ -993,6 +1153,30 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menerbitkan viewing key 
 
 #### UC-02: Onboarding Perusahaan dan Deploy Vault
 
+```mermaid
+sequenceDiagram
+    actor OWNER as Owner SaaS
+    actor HR as HR Admin
+    participant FE as Frontend
+    participant BE as Backend
+    participant SC as PayrollFactory
+    participant Base as Base Blockchain
+
+    HR->>BE: POST /registration/request {address, email, nama}
+    BE-->>HR: Status pending
+    OWNER->>FE: Buka /owner — lihat antrian pendaftaran
+    FE->>BE: GET /registration/pending
+    BE-->>FE: Daftar permohonan HR
+    OWNER->>BE: PATCH /registration/:address/approve
+    BE-->>OWNER: Status approved
+    OWNER->>SC: deployVault(hrAuthority, companyName, ...)
+    SC->>SC: Validasi HRAlreadyHasVault
+    SC->>Base: Deploy instance CompanyVault baru
+    Base-->>SC: vaultAddress
+    SC-->>OWNER: event VaultDeployed
+    OWNER-->>HR: Notifikasi vault siap
+```
+
 | | |
 |-|-|
 | **Nama Use Case** | Onboarding Perusahaan dan Deploy Vault |
@@ -1007,6 +1191,24 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menerbitkan viewing key 
 ---
 
 #### UC-03: Deposit IDRX ke Vault Perusahaan
+
+```mermaid
+sequenceDiagram
+    actor HR as HR Admin
+    participant FE as Frontend
+    participant IDRX as IDRX Token
+    participant CV as CompanyVault
+
+    HR->>FE: Input jumlah deposit di /hr/vault
+    FE->>IDRX: approve(vaultAddress, amount)
+    IDRX-->>FE: Approval dikonfirmasi
+    FE->>CV: fundVault(amount)
+    CV->>IDRX: transferFrom(hr, vault, amount)
+    IDRX-->>CV: Transfer berhasil
+    CV->>CV: vaultBalance += amount
+    CV-->>FE: event VaultFunded(amount)
+    FE-->>HR: Saldo vault diperbarui
+```
 
 | | |
 |-|-|
@@ -1023,6 +1225,24 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menerbitkan viewing key 
 
 #### UC-04: Onboarding Karyawan dan Inisiasi Stream Gaji
 
+```mermaid
+sequenceDiagram
+    actor HR as HR Admin
+    participant FE as Frontend
+    participant CV as CompanyVault
+    participant SBT as EmploymentSBT
+
+    HR->>FE: Isi form onboarding karyawan (workId, flowRate, splits)
+    FE->>CV: startStream(employee, flowRate, employeeBps, complianceBps, severanceBps)
+    CV->>CV: Validasi splits total == 10.000 bps
+    CV->>CV: Validasi StreamAlreadyActive
+    CV->>CV: Inisiasi EmployeeStream + SeveranceVault (Locked)
+    CV->>SBT: mint(employee, companyName, hrAuthority)
+    SBT-->>CV: tokenId diterbitkan
+    CV-->>FE: event StreamStarted + EmploymentCertified
+    FE-->>HR: Karyawan berhasil di-onboard
+```
+
 | | |
 |-|-|
 | **Nama Use Case** | Onboarding Karyawan dan Inisiasi Stream Gaji |
@@ -1037,6 +1257,34 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menerbitkan viewing key 
 ---
 
 #### UC-05: Karyawan Klaim Gaji Terakumulasi (EWA)
+
+```mermaid
+sequenceDiagram
+    actor EMP as Karyawan
+    participant FE as Frontend
+    participant Privy
+    participant BE as Backend
+    participant Pimlico
+    participant CV as CompanyVault
+    participant ELC as EmployeeLiquidityContract
+    participant IDRX as IDRX Token
+
+    EMP->>FE: Klik "Tarik Gaji" di /employee/ewa
+    FE->>CV: getAccrued(employeeAddress) — view
+    CV-->>FE: Jumlah akrual (wei)
+    FE->>FE: Build UserOperation {callData: claimSalary()}
+    FE->>Privy: signUserOperation(userOp)
+    Privy-->>FE: Signed UserOperation
+    FE->>BE: POST /bundler/relay {userOp, jwt}
+    BE->>BE: Validasi JWT + rate limit (max 10/jam)
+    BE->>Pimlico: eth_sendUserOperation
+    Pimlico->>CV: claimSalary() via EntryPoint
+    CV->>ELC: autoRepay() — cicil pinjaman jika ada
+    CV->>CV: Split: 93% karyawan / 5% compliance / 2% severance
+    CV->>IDRX: transfer(employee, employeeAmount)
+    CV-->>FE: event SalaryClaimed
+    FE-->>EMP: Notifikasi sukses + saldo reset
+```
 
 | | |
 |-|-|
@@ -1053,6 +1301,21 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menerbitkan viewing key 
 
 #### UC-06: Inisiasi PHK oleh HR Admin
 
+```mermaid
+sequenceDiagram
+    actor HR as HR Admin
+    participant FE as Frontend
+    participant CV as CompanyVault
+
+    HR->>FE: Buka /hr/phk — pilih karyawan + isi alasan
+    FE->>CV: proposeTermination(employee, reasonHash)
+    CV->>CV: Validasi TerminationAlreadyProposed
+    CV->>CV: Simpan proposal: hrApproved=true, expiresAt=now+7hari
+    CV->>CV: Simpan flowRateSnapshot untuk kalkulasi pesangon
+    CV-->>FE: event TerminationProposed
+    FE-->>HR: Proposal PHK aktif — menunggu Legal Officer
+```
+
 | | |
 |-|-|
 | **Nama Use Case** | Inisiasi PHK oleh HR Admin |
@@ -1067,6 +1330,30 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menerbitkan viewing key 
 ---
 
 #### UC-07: Persetujuan PHK oleh Legal Officer
+
+```mermaid
+sequenceDiagram
+    actor LEGAL as Legal Officer
+    participant FE as Frontend
+    participant CV as CompanyVault
+    participant SBT as EmploymentSBT
+    participant IDRX as IDRX Token
+
+    LEGAL->>FE: Buka daftar proposal PHK menunggu persetujuan
+    FE->>CV: approveTermination(employee)
+    CV->>CV: Validasi LEGAL_ROLE
+    CV->>CV: Validasi AlreadyApproved + ProposalExpired
+    CV->>CV: legalApproved = true
+    CV-->>FE: event TerminationApproved — kedua pihak setuju
+    LEGAL->>FE: Klik "Eksekusi PHK"
+    FE->>CV: executeTermination(employee)
+    CV->>CV: Hitung pesangon (PayrollMath.severanceMultiplier)
+    CV->>CV: _forfeitAllVests(employee)
+    CV->>SBT: revoke(tokenId)
+    CV->>IDRX: transfer(employee, severanceDue)
+    CV-->>FE: event TerminationExecuted
+    FE-->>LEGAL: PHK berhasil dieksekusi
+```
 
 | | |
 |-|-|
@@ -1083,6 +1370,25 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menerbitkan viewing key 
 
 #### UC-08: Karyawan Resign Mandiri
 
+```mermaid
+sequenceDiagram
+    actor EMP as Karyawan
+    actor HR as HR Admin
+    participant FE as Frontend
+    participant CV as CompanyVault
+    participant SBT as EmploymentSBT
+
+    EMP->>HR: Ajukan pengunduran diri (di luar sistem)
+    HR->>FE: Proses resign di /hr/employees/[id]
+    FE->>CV: resignEmployee(employee)
+    CV->>CV: Stop stream + _settle(employee)
+    CV->>CV: Kembalikan severanceVault.balance ke vaultBalance
+    CV->>CV: _forfeitAllVests(employee)
+    CV->>SBT: revoke(tokenId)
+    CV-->>FE: event EmployeeResigned
+    FE-->>HR: Karyawan berhasil di-offboard
+```
+
 | | |
 |-|-|
 | **Nama Use Case** | Karyawan Resign Mandiri |
@@ -1097,6 +1403,22 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menerbitkan viewing key 
 ---
 
 #### UC-09: HR Grant Vesting Schedule ke Karyawan
+
+```mermaid
+sequenceDiagram
+    actor HR as HR Admin
+    participant FE as Frontend
+    participant CV as CompanyVault
+
+    HR->>FE: Isi form vest (karyawan, jumlah, cliff date, tipe)
+    FE->>CV: createCliffVest(employee, amount, cliffTs, vestType)
+    CV->>CV: Validasi cliffTs > block.timestamp
+    CV->>CV: Validasi InsufficientVaultBalance
+    CV->>CV: vaultBalance -= amount
+    CV->>CV: Simpan CliffVest{Locked}, vestId = vestCounter++
+    CV-->>FE: event CliffVestCreated(employee, vestId, amount, cliffTs)
+    FE-->>HR: Vest berhasil dibuat
+```
 
 | | |
 |-|-|
@@ -1113,6 +1435,26 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menerbitkan viewing key 
 
 #### UC-10: Karyawan Claim Vested Bonus
 
+```mermaid
+sequenceDiagram
+    actor EMP as Karyawan
+    participant FE as Frontend
+    participant CV as CompanyVault
+    participant IDRX as IDRX Token
+
+    EMP->>FE: Buka /employee/vesting — lihat daftar vest
+    FE->>CV: cliffVests(employee, vestId) — view
+    CV-->>FE: Status vest + cliffTs
+    EMP->>FE: Klik "Cairkan" pada vest yang matang
+    FE->>CV: claimCliffVest(vestId)
+    CV->>CV: Validasi CliffNotReached (block.timestamp >= cliffTs)
+    CV->>CV: Validasi VestAlreadySettled
+    CV->>CV: status = Claimed
+    CV->>IDRX: transfer(employee, amount)
+    CV-->>FE: event CliffVestClaimed
+    FE-->>EMP: Bonus berhasil dicairkan
+```
+
 | | |
 |-|-|
 | **Nama Use Case** | Karyawan Claim Vested Bonus |
@@ -1127,6 +1469,26 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menerbitkan viewing key 
 ---
 
 #### UC-11: Karyawan Bergabung ke Koperasi dan Menyimpan Dana
+
+```mermaid
+sequenceDiagram
+    actor EMP as Karyawan
+    participant FE as Frontend
+    participant IDRX as IDRX Token
+    participant ELC as EmployeeLiquidityContract
+
+    EMP->>FE: Input jumlah deposit di /employee/koperasi
+    FE->>IDRX: approve(elcAddress, amount)
+    IDRX-->>FE: Approval dikonfirmasi
+    FE->>ELC: depositToPool(amount)
+    ELC->>ELC: Validasi PoolNotInitialized
+    ELC->>ELC: Validasi amount >= 100 IDRX (minimum)
+    ELC->>IDRX: transferFrom(employee, elc, amount)
+    ELC->>ELC: lenderDeposits[employee].principal += amount
+    ELC->>ELC: totalDeposited += amount
+    ELC-->>FE: event Deposited(employee, amount)
+    FE-->>EMP: Simpanan berhasil didepositkan
+```
 
 | | |
 |-|-|
@@ -1143,6 +1505,27 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menerbitkan viewing key 
 
 #### UC-12: Karyawan Mengajukan Pinjaman Koperasi
 
+```mermaid
+sequenceDiagram
+    actor EMP as Karyawan
+    participant FE as Frontend
+    participant CV as CompanyVault
+    participant ELC as EmployeeLiquidityContract
+    participant IDRX as IDRX Token
+
+    EMP->>FE: Input jumlah pinjaman di /employee/koperasi
+    FE->>CV: getStreamInfo(employee) — cek flowRate
+    CV-->>FE: flowRate aktif
+    FE->>ELC: borrowFromPool(amount)
+    ELC->>ELC: Validasi ActiveLoanExists
+    ELC->>ELC: Validasi LoanLimitExceeded (max 80% gaji bulanan)
+    ELC->>ELC: Validasi InsufficientPoolLiquidity
+    ELC->>ELC: Hitung bunga di muka, simpan LoanRecord
+    ELC->>IDRX: transfer(employee, amount)
+    ELC-->>FE: event LoanCreated(employee, principal, interest, dueDate)
+    FE-->>EMP: Pinjaman berhasil dicairkan
+```
+
 | | |
 |-|-|
 | **Nama Use Case** | Karyawan Mengajukan Pinjaman Koperasi |
@@ -1157,6 +1540,31 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menerbitkan viewing key 
 ---
 
 #### UC-13: HR Generate Laporan Kepatuhan (BPJS/PPh21)
+
+```mermaid
+sequenceDiagram
+    actor HR as HR Admin
+    participant FE as Frontend
+    participant BE as Backend
+    participant Ponder as Ponder Indexer
+    participant PG as PostgreSQL
+
+    HR->>FE: Buka /hr/compliance — pilih periode bulan
+    FE->>BE: GET /compliance/summary/:hr?month=2026-05
+    BE->>Ponder: Query SalaryClaimed events per vault
+    Ponder-->>BE: Agregasi total klaim, compliance, severance
+    BE-->>FE: JSON ringkasan kepatuhan
+    FE-->>HR: Pratinjau laporan ditampilkan
+    HR->>FE: Klik "Unduh CSV"
+    FE->>BE: GET /compliance/export/:hr?month=2026-05
+    BE->>Ponder: Query detail per karyawan
+    Ponder-->>BE: Data on-chain per karyawan
+    BE->>PG: Query nama/NIK/telepon karyawan
+    PG-->>BE: Data PII terenkripsi
+    BE->>BE: Dekripsi AES-256-GCM + generate CSV
+    BE-->>FE: File CSV
+    FE-->>HR: Download CSV berhasil
+```
 
 | | |
 |-|-|
@@ -1173,6 +1581,26 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menerbitkan viewing key 
 
 #### UC-14: Verifikasi Sertifikat Ketenagakerjaan (SBT)
 
+```mermaid
+sequenceDiagram
+    actor THIRD as Pihak Ketiga
+    participant FE as Frontend
+    participant SBT as EmploymentSBT
+
+    THIRD->>FE: Masukkan alamat wallet karyawan
+    FE->>SBT: employeeTokenId(employeeAddress)
+    SBT-->>FE: tokenId (0 jika tidak ada SBT aktif)
+    alt tokenId != 0
+        FE->>SBT: employmentRecords(tokenId)
+        SBT-->>FE: {companyName, hrAuthority, startTs}
+        FE->>SBT: locked(tokenId)
+        SBT-->>FE: true (soulbound terkonfirmasi)
+        FE-->>THIRD: Status aktif + data ketenagakerjaan
+    else tokenId == 0
+        FE-->>THIRD: Karyawan tidak memiliki SBT aktif
+    end
+```
+
 | | |
 |-|-|
 | **Nama Use Case** | Verifikasi Sertifikat Ketenagakerjaan (SBT) |
@@ -1187,6 +1615,25 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menerbitkan viewing key 
 ---
 
 #### UC-15: Owner SaaS Deploy Company Vault Baru
+
+```mermaid
+sequenceDiagram
+    actor OWNER as Owner SaaS
+    participant FE as Frontend
+    participant PF as PayrollFactory
+    participant CV as CompanyVault
+
+    OWNER->>FE: Buka /owner — klik "Deploy Vault Baru"
+    FE->>PF: deployVault(hrAuthority, companyName, elcAddr, sbtAddr)
+    PF->>PF: Validasi SUPERADMIN_ROLE
+    PF->>PF: Validasi HRAlreadyHasVault
+    PF->>CV: new CompanyVault(params)
+    CV-->>PF: vaultAddress
+    PF->>PF: companyVaults[hr] = vaultAddress
+    PF->>PF: allVaults.push(vaultAddress)
+    PF-->>FE: event VaultDeployed(hr, vaultAddress, companyName)
+    FE-->>OWNER: Vault baru berhasil di-deploy
+```
 
 | | |
 |-|-|
@@ -1203,6 +1650,25 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menerbitkan viewing key 
 
 #### UC-16: HR Lihat Dashboard Vault dan Status Stream
 
+```mermaid
+sequenceDiagram
+    actor HR as HR Admin
+    participant FE as Frontend
+    participant CV as CompanyVault
+    participant Ponder as Ponder Indexer
+
+    HR->>FE: Buka /hr/vault
+    FE->>CV: vaultBalance() — view
+    CV-->>FE: Saldo vault (wei)
+    FE->>CV: totalFlowRate() — view
+    CV-->>FE: Total flow rate semua karyawan
+    FE->>Ponder: Query daftar stream aktif + karyawan
+    Ponder-->>FE: Data stream per karyawan
+    FE->>FE: Hitung burn rate bulanan = totalFlowRate × 2.592.000
+    FE->>FE: Hitung estimasi saldo habis
+    FE-->>HR: Dashboard vault + proyeksi kas ditampilkan
+```
+
 | | |
 |-|-|
 | **Nama Use Case** | HR Lihat Dashboard Vault dan Status Stream |
@@ -1217,6 +1683,24 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menerbitkan viewing key 
 ---
 
 #### UC-17: HR Admin Set Gaji Karyawan dalam Format Terenkripsi (FHE)
+
+```mermaid
+sequenceDiagram
+    actor HR as HR Admin
+    participant FE as Frontend
+    participant Inco as Inco Lightning SDK
+    participant CCV as ConfidentialCompanyVault
+
+    HR->>FE: Input nominal gaji karyawan (plaintext)
+    FE->>Inco: encrypt(salary, publicKey)
+    Inco-->>FE: ciphertext (euint64)
+    FE->>CCV: setEncryptedSalary(employee, ciphertext)
+    CCV->>CCV: Validasi HR_ROLE
+    CCV->>CCV: encryptedSalaries[employee] = ciphertext
+    CCV-->>FE: event EncryptedSalarySet (tanpa nilai plaintext)
+    FE-->>HR: Gaji terenkripsi berhasil disimpan
+    note over FE,CCV: [Perlu dikonfirmasi — Sprint 7]
+```
 
 | | |
 |-|-|
@@ -1233,6 +1717,22 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menerbitkan viewing key 
 
 #### UC-18: Karyawan Lihat Gaji Sendiri via Viewing Key
 
+```mermaid
+sequenceDiagram
+    actor EMP as Karyawan
+    participant FE as Frontend
+    participant CCV as ConfidentialCompanyVault
+    participant Inco as Inco Lightning SDK
+
+    EMP->>FE: Buka halaman gaji di /employee/ewa
+    FE->>CCV: encryptedSalaries(employeeAddress) — view
+    CCV-->>FE: ciphertext (euint64)
+    FE->>Inco: decrypt(ciphertext, viewingKey)
+    Inco-->>FE: plaintext salary (uint64)
+    FE-->>EMP: Nominal gaji ditampilkan dalam IDRX
+    note over FE,Inco: [Perlu dikonfirmasi — Sprint 7]
+```
+
 | | |
 |-|-|
 | **Nama Use Case** | Karyawan Lihat Gaji Sendiri via Viewing Key |
@@ -1247,6 +1747,24 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menerbitkan viewing key 
 ---
 
 #### UC-19: HR Lihat Total Payroll via Homomorphic Aggregation
+
+```mermaid
+sequenceDiagram
+    actor HR as HR Admin
+    participant FE as Frontend
+    participant CCV as ConfidentialCompanyVault
+    participant Inco as Inco Lightning SDK
+
+    HR->>FE: Klik "Hitung Total Payroll" di dashboard
+    FE->>CCV: aggregateTotalPayroll() — on-chain FHE sum
+    CCV->>Inco: FHE.add(salary1, salary2, ...) — homomorfik
+    Inco-->>CCV: ciphertext agregat total
+    CCV-->>FE: ciphertext total payroll
+    FE->>Inco: decrypt(ciphertext, hrAggregateKey)
+    Inco-->>FE: Total payroll plaintext
+    FE-->>HR: Total penggajian ditampilkan (tanpa ekspos gaji individual)
+    note over FE,Inco: [Perlu dikonfirmasi — Sprint 7]
+```
 
 | | |
 |-|-|
@@ -1263,6 +1781,27 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menerbitkan viewing key 
 ---
 
 #### UC-20: Owner SaaS Konfigurasi dan Klaim Platform Fee
+
+```mermaid
+sequenceDiagram
+    actor OWNER as Owner SaaS
+    participant FE as Frontend
+    participant PF as PayrollFactory
+    participant Ponder as Ponder Indexer
+
+    OWNER->>FE: Buka tab "Monetisasi" di /owner
+    FE->>PF: platformFeeBps() — baca konfigurasi saat ini
+    PF-->>FE: feeBps aktif
+    OWNER->>FE: Input feeBps baru (maks 100 bps = 1%)
+    FE->>PF: setPlatformFee(feeBps)
+    PF->>PF: Validasi SUPERADMIN_ROLE
+    PF->>PF: Validasi FeeTooHigh (feeBps <= MAX_FEE)
+    PF->>PF: platformFeeBps = feeBps
+    PF-->>FE: event PlatformFeeUpdated(feeBps)
+    FE->>Ponder: Query histori PlatformFeePaid events
+    Ponder-->>FE: Total fee terkumpul per periode
+    FE-->>OWNER: Dashboard pendapatan platform diperbarui
+```
 
 | | |
 |-|-|
