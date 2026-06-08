@@ -20,7 +20,7 @@
 | **Backend** | Node.js + PostgreSQL | ✅ Running | Bundler relay, off-chain data, compliance reporting |
 | **Auth** | EIP-191 signature + JWT (15min/7d) | ✅ Working | Stateless, verifiable, no DB lookup per request |
 | **Testing** | Foundry (forge test) + Anvil | ✅ Done | Unit test + fork simulation |
-| **Salary Privacy** | Inco Lightning FHE (fhEVM) | 📋 Planned | Encrypted `euint64` salary storage — mencegah employee kepo gaji rekan via on-chain query |
+| **Salary Privacy** | Inco Lightning FHE (fhEVM) | ✅ Deployed | Encrypted `euint256` salary storage via `ConfidentialCompanyVault` — mencegah employee kepo gaji rekan via on-chain query |
 | **KYC — Prod** | Verihubs / Dukcapil API | 📋 Planned | eKYC NIK binding per UU PDP 2022 |
 | **Monitoring** | Ponder logs + Alchemy webhooks | ✅ Running | Event indexing + on-chain monitoring |
 
@@ -28,14 +28,15 @@
 
 ## Contract Structure
 
-Platform terdiri dari **4 Solidity contracts** terpisah yang berinteraksi dalam ekosistem *Multi-Tenant* (Factory Pattern):
+Platform terdiri dari **5 Solidity contracts** terpisah yang berinteraksi dalam ekosistem *Multi-Tenant* (Factory Pattern):
 
 | Contract | Storage yang Dikelola | Fungsi Utama |
 |---|---|---|
-| `PayrollFactory` | companyVaults (mapping), allVaults | deployVault, emergencyFreezeAll |
-| `CompanyVault` | (Isolated per Tenant): employeeStreams, severanceVaults, complianceVaults, cliffVests, terminations | fundVault, startStream, claimSalary, proposeTermination, executeTermination, createCliffVest |
-| `EmployeeLiquidityContract` | pools, lenderDeposits, loanRecords, totalProtocolFee | initializePool, depositToPool, borrowFromPool, repayLoan, claimProtocolFee |
-| `EmploymentSBT` | tokenIdCounter, ownerOf, tokenURI | mintSBT, burnSBT (ERC-5192 soulbound) |
+| `PayrollFactory` | companyVaults (mapping), allVaults, platformFeeBps, protocolTreasury | deployVault, emergencyFreezeAll, setPlatformFee, setProtocolTreasury |
+| `CompanyVault` | (Isolated per Tenant): employeeStreams, severanceVaults, complianceBalance, cliffVests, terminations | fundVault, startStream, claimSalary, proposeTermination, executeTermination, createCliffVest |
+| `ConfidentialCompanyVault` | (extends CompanyVault): encryptedSalaries, auditorExpiry | setEncryptedSalary (payable), getEncryptedSalary, aggregateTotalPayroll, grantViewingKey |
+| `EmployeeLiquidityContract` | pools, lenderDeposits, loanRecords, registeredVaults, totalProtocolFee | registerVault, depositToPool(vault, amount), borrowFromPool(vault, amount), repayLoan, claimProtocolFee |
+| `EmploymentSBT` | tokenIdCounter, ownerOf, employmentRecords | mint, revoke (ERC-5192 soulbound) |
 
 ---
 
@@ -256,8 +257,9 @@ via PayrollFactory.deployVault()
    claimSalary() function:
    ├── Verify whitelist & stream active
    ├── accrued = flowRate × (block.timestamp - lastWithdrawnTs)
+   ├── platformCut = accrued × platformFeeBps / 10000 → protocolTreasury
    ├── External call → EmployeeLiquidityContract (auto-repay jika ada pinjaman)
-   └── 3× IERC20.transfer() atomic:
+   └── net = accrued - platformCut - repaid → split atomic:
        ├── 93% → Employee address
        ├──  5% → ComplianceVault balance
        └──  2% → SeveranceVault balance
@@ -280,12 +282,17 @@ via PayrollFactory.deployVault()
 | Storage | Lokasi Kontrak | Key | Uniqueness |
 |---|---|---|---|
 | `companyVaults` | `PayrollFactory` | `hr_authority address` | 1 per HR wallet |
+| `platformFeeBps` | `PayrollFactory` | (State variable) | Global — dipotong setiap claim |
+| `protocolTreasury` | `PayrollFactory` | (State variable) | Tujuan platform fee |
 | `vaultBalance` | `CompanyVault` | (State variable) | 1 per company vault |
 | `employeeStreams` | `CompanyVault` | `employee address` | 1 per employee (per company) |
 | `severanceVaults` | `CompanyVault` | `employee address` | 1 per employee (per company) |
 | `complianceBalance`| `CompanyVault` | (State variable) | 1 per company vault |
 | `cliffVests` | `CompanyVault` | `employee address + vestId` | Multiple per employee |
 | `terminations` | `CompanyVault` | `employee address` | 1 per active proposal |
+| `encryptedSalaries`| `ConfidentialCompanyVault` | `employee address` | 1 per employee — `euint256` ciphertext |
+| `auditorExpiry` | `ConfidentialCompanyVault` | `auditor address` | Time-limited delegated key |
+| `registeredVaults` | `EmployeeLiquidityContract`| `vault address` | Multi-tenant registry |
 | `pools` | `EmployeeLiquidityContract`| `company address` | 1 per company |
 | `lenderDeposits` | `EmployeeLiquidityContract`| `lender address` | 1 per lender |
 | `loanRecords` | `EmployeeLiquidityContract`| `borrower address` | 1 active per borrower |
@@ -326,25 +333,36 @@ Threat actor yang paling realistis: **karyawan iseng** yang tahu Work ID rekanny
 
 ### Solusi: Inco Lightning FHE
 
-Inco Lightning adalah FHE co-processor untuk Base Sepolia (live sejak April 2025). Gaji disimpan sebagai ciphertext `euint64` — tidak bisa dibaca on-chain oleh siapapun kecuali pemegang viewing key.
+Inco Lightning adalah TEE-backed FHE co-processor untuk Base Sepolia (live sejak April 2025, npm: `@inco/lightning`). Gaji disimpan sebagai ciphertext `euint256` — tidak bisa dibaca on-chain oleh siapapun kecuali pemegang ACL viewing key.
+
+> **Catatan teknis:** Inco Lightning v1 hanya menyediakan `euint256` (bukan `euint64`). Nilai gaji IDRX wei tetap dalam jangkauan uint256.
 
 ```solidity
-import "@inco/lightning/lib.sol";
+import {euint256, e, inco} from "@inco/lightning/src/Lib.sol";
 
-// Salary stored as encrypted uint64 — on-chain hanya ciphertext
-mapping(address => euint64) private encryptedSalaries;
+// Salary stored as encrypted uint256 — on-chain hanya ciphertext
+mapping(address => euint256) public encryptedSalaries;
 
-// HR set salary — amount dienkripsi client-side sebelum tx
-function setSalaryConfidential(address employee, euint64 encryptedAmount)
-    external onlyHR
+// HR set salary — amount dienkripsi client-side via Inco JS SDK
+// Fungsi ini payable karena Inco membebankan ETH fee per operasi FHE
+function setEncryptedSalary(address employee, bytes memory encryptedSalary)
+    external payable onlyHR
 {
-    encryptedSalaries[employee] = encryptedAmount;
+    require(msg.value == inco.getFee(), "Inco fee not paid");
+    euint256 ciphertext = encryptedSalary.newEuint256(msg.sender);
+    ciphertext.allowThis();
+    ciphertext.allow(msg.sender); // HR viewing access
+    ciphertext.allow(employee);   // Employee self-view
+    encryptedSalaries[employee] = ciphertext;
 }
 
-// Employee hanya bisa decrypt miliknya sendiri
-function getMySalary() external view returns (euint64) {
-    return encryptedSalaries[msg.sender];
+// Employee dan HR bisa akses ciphertext (client-side decrypt via Inco JS SDK)
+function getEncryptedSalary(address employee) external view returns (euint256) {
+    return encryptedSalaries[employee];
 }
+
+// HR aggregate total payroll secara homomorfik — tanpa dekripsi individual
+function aggregateTotalPayroll() external onlyHR returns (euint256 aggregate) { ... }
 ```
 
 ### Access Control Model
@@ -370,10 +388,15 @@ function getMySalary() external view returns (euint64) {
 
 ```
 ConfidentialCompanyVault.sol (extends CompanyVault)
-  ├── encryptedSalaries: mapping(address => euint64)   ← Inco FHE
-  ├── setSalaryConfidential()                           ← HR only
-  ├── getMySalary()                                     ← self-read
-  └── getAggregatePayroll()                             ← HR only, homomorphic sum
+  ├── encryptedSalaries: mapping(address => euint256)  ← Inco FHE (public)
+  ├── auditorExpiry: mapping(address => uint256)        ← FR-1105
+  ├── setEncryptedSalary(address, bytes) payable        ← HR only, requires inco.getFee()
+  ├── getEncryptedSalary(address)                       ← employee self / HR
+  ├── aggregateTotalPayroll()                            ← HR only, homomorphic sum
+  ├── grantViewingKey(address auditor, uint256 expiresAt) ← FR-1105
+  └── revokeAuditorAccess(address auditor)              ← FR-1105
+
+Deployed: 0x4560968670Dd852dACd73c7B8748695eC427e203 (Base Sepolia, block 42398878)
 ```
 
 `CompanyVault` existing tidak diubah — `ConfidentialCompanyVault` adalah ekstensi opsional. Core payroll (streaming, claim, split) tetap berjalan tanpa FHE.
@@ -411,53 +434,66 @@ forge script script/Deploy.s.sol --rpc-url $BASE_SEPOLIA_RPC_URL --broadcast
 payroll-saas/
 ├── finley-payroll/                     # Foundry — Solidity contracts + tests
 │   ├── src/
-│   │   ├── PayrollFactory.sol          # Deploys isolated CompanyVaults
+│   │   ├── PayrollFactory.sol          # Deploys isolated CompanyVaults; setPlatformFee, setProtocolTreasury
 │   │   ├── CompanyVault.sol            # Single-tenant isolated vault
 │   │   │   ├── fundVault() / withdrawVault()
 │   │   │   ├── startStream() / pauseStream() / resumeStream() / cancelStream()
-│   │   │   ├── claimSalary()           # 93/5/2 auto-split
+│   │   │   ├── claimSalary()           # platform fee → 93/5/2 auto-split
 │   │   │   ├── proposeTermination() / approveTermination() / executeTermination()
 │   │   │   ├── resignEmployee()
 │   │   │   ├── createCliffVest() / claimCliffVest() / cancelCliffVest()
 │   │   │   └── getStreamInfo()         # cross-contract read
+│   │   ├── ConfidentialCompanyVault.sol  # FHE extension (Sprint 7)
+│   │   │   ├── setEncryptedSalary(address, bytes) payable  # FR-1102
+│   │   │   ├── getEncryptedSalary(address)                 # FR-1103
+│   │   │   ├── aggregateTotalPayroll()                      # FR-1104
+│   │   │   ├── grantViewingKey(auditor, expiresAt)          # FR-1105
+│   │   │   └── revokeAuditorAccess(auditor)                 # FR-1105
 │   │   ├── EmployeeLiquidityContract.sol
+│   │   │   ├── registerVault() / unregisterVault()  # multi-tenant registry
 │   │   │   ├── initializePool()
-│   │   │   ├── depositToPool() / withdrawDeposit()
-│   │   │   ├── borrowFromPool() / repayLoanManual()
+│   │   │   ├── depositToPool(vault, amount) / withdrawDeposit()
+│   │   │   ├── borrowFromPool(vault, amount) / repayLoanManual()
 │   │   │   ├── autoRepay()             # called by CompanyVault
 │   │   │   ├── liquidateLoan()         
 │   │   │   └── claimProtocolFee()      # 1% Yield cut for SuperAdmin
-│   │   ├── EmploymentSBT.sol           # ERC-5192 soulbound token (FR-B03)
+│   │   ├── EmploymentSBT.sol           # ERC-5192 soulbound token
 │   │   ├── interfaces/
-│   │   │   ├── IPayroll.sol
+│   │   │   ├── ICompanyVault.sol       # VestType: Retention/Probation/ESOP
 │   │   │   ├── IEmployeeLiquidity.sol
 │   │   │   └── IERC5192.sol
 │   │   └── libraries/
 │   │       └── PayrollMath.sol
-│   ├── script/                         # Foundry deploy scripts
+│   ├── script/
+│   │   ├── Deploy.s.sol                # Deploy Factory + ELC + SBT (real IDRX)
+│   │   ├── DeployMock.s.sol            # Deploy with MockIDRX (testnet)
+│   │   └── DeployConfidential.s.sol    # Deploy ConfidentialCompanyVault per company
 │   └── test/
-│       ├── PayrollContract.t.sol
+│       ├── CompanyVault.t.sol
+│       ├── ConfidentialCompanyVault.t.sol  # FHE tests (6 di-skip — butuh Inco node)
 │       ├── EmployeeLiquidityContract.t.sol
 │       ├── EmploymentSBT.t.sol
 │       └── PayrollMath.t.sol
 ├── ponder/                             # Event indexer — schema + handlers
-│   ├── ponder.config.ts                # contract addresses + RPC config
-│   ├── ponder.schema.ts                # onchain tables (company, stream, claim …)
+│   ├── ponder.config.ts                # PayrollContract + ELC + ConfidentialCompanyVault
+│   ├── ponder.schema.ts                # 13 onchain tables incl. platform_fee_payment, encrypted_salary, auditor_grant
 │   └── src/
-│       ├── PayrollContract.ts          # event handlers for PayrollContract
-│       └── EmployeeLiquidityContract.ts
+│       ├── PayrollContract.ts          # 33 event handlers incl. PlatformFeePaid
+│       ├── EmployeeLiquidityContract.ts
+│       └── ConfidentialCompanyVault.ts # EncryptedSalarySet + AuditorViewingKeyGranted
 ├── backend/                            # Node.js — bundler relay, compliance, webhook
 │   └── src/
 │       ├── routes/
 │       │   ├── auth.ts                 # POST /auth/login, /refresh, /logout, /profile
 │       │   ├── registration.ts         # HR onboarding flow
-│       │   ├── bundler.ts              # POST /bundler/relay (ERC-4337)
-│       │   ├── compliance.ts           # GET /compliance/summary/:hr
-│       │   └── webhook.ts              # Alchemy webhook receiver
+│       │   ├── bundler.ts              # POST /bundler/relay (callData validated: claimSalary only)
+│       │   ├── compliance.ts           # GET /compliance/export + /summary
+│       │   └── webhook.ts              # SalaryClaimed, PlatformFeePaid, EncryptedSalarySet, LowVaultBalance
 │       └── services/
-│           ├── rateLimiter.ts          # max 10 claims/hour (FR-B02)
-│           ├── paymasterMonitor.ts     # alert if ETH < 0.05 (FR-B02)
-│           └── liquidation.ts          # cron — overdue loan liquidation (FR-E03)
+│           ├── rateLimiter.ts          # max 10 claims/hour (NFR-14)
+│           ├── paymasterMonitor.ts     # alert if ETH < 0.05 (FR-403)
+│           ├── liquidation.ts          # cron 6h — overdue loan liquidation
+│           └── wsServer.ts             # WebSocket broadcast: 4 event types
 └── frontend/                           # Next.js 16 — HR & employee dashboards
     └── src/
         ├── app/
@@ -477,27 +513,30 @@ payroll-saas/
 
 > Network: **Base Sepolia** (Chain ID: 84532)
 > Explorer: https://sepolia.basescan.org
-> Redeployed: 26 Mei 2026
+> Redeployed: 4 Juni 2026 — block 42397510
 
-| Contract | Address |
-|---|---|
-| `PayrollFactory` | `0x0B4BDD8fF3f9a76CA67bD16d3b25A0922A3D1Fb5` |
-| `EmployeeLiquidityContract` | `0x50fcAc62A081a6212BF947298a18BdC6d1BFde4A` |
-| `EmploymentSBT` | `0x009a7A5E0aFC42BE1b28d5b1907F6A32b1602e3E` |
-| `IDRX (Mock)` | `0x18Bc5bcC660cf2B9cE3cd51a404aFe1a0cBD3C22` |
+| Contract | Address | Verified |
+|---|---|---|
+| `PayrollFactory` | `0x1B5A705Cb11BAF5798DC78fE27b8686C8c986BdF` | ✅ |
+| `EmployeeLiquidityContract` | `0xd9cd18C33Ef3922810bD1b43B4F09693399d14a9` | ✅ |
+| `EmploymentSBT` | `0xF0D52Bc9f3455F0D200bCE6Cf9e8C4f0759a5128` | ✅ |
+| `MockIDRX` | `0x0996e627cE22C4FE2D5c4788b159a83C065D6d09` | ✅ |
+| `ConfidentialCompanyVault` (PT Payana Demo) | `0x4560968670Dd852dACd73c7B8748695eC427e203` | ✅ block 42398878 |
 
 **BaseScan links:**
-- PayrollFactory: https://sepolia.basescan.org/address/0x0B4BDD8fF3f9a76CA67bD16d3b25A0922A3D1Fb5
-- EmployeeLiquidityContract: https://sepolia.basescan.org/address/0x50fcAc62A081a6212BF947298a18BdC6d1BFde4A
-- EmploymentSBT: https://sepolia.basescan.org/address/0x009a7A5E0aFC42BE1b28d5b1907F6A32b1602e3E
-- IDRX (Mock): https://sepolia.basescan.org/address/0x18Bc5bcC660cf2B9cE3cd51a404aFe1a0cBD3C22
+- PayrollFactory: https://sepolia.basescan.org/address/0x1B5A705Cb11BAF5798DC78fE27b8686C8c986BdF
+- EmployeeLiquidityContract: https://sepolia.basescan.org/address/0xd9cd18C33Ef3922810bD1b43B4F09693399d14a9
+- EmploymentSBT: https://sepolia.basescan.org/address/0xF0D52Bc9f3455F0D200bCE6Cf9e8C4f0759a5128
+- MockIDRX: https://sepolia.basescan.org/address/0x0996e627cE22C4FE2D5c4788b159a83C065D6d09
+- ConfidentialCompanyVault: https://sepolia.basescan.org/address/0x4560968670Dd852dACd73c7B8748695eC427e203
 
 **Frontend env vars (`.env.local`):**
 ```bash
-NEXT_PUBLIC_FACTORY_ADDRESS=0x0B4BDD8fF3f9a76CA67bD16d3b25A0922A3D1Fb5
-NEXT_PUBLIC_LIQUIDITY_CONTRACT_ADDRESS=0x50fcAc62A081a6212BF947298a18BdC6d1BFde4A
-NEXT_PUBLIC_SBT_CONTRACT_ADDRESS=0x009a7A5E0aFC42BE1b28d5b1907F6A32b1602e3E
-NEXT_PUBLIC_IDRX_ADDRESS=0x18Bc5bcC660cf2B9cE3cd51a404aFe1a0cBD3C22
+NEXT_PUBLIC_PAYROLL_FACTORY_ADDRESS=0x1B5A705Cb11BAF5798DC78fE27b8686C8c986BdF
+NEXT_PUBLIC_LIQUIDITY_CONTRACT_ADDRESS=0xd9cd18C33Ef3922810bD1b43B4F09693399d14a9
+NEXT_PUBLIC_SBT_CONTRACT_ADDRESS=0xF0D52Bc9f3455F0D200bCE6Cf9e8C4f0759a5128
+NEXT_PUBLIC_IDRX_ADDRESS=0x0996e627cE22C4FE2D5c4788b159a83C065D6d09
+NEXT_PUBLIC_CONFIDENTIAL_VAULT_ADDRESS=0x4560968670Dd852dACd73c7B8748695eC427e203
 NEXT_PUBLIC_CHAIN_ID=84532
 ```
 
@@ -538,6 +577,13 @@ AES_ENCRYPTION_KEY=...
 # Ponder
 PONDER_RPC_URL_84532=https://base-sepolia.g.alchemy.com/v2/...
 DATABASE_URL=postgresql://...
+PAYROLL_CONTRACT_ADDRESS=0x1B5A705Cb11BAF5798DC78fE27b8686C8c986BdF
+LIQUIDITY_CONTRACT_ADDRESS=0xd9cd18C33Ef3922810bD1b43B4F09693399d14a9
+SBT_CONTRACT_ADDRESS=0xF0D52Bc9f3455F0D200bCE6Cf9e8C4f0759a5128
+IDRX_ADDRESS=0x0996e627cE22C4FE2D5c4788b159a83C065D6d09
+CONFIDENTIAL_VAULT_ADDRESS=0x4560968670Dd852dACd73c7B8748695eC427e203
+PAYROLL_START_BLOCK=42397510
+CONFIDENTIAL_START_BLOCK=42398878
 ```
 
 ### Swagger UI (Ponder)

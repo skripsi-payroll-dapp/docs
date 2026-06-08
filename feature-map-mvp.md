@@ -47,10 +47,10 @@
 | | Simulasi tarik IDRX ke Rupiah (Payment Gateway) | P1 — Should | Sprint 8 |
 | **K. Sistem Notifikasi & Audit**| Activity Log (HR Jejak Audit) | P0 — Must | Sprint 8 |
 | | Notifikasi in-app alert (Lonceng) | P0 — Must | Sprint 8 |
-| **L. Salary Privacy** | Encrypted salary storage via Inco FHE (`euint64`) | P1 — Should | Sprint 7 |
-| | Employee self-decrypt: lihat gaji sendiri | P1 — Should | Sprint 7 |
-| | HR aggregate view: total payroll homomorphic | P1 — Should | Sprint 7 |
-| | Compliance delegated decryption key | P2 — Nice | Sprint 7 |
+| **L. Salary Privacy** | Encrypted salary storage via Inco FHE (`euint256`) | P1 — Should ✅ | Sprint 7 |
+| | Employee self-decrypt: lihat gaji sendiri via `getEncryptedSalary()` | P1 — Should ✅ | Sprint 7 |
+| | HR aggregate view: total payroll via `aggregateTotalPayroll()` | P1 — Should ✅ | Sprint 7 |
+| | Compliance delegated decryption key via `grantViewingKey()` | P2 — Nice ✅ | Sprint 7 |
 
 ---
 

@@ -76,7 +76,7 @@ Sistem yang berada **di luar ruang lingkup** MVP ini antara lain: integrasi HRIS
 | Earned Wage Access (EWA) | Kemampuan karyawan untuk mengakses porsi gaji yang sudah mereka peroleh (accrued) sebelum tanggal gajian resmi; dalam Payana, EWA diimplementasikan melalui fungsi `claimSalary()` yang dapat dipanggil kapan saja selama stream aktif. |
 | Vault | Kontrak penyimpanan dana perusahaan di atas blockchain; dalam Payana, setiap perusahaan memiliki satu `CompanyVault` terisolasi yang menyimpan saldo IDRX dan mengelola seluruh stream karyawan miliknya. |
 | Soulbound Token (SBT) | Token non-fungible yang tidak dapat dipindahtangankan (non-transferable) dan melekat permanen pada satu alamat wallet; digunakan dalam Payana sebagai Sertifikat Ketenagakerjaan digital berbasis standar ERC-5192. |
-| Fully Homomorphic Encryption (FHE) | Skema kriptografi yang memungkinkan komputasi langsung atas data terenkripsi tanpa proses dekripsi terlebih dahulu; dalam konteks Payana, digunakan melalui Inco Lightning untuk menyimpan nilai gaji sebagai `euint64` terenkripsi on-chain sehingga tidak dapat dibaca oleh pihak yang tidak berwenang. |
+| Fully Homomorphic Encryption (FHE) | Skema kriptografi yang memungkinkan komputasi langsung atas data terenkripsi tanpa proses dekripsi terlebih dahulu; dalam konteks Payana, digunakan melalui Inco Lightning untuk menyimpan nilai gaji sebagai `euint256` terenkripsi on-chain sehingga tidak dapat dibaca oleh pihak yang tidak berwenang. |
 | IDRX | Stablecoin ERC-20 yang dilatunilai terhadap Rupiah Indonesia (1 IDRX = 1 IDR), digunakan sebagai medium pembayaran gaji dalam ekosistem Payana. |
 | Wallet | Sepasang kunci kriptografi (kunci publik dan kunci privat) yang merepresentasikan identitas dan kepemilikan aset di blockchain; dalam Payana disebut "Akun Gaji" untuk menghindari jargon teknis di antarmuka karyawan. |
 | Stream | Konfigurasi pembayaran per-karyawan yang mendefinisikan laju alir gaji (flowRate dalam satuan IDRX per detik), waktu mulai, dan status aktif/jeda; disimpan dalam `employeeStreams` mapping di `CompanyVault`. |
@@ -87,7 +87,7 @@ Sistem yang berada **di luar ruang lingkup** MVP ini antara lain: integrasi HRIS
 | Gasless Transaction | Mekanisme di mana biaya gas (ongkos komputasi blockchain) dibayar oleh pihak ketiga (Paymaster) sehingga pengguna akhir (karyawan) dapat mengirimkan transaksi tanpa memiliki ETH; diimplementasikan menggunakan standar ERC-4337 Account Abstraction. |
 | Factory Pattern | Pola desain kontrak di mana satu kontrak induk (`PayrollFactory`) bertanggung jawab men-deploy dan melacak kontrak-kontrak anak (`CompanyVault`) secara terisolasi per tenant, memungkinkan arsitektur multi-tenant on-chain. |
 | Cliff Vesting | Mekanisme di mana sejumlah dana (bonus, ESOP) dikunci untuk jangka waktu tertentu (periode cliff) dan baru dapat dicairkan sekaligus setelah periode tersebut berakhir. |
-| euint64 | Tipe data bilangan bulat 64-bit terenkripsi yang disediakan oleh Inco Lightning FHE; nilai aktualnya tidak dapat dibaca secara on-chain oleh pihak yang tidak memegang viewing key yang sesuai. |
+| euint256 | Tipe data bilangan bulat 256-bit terenkripsi yang disediakan oleh Inco Lightning FHE v1; merupakan tipe integer terenkripsi utama yang tersedia di paket `@inco/lightning`. Nilai aktualnya tidak dapat dibaca secara on-chain oleh pihak yang tidak memegang viewing key yang sesuai. Catatan: SKPL awalnya mereferensikan `euint64`, namun Inco Lightning v1 hanya menyediakan `euint256` — nilai gaji dalam satuan IDRX wei tetap berada dalam jangkauan uint256. |
 
 #### Akronim dan Singkatan
 
@@ -178,7 +178,7 @@ Dokumen SKPL Payana disusun dalam empat bab utama dan satu lampiran, dengan urai
 
 Payana adalah produk perangkat lunak mandiri (bukan modul dari sistem yang lebih besar) yang dirancang untuk menggantikan alur kerja penggajian konvensional berbasis transfer bank batch bulanan. Dalam ekosistem teknologi Indonesia, Payana berdiri di persimpangan antara platform SaaS Sumber Daya Manusia (HRIS) dan infrastruktur keuangan terdesentralisasi (DeFi), namun dengan antarmuka yang dibuat sepenuhnya ramah bagi pengguna non-teknis sehingga tidak memerlukan pengetahuan blockchain apa pun dari sisi karyawan.
 
-Sistem Payana dibangun di atas empat lapisan arsitektur yang terstruktur dan saling bergantung. Lapisan pertama dan paling fundamental adalah **lapisan Smart Contract** yang berjalan di atas jaringan Base (Ethereum Layer-2). Pada lapisan ini, terdapat empat kontrak Solidity utama: `PayrollFactory` sebagai penyelia multi-tenant yang men-deploy dan melacak `CompanyVault` per perusahaan, `CompanyVault` sebagai kontrak terisolasi per tenant yang menyimpan seluruh logika penggajian (streaming, klaim, pesangon, vesting, PHK), `EmployeeLiquidityContract` sebagai kontrak koperasi karyawan, dan `EmploymentSBT` sebagai penerbit sertifikat ketenagakerjaan soulbound. Keempat kontrak ini di-deploy permanen di Base Sepolia (testnet, Chain ID 84532) dengan PayrollFactory beralamat di `0x0B4BDD8fF3f9a76CA67bD16d3b25A0922A3D1Fb5`. Seluruh nilai moneter dalam sistem dinyatakan dalam token **IDRX** (ERC-20 berpegged Rupiah), sehingga karyawan berinteraksi dengan unit yang familiar secara nominal tanpa perlu memahami konversi mata uang kripto.
+Sistem Payana dibangun di atas empat lapisan arsitektur yang terstruktur dan saling bergantung. Lapisan pertama dan paling fundamental adalah **lapisan Smart Contract** yang berjalan di atas jaringan Base (Ethereum Layer-2). Pada lapisan ini, terdapat empat kontrak Solidity utama: `PayrollFactory` sebagai penyelia multi-tenant yang men-deploy dan melacak `CompanyVault` per perusahaan, `CompanyVault` sebagai kontrak terisolasi per tenant yang menyimpan seluruh logika penggajian (streaming, klaim, pesangon, vesting, PHK), `EmployeeLiquidityContract` sebagai kontrak koperasi karyawan, dan `EmploymentSBT` sebagai penerbit sertifikat ketenagakerjaan soulbound. Keempat kontrak ini di-deploy permanen di Base Sepolia (testnet, Chain ID 84532) dengan PayrollFactory beralamat di `0x1B5A705Cb11BAF5798DC78fE27b8686C8c986BdF`. Seluruh nilai moneter dalam sistem dinyatakan dalam token **IDRX** (ERC-20 berpegged Rupiah), sehingga karyawan berinteraksi dengan unit yang familiar secara nominal tanpa perlu memahami konversi mata uang kripto.
 
 Lapisan kedua adalah **lapisan Ponder Indexer** yang bertugas mengindeks seluruh event blockchain secara real-time ke dalam basis data relasional yang dapat dikueri. Ponder (versi 0.16.6) berlangganan event dari kontrak Payana melalui RPC Alchemy dan menyimpan data terstruktur seperti informasi stream, riwayat klaim, dan status pesangon ke dalam tabel PostgreSQL. Lapisan ini menyediakan REST API berbasis Hono (versi 4.5.0) yang dikonsumsi oleh lapisan backend untuk mempercepat pembacaan data on-chain tanpa harus melakukan RPC call langsung pada setiap permintaan dashboard.
 
@@ -238,7 +238,7 @@ Rasional   : Otomatisasi akumulasi dan pelaporan kepatuhan secara signifikan men
 
 **9. Kerahasiaan Data Gaji (Salary Privacy — Inco FHE)**
 
-Deskripsi  : Sistem menyediakan lapisan privasi tambahan untuk nilai gaji karyawan menggunakan Fully Homomorphic Encryption (FHE) melalui Inco Lightning. Gaji disimpan on-chain sebagai ciphertext bertipe `euint64` dalam `encryptedSalaries` mapping. Karyawan hanya dapat mendekripsi gajinya sendiri menggunakan viewing key personal (melalui Privy wallet), sementara HR dapat melihat total agregat payroll secara homomorphic (`getAggregatePayroll()`) tanpa mendekripsi nilai individual. Karyawan lain yang mencoba membaca data hanya mendapatkan ciphertext yang tidak bermakna.
+Deskripsi  : Sistem menyediakan lapisan privasi tambahan untuk nilai gaji karyawan menggunakan Fully Homomorphic Encryption (FHE) melalui Inco Lightning (TEE-backed, Base Sepolia). Gaji disimpan on-chain sebagai ciphertext bertipe `euint256` dalam mapping publik `encryptedSalaries` di `ConfidentialCompanyVault`. Karyawan dapat mendekripsi gajinya sendiri melalui `getEncryptedSalary(address)` dengan ACL viewing key yang diberikan saat `setEncryptedSalary()`. HR dapat melihat total agregat payroll secara homomorfik via `aggregateTotalPayroll()` tanpa mendekripsi nilai individual. Auditor dapat diberi delegated viewing key terbatas waktu via `grantViewingKey()`. Karyawan lain yang mencoba membaca `encryptedSalaries` hanya mendapatkan ciphertext yang tidak dapat didekripsi tanpa kunci yang sesuai.
 
 Rasional   : Blockchain Base bersifat publik dan dapat dikueri oleh siapapun. Tanpa enkripsi, karyawan yang mengetahui Work ID rekannya dapat menghitung gaji rekan tersebut dari nilai `flowRate` on-chain. Enkripsi FHE memproteksi privasi gaji — aset sensitif yang sering menjadi sumber konflik interpersonal di lingkungan kerja — tanpa mengorbankan auditabilitas bagi pihak yang berwenang.
 
@@ -418,7 +418,7 @@ Perangkat lunak sisi server dan blockchain:
 | 12 | Solidity | 0.8.26 | soliditylang.org | Bahasa pemrograman smart contract untuk keempat kontrak on-chain Payana. |
 | 13 | Foundry (Forge) | Latest | getfoundry.sh | Framework kompilasi, pengujian unit, dan deployment smart contract Solidity. |
 | 14 | OpenZeppelin Contracts | v5 | openzeppelin.com | Library smart contract teraudit: AccessControl, ReentrancyGuard, ERC-721, SafeERC20. |
-| 15 | Inco Lightning | [Perlu dikonfirmasi] | inco.org | FHE co-processor untuk tipe data euint64 di Base Sepolia; digunakan pada fitur Salary Privacy yang direncanakan. |
+| 15 | Inco Lightning | v1 (npm: @inco/lightning) | inco.org | TEE-backed FHE co-processor di Base Sepolia; menyediakan tipe data `euint256` dan ACL viewing key. Digunakan pada `ConfidentialCompanyVault` untuk fitur Salary Privacy (Sprint 7). |
 
 Perangkat lunak sisi klien:
 
@@ -465,7 +465,7 @@ Payana akan berhubungan dengan sistem-sistem berikut:
 
 5. Privy digunakan sebagai Wallet-as-a-Service (WaaS) yang memungkinkan pengguna mendapatkan embedded wallet Ethereum (Smart Account kompatibel ERC-4337) melalui login email atau akun media sosial, tanpa perlu menyimpan seed phrase secara manual.
 
-6. Inco Lightning adalah FHE co-processor yang direncanakan untuk fitur Salary Privacy. Sistem akan memanfaatkan Inco Lightning untuk menyimpan nominal gaji karyawan sebagai ciphertext bertipe euint64 on-chain sehingga pihak yang tidak berwenang tidak dapat membaca nominal gaji meskipun mengakses blockchain secara langsung. Inco Lightning saat ini hanya tersedia di Base Sepolia.
+6. Inco Lightning adalah TEE-backed FHE co-processor yang diimplementasikan pada fitur Salary Privacy (Sprint 7) melalui ekstensi `ConfidentialCompanyVault`. Sistem menyimpan nominal gaji karyawan sebagai ciphertext bertipe `euint256` on-chain sehingga pihak yang tidak berwenang tidak dapat membaca nominal gaji meskipun mengakses blockchain secara langsung. ACL viewing key memungkinkan karyawan mendekripsi gajinya sendiri dan HR mendekripsi agregat payroll secara homomorfik. Inco Lightning tersedia di Base Sepolia; belum tersedia di Base Mainnet per Juni 2026.
 
 7. Azure Database for PostgreSQL (Flexible Server) digunakan sebagai database relasional off-chain yang menyimpan data sesi JWT, profil karyawan terenkripsi (nama, NIK, telepon dalam format AES-256-GCM), audit log backend, data pendaftaran HR, serta tabel-tabel yang diindeks oleh Ponder. Server berlokasi di region Indonesia Central (Jakarta) untuk memenuhi persyaratan residensi data sesuai UU PDP No. 27/2022.
 
@@ -908,7 +908,7 @@ Kelompok ini mendefinisikan kebutuhan fungsional untuk komponen kerahasiaan data
 
 ID Requirement : FR-PAYANA-1101
 
-Deskripsi      : Sistem harus memampukan HR Admin untuk menetapkan flow rate gaji karyawan dalam format terenkripsi sebagai tipe data `euint64` menggunakan Inco Lightning FHE co-processor pada ekstensi `ConfidentialCompanyVault`, sehingga nilai nominal gaji tidak dapat dibaca secara langsung oleh pihak lain yang mengquery on-chain. Nilai `euint64` disimpan di storage smart contract dalam bentuk ciphertext yang hanya dapat didekripsi oleh pemegang kunci yang berwenang (viewing key), dan setiap operasi komputasi yang melibatkan nilai ini — seperti penjumlahan dan perbandingan — dilakukan secara homomorfik tanpa perlu mendekripsi data terlebih dahulu. Komponen ini direncanakan untuk diimplementasikan pada Sprint 7 dan bersifat opsional — modul payroll inti harus tetap berfungsi penuh tanpa FHE. [Perlu dikonfirmasi] Mekanisme migrasi dari `CompanyVault` standar ke `ConfidentialCompanyVault` memerlukan desain arsitektur lebih lanjut.
+Deskripsi      : Sistem harus memampukan HR Admin untuk menetapkan nominal gaji karyawan dalam format terenkripsi sebagai tipe data `euint256` menggunakan Inco Lightning FHE co-processor pada ekstensi `ConfidentialCompanyVault`, sehingga nilai nominal gaji tidak dapat dibaca secara langsung oleh pihak lain yang mengquery on-chain. Nilai `euint256` disimpan di mapping publik `encryptedSalaries` dalam bentuk ciphertext yang hanya dapat didekripsi oleh pemegang kunci yang berwenang (viewing key), dan setiap operasi komputasi — seperti penjumlahan homomorfik via `aggregateTotalPayroll()` — dilakukan langsung pada ciphertext tanpa mendekripsi. `ConfidentialCompanyVault` adalah ekstensi opsional dari `CompanyVault`; modul payroll inti tetap berfungsi penuh tanpa FHE. Migrasi dari `CompanyVault` ke `ConfidentialCompanyVault` dilakukan melalui deployment terpisah menggunakan `PayrollFactory` yang sama.
 
 ---
 
@@ -916,7 +916,7 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menetapkan flow rate gaj
 
 ID Requirement : FR-PAYANA-1102
 
-Deskripsi      : Sistem harus memampukan HR Admin untuk menetapkan atau memperbarui nominal gaji karyawan dalam bentuk terenkripsi melalui fungsi setter yang menerima ciphertext `euint64` yang telah dienkripsi di sisi klien menggunakan kunci publik Inco Lightning, sehingga nilai plaintext tidak pernah terekspos di jaringan publik atau di dalam calldata transaksi yang dapat diinspeksi. HR Admin yang memiliki viewing key yang sesuai harus dapat mendekripsi dan melihat nilai gaji individual karyawan melalui mekanisme re-encryption yang disediakan oleh Inco Lightning, tanpa harus mengekspos kunci pribadi di frontend. Setiap perubahan nominal gaji harus disimpan sebagai `euint64` baru yang menggantikan nilai sebelumnya, dan event perubahan diterbitkan tanpa mencantumkan nilai plaintext untuk menjaga kerahasiaan di audit trail publik. [Perlu dikonfirmasi] Format calldata dan protokol enkripsi sisi klien yang spesifik mengikuti dokumentasi Inco Lightning terbaru.
+Deskripsi      : Sistem harus memampukan HR Admin untuk menetapkan atau memperbarui nominal gaji karyawan dalam bentuk terenkripsi melalui fungsi `setEncryptedSalary(address employee, bytes memory encryptedSalary)` yang menerima `bytes` hasil enkripsi dari Inco JS SDK di sisi klien, sehingga nilai plaintext tidak pernah terekspos di jaringan publik atau di dalam calldata transaksi yang dapat diinspeksi. Proses enkripsi sisi klien menggunakan Inco JS SDK: `const { bytes: encryptedSalary } = await inco.encrypt(salaryValue)`. Fungsi ini bersifat `payable` karena Inco Lightning membebankan biaya ETH per operasi FHE via `inco.getFee()`. ACL Inco diberikan kepada contract sendiri (`allowThis()`), HR (`allow(msg.sender)`), dan karyawan (`allow(employee)`) saat penyimpanan. Setiap pembaruan menggantikan ciphertext sebelumnya dan menerbitkan event `EncryptedSalarySet` tanpa nilai plaintext.
 
 ---
 
@@ -932,7 +932,7 @@ Deskripsi      : Sistem harus memampukan setiap karyawan untuk mendekripsi dan m
 
 ID Requirement : FR-PAYANA-1104
 
-Deskripsi      : Sistem harus memampukan HR Admin untuk mendapatkan total nilai payroll seluruh karyawan aktif dalam bentuk ciphertext terenkripsi melalui operasi penjumlahan homomorfik pada seluruh nilai `euint64` yang tersimpan, tanpa perlu mendekripsi nilai individual setiap karyawan terlebih dahulu. Operasi penjumlahan homomorfik ini dilaksanakan secara on-chain oleh Inco Lightning FHE co-processor yang beroperasi langsung pada ciphertext, sehingga bahkan smart contract itu sendiri tidak pernah mengetahui nilai plaintext individual yang dijumlahkan. HR Admin yang memiliki viewing key agregat harus dapat mendekripsi hasil penjumlahan ini untuk mendapatkan total payroll dalam satuan IDRX, yang dapat digunakan untuk perencanaan kas dan verifikasi bahwa saldo vault mencukupi tanpa mengekspos rincian gaji per individu. [Perlu dikonfirmasi] Implementasi spesifik fungsi penjumlahan homomorfik on-chain mengikuti kapabilitas dan batasan API Inco Lightning yang berlaku pada saat Sprint 7.
+Deskripsi      : Sistem harus memampukan HR Admin untuk mendapatkan total nilai payroll seluruh karyawan aktif dalam bentuk ciphertext terenkripsi melalui fungsi `aggregateTotalPayroll()` yang melakukan operasi penjumlahan homomorfik pada seluruh nilai `euint256` yang tersimpan, tanpa perlu mendekripsi nilai individual setiap karyawan terlebih dahulu. Operasi penjumlahan menggunakan metode `.add()` yang disediakan library `e` dari Inco Lightning, dieksekusi on-chain pada ciphertext sehingga smart contract tidak pernah mengetahui nilai plaintext individual. HR Admin yang memiliki ACL viewing key dapat mendekripsi hasil penjumlahan client-side via Inco JS SDK (`await inco.decrypt(aggregateHandle)`). Fungsi berjalan O(n) terhadap jumlah karyawan dengan gaji terenkripsi; ACL pada hasil agregat diberikan ke HR pemanggil via `.allow(msg.sender)` sebelum dikembalikan.
 
 ---
 
@@ -1480,8 +1480,8 @@ sequenceDiagram
     EMP->>FE: Input jumlah deposit di /employee/koperasi
     FE->>IDRX: approve(elcAddress, amount)
     IDRX-->>FE: Approval dikonfirmasi
-    FE->>ELC: depositToPool(amount)
-    ELC->>ELC: Validasi PoolNotInitialized
+    FE->>ELC: depositToPool(vaultAddress, amount)
+    ELC->>ELC: Validasi VaultNotRegistered + PoolNotInitialized
     ELC->>ELC: Validasi amount >= 100 IDRX (minimum)
     ELC->>IDRX: transferFrom(employee, elc, amount)
     ELC->>ELC: lenderDeposits[employee].principal += amount
@@ -1516,8 +1516,8 @@ sequenceDiagram
     EMP->>FE: Input jumlah pinjaman di /employee/koperasi
     FE->>CV: getStreamInfo(employee) — cek flowRate
     CV-->>FE: flowRate aktif
-    FE->>ELC: borrowFromPool(amount)
-    ELC->>ELC: Validasi ActiveLoanExists
+    FE->>ELC: borrowFromPool(vaultAddress, amount)
+    ELC->>ELC: Validasi VaultNotRegistered + ActiveLoanExists
     ELC->>ELC: Validasi LoanLimitExceeded (max 80% gaji bulanan)
     ELC->>ELC: Validasi InsufficientPoolLiquidity
     ELC->>ELC: Hitung bunga di muka, simpan LoanRecord
@@ -1533,7 +1533,7 @@ sequenceDiagram
 | **Aktor** | Karyawan |
 | **Pre Kondisi** | Karyawan telah login dengan role `employee`. Karyawan merupakan anggota koperasi aktif. Karyawan memiliki stream gaji yang sedang berjalan. Karyawan tidak memiliki pinjaman koperasi yang masih aktif. Employee Liquidity Pool telah diinisialisasi dan memiliki likuiditas. |
 | **Pos Kondisi** | Dana pinjaman IDRX masuk ke wallet karyawan. Entri pinjaman aktif tercatat di smart contract `EmployeeLiquidityContract`. Pada setiap klaim EWA berikutnya, cicilan akan dipotong otomatis dari akumulasi gaji karyawan hingga pinjaman lunas. |
-| **Basic Flow** | 1. Karyawan membuka halaman `/employee/koperasi` dan memilih tab "Pinjam". <br> 2. Frontend membaca data dari smart contract: gaji bulanan karyawan (untuk menghitung limit pinjaman = 80% gaji), saldo likuiditas pool saat ini, dan status pinjaman aktif karyawan. <br> 3. Sistem menampilkan informasi limit pinjaman maksimal, estimasi cicilan per klaim EWA, dan ketentuan pinjaman. <br> 4. Karyawan memasukkan jumlah pinjaman yang diinginkan (tidak boleh melebihi 80% gaji bulanan). <br> 5. Karyawan meninjau rincian pinjaman dan mengklik "Ajukan Pinjaman". <br> 6. Frontend memanggil `EmployeeLiquidityContract.borrowFromPool(amount)` melalui UserOperation (ERC-4337) yang ditandatangani Privy secara diam-diam. <br> 7. Smart contract memvalidasi seluruh kondisi: jumlah tidak melebihi 80% gaji, pool memiliki likuiditas mencukupi, karyawan tidak memiliki pinjaman aktif, dan pool sudah diinisialisasi. <br> 8. Dana pinjaman ditransfer dari liquidity pool ke wallet karyawan secara on-chain. <br> 9. Backend menerima webhook dari Alchemy, mencatat entri pinjaman aktif di database, dan mengirimkan notifikasi konfirmasi ke karyawan. <br> 10. Frontend menampilkan konfirmasi "Pinjaman berhasil. Dana [jumlah] IDRX telah masuk ke wallet Anda. Cicilan akan dipotong otomatis pada setiap klaim gaji berikutnya." dan memperbarui tampilan tab "Pinjaman Aktif". |
+| **Basic Flow** | 1. Karyawan membuka halaman `/employee/koperasi` dan memilih tab "Pinjam". <br> 2. Frontend membaca data dari smart contract: gaji bulanan karyawan (untuk menghitung limit pinjaman = 80% gaji), saldo likuiditas pool saat ini, dan status pinjaman aktif karyawan. <br> 3. Sistem menampilkan informasi limit pinjaman maksimal, estimasi cicilan per klaim EWA, dan ketentuan pinjaman. <br> 4. Karyawan memasukkan jumlah pinjaman yang diinginkan (tidak boleh melebihi 80% gaji bulanan). <br> 5. Karyawan meninjau rincian pinjaman dan mengklik "Ajukan Pinjaman". <br> 6. Frontend memanggil `EmployeeLiquidityContract.borrowFromPool(vaultAddress, amount)` melalui UserOperation (ERC-4337) yang ditandatangani Privy secara diam-diam. <br> 7. Smart contract memvalidasi seluruh kondisi: jumlah tidak melebihi 80% gaji, pool memiliki likuiditas mencukupi, karyawan tidak memiliki pinjaman aktif, dan pool sudah diinisialisasi. <br> 8. Dana pinjaman ditransfer dari liquidity pool ke wallet karyawan secara on-chain. <br> 9. Backend menerima webhook dari Alchemy, mencatat entri pinjaman aktif di database, dan mengirimkan notifikasi konfirmasi ke karyawan. <br> 10. Frontend menampilkan konfirmasi "Pinjaman berhasil. Dana [jumlah] IDRX telah masuk ke wallet Anda. Cicilan akan dipotong otomatis pada setiap klaim gaji berikutnya." dan memperbarui tampilan tab "Pinjaman Aktif". |
 | **Alternative Flow** | A1. Apabila karyawan sudah memiliki pinjaman aktif yang belum lunas, sistem menampilkan informasi pinjaman aktif (pokok sisa, jumlah yang sudah dilunasi, dan estimasi pelunasan penuh). Karyawan tidak dapat mengajukan pinjaman baru hingga pinjaman sebelumnya selesai dilunasi. |
 | **Error Flow** | E1. Apabila karyawan sudah memiliki pinjaman aktif yang belum lunas (`ActiveLoanExists`), smart contract menolak permintaan pinjaman baru. Frontend menampilkan pesan "Anda masih memiliki pinjaman aktif yang belum lunas. Selesaikan pinjaman yang ada terlebih dahulu sebelum mengajukan pinjaman baru." <br> E2. Apabila jumlah pinjaman yang diajukan melebihi batas 80% dari gaji bulanan (`LoanLimitExceeded`), smart contract menolak transaksi. Frontend menampilkan pesan "Jumlah pinjaman melebihi batas maksimal. Limit pinjaman Anda adalah [limit] IDRX (80% dari gaji bulanan)." <br> E3. Apabila Employee Liquidity Pool tidak memiliki IDRX yang cukup untuk memenuhi permintaan pinjaman (`InsufficientPoolLiquidity`), smart contract menolak transaksi. Frontend menampilkan pesan "Dana koperasi saat ini tidak mencukupi untuk memenuhi permintaan pinjaman Anda. Silakan coba kembali nanti atau ajukan jumlah yang lebih kecil." <br> E4. Apabila pool belum diinisialisasi sama sekali (`PoolNotInitialized`), smart contract menolak seluruh operasi pinjaman. Frontend menampilkan pesan "Koperasi karyawan belum aktif. Silakan hubungi administrator sistem Payana." |
 
@@ -1693,7 +1693,7 @@ sequenceDiagram
 
     HR->>FE: Input nominal gaji karyawan (plaintext)
     FE->>Inco: encrypt(salary, publicKey)
-    Inco-->>FE: ciphertext (euint64)
+    Inco-->>FE: ciphertext (euint256)
     FE->>CCV: setEncryptedSalary(employee, ciphertext)
     CCV->>CCV: Validasi HR_ROLE
     CCV->>CCV: encryptedSalaries[employee] = ciphertext
@@ -1705,13 +1705,13 @@ sequenceDiagram
 | | |
 |-|-|
 | **Nama Use Case** | HR Admin Set Gaji Karyawan dalam Format Terenkripsi (FHE) |
-| **Deskripsi Singkat** | HR Admin menetapkan atau memperbarui besaran gaji karyawan menggunakan teknologi Fully Homomorphic Encryption (FHE) melalui integrasi Inco Network. Data gaji disimpan dalam bentuk ciphertext (`euint64`) on-chain sehingga nilai nominal gaji tidak terekspos secara publik di blockchain, melindungi privasi kompensasi karyawan. |
+| **Deskripsi Singkat** | HR Admin menetapkan atau memperbarui besaran gaji karyawan menggunakan teknologi Fully Homomorphic Encryption (FHE) melalui integrasi Inco Network. Data gaji disimpan dalam bentuk ciphertext (`euint256`) on-chain sehingga nilai nominal gaji tidak terekspos secara publik di blockchain, melindungi privasi kompensasi karyawan. |
 | **Aktor** | HR Admin |
 | **Pre Kondisi** | HR Admin telah login dengan role `hr`. Karyawan yang dituju memiliki stream gaji aktif. Inco FHE Network tersedia dan terintegrasi dengan CompanyVault. HR Admin memiliki kunci enkripsi yang diperlukan untuk mengenkripsi nilai gaji. |
-| **Pos Kondisi** | Nilai gaji karyawan tersimpan on-chain dalam format terenkripsi (`euint64`). Flow rate stream gaji diperbarui sesuai gaji baru tanpa mengekspos nilai plaintext ke publik. HR Admin mendapatkan konfirmasi pembaruan berhasil. |
-| **Basic Flow** | 1. HR Admin mengakses halaman `/hr/employees` dan memilih karyawan yang akan diperbarui gajinya. <br> 2. HR Admin mengklik "Perbarui Gaji (Terenkripsi)". Sistem menampilkan formulir input gaji dengan keterangan bahwa nilai akan dienkripsi menggunakan FHE sebelum dikirim ke blockchain. <br> 3. HR Admin memasukkan nilai gaji baru dalam IDRX dalam plaintext di antarmuka lokal. <br> 4. Frontend menggunakan library Inco FHE untuk mengenkripsi nilai gaji menjadi `euint64` ciphertext di sisi klien sebelum data dikirim. Kunci enkripsi menggunakan kunci publik FHE dari Inco Network. <br> 5. Frontend memanggil `CompanyVault.setEncryptedSalary(employeeAddress, encryptedSalary)` dengan ciphertext `euint64` sebagai parameter, bukan nilai plaintext. <br> 6. Smart contract menyimpan ciphertext gaji on-chain dan memperbarui flow rate stream gaji karyawan menggunakan operasi homomorphic (komputasi dilakukan pada data terenkripsi tanpa mendekripsi). <br> 7. Backend menerima webhook, mencatat pembaruan gaji (hanya metadata, bukan nilai plaintext) di audit log. <br> 8. Frontend menampilkan konfirmasi "Gaji karyawan [nama] berhasil diperbarui dalam format terenkripsi." |
+| **Pos Kondisi** | Nilai gaji karyawan tersimpan on-chain dalam format terenkripsi (`euint256`) di mapping `encryptedSalaries`. Event `EncryptedSalarySet` diterbitkan tanpa nilai plaintext. HR Admin mendapatkan konfirmasi pembaruan berhasil. |
+| **Basic Flow** | 1. HR Admin mengakses halaman `/hr/employees` dan memilih karyawan yang akan diperbarui gajinya. <br> 2. HR Admin mengklik "Perbarui Gaji (Terenkripsi)". Sistem menampilkan formulir input gaji dengan keterangan bahwa nilai akan dienkripsi menggunakan FHE sebelum dikirim ke blockchain. <br> 3. HR Admin memasukkan nilai gaji baru dalam IDRX dalam plaintext di antarmuka lokal. <br> 4. Frontend menggunakan Inco JS SDK untuk mengenkripsi nilai gaji menjadi `euint256` ciphertext di sisi klien: `const { bytes: encryptedSalary } = await inco.encrypt(salaryValue)`. <br> 5. Frontend memanggil `ConfidentialCompanyVault.setEncryptedSalary(employeeAddress, encryptedSalary)` dengan menyertakan ETH fee via `msg.value` sesuai `inco.getFee()`. <br> 6. Smart contract memverifikasi proof melalui Inco co-processor, menyimpan ciphertext `euint256` di mapping `encryptedSalaries`, dan memberikan ACL viewing key kepada HR dan karyawan yang bersangkutan. <br> 7. Backend menerima webhook, mencatat pembaruan gaji (hanya metadata, bukan nilai plaintext) di audit log. <br> 8. Frontend menampilkan konfirmasi "Gaji karyawan [nama] berhasil diperbarui dalam format terenkripsi." |
 | **Alternative Flow** | A1. Apabila HR Admin ingin memverifikasi bahwa nilai yang tersimpan sudah benar tanpa mengekspos ke publik, HR Admin dapat menggunakan viewing key khusus yang dimiliki untuk mendekripsi dan memverifikasi nilai secara lokal. |
-| **Error Flow** | E1. Apabila HR Admin tidak memiliki `HR_ROLE` yang valid (`Unauthorized`), transaksi akan di-revert. Frontend menampilkan pesan "Akses ditolak. Anda tidak memiliki wewenang untuk menetapkan gaji karyawan." <br> E2. Apabila Inco FHE Network mengalami gangguan sehingga proses enkripsi di sisi klien gagal, frontend menampilkan pesan "Layanan enkripsi saat ini tidak tersedia. Pembaruan gaji terenkripsi tidak dapat diproses. Silakan coba kembali nanti." <br> E3. Apabila nilai gaji yang dimasukkan HR Admin tidak valid (misalnya negatif atau melampaui batas maksimal `euint64`), frontend memvalidasi sebelum enkripsi dan menampilkan pesan "Nilai gaji tidak valid. Masukkan nilai gaji yang sesuai." |
+| **Error Flow** | E1. Apabila HR Admin tidak memiliki `HR_ROLE` yang valid (`Unauthorized`), transaksi akan di-revert. Frontend menampilkan pesan "Akses ditolak. Anda tidak memiliki wewenang untuk menetapkan gaji karyawan." <br> E2. Apabila Inco FHE Network mengalami gangguan sehingga proses enkripsi di sisi klien gagal, frontend menampilkan pesan "Layanan enkripsi saat ini tidak tersedia. Pembaruan gaji terenkripsi tidak dapat diproses. Silakan coba kembali nanti." <br> E3. Apabila nilai gaji yang dimasukkan HR Admin tidak valid (misalnya negatif atau nol), frontend memvalidasi sebelum enkripsi dan menampilkan pesan "Nilai gaji tidak valid. Masukkan nilai gaji yang sesuai." E4. Apabila ETH fee Inco tidak disertakan atau tidak sesuai `inco.getFee()`, transaksi di-revert dengan pesan "ConfidentialVault: Inco fee not paid". |
 
 ---
 
@@ -1726,9 +1726,9 @@ sequenceDiagram
 
     EMP->>FE: Buka halaman gaji di /employee/ewa
     FE->>CCV: encryptedSalaries(employeeAddress) — view
-    CCV-->>FE: ciphertext (euint64)
+    CCV-->>FE: ciphertext (euint256)
     FE->>Inco: decrypt(ciphertext, viewingKey)
-    Inco-->>FE: plaintext salary (uint64)
+    Inco-->>FE: plaintext salary (uint256)
     FE-->>EMP: Nominal gaji ditampilkan dalam IDRX
     note over FE,Inco: [Perlu dikonfirmasi — Sprint 7]
 ```
@@ -1903,11 +1903,11 @@ Rasional       : Dokumentasi API yang akurat mempersingkat waktu onboarding deve
 #### 3.4.6 Privacy
 
 ID Requirement : NFR-PAYANA-19
-Deskripsi      : Gas overhead untuk operasi penyimpanan gaji dalam format FHE (euint64 via Inco Lightning) tidak boleh melebihi 5 kali lipat gas yang diperlukan untuk operasi penyimpanan uint256 plaintext yang setara, dan harus tetap di bawah biaya setara USD 0,01 per transaksi di jaringan Base pada kondisi gas price normal (< 1 gwei).
+Deskripsi      : Gas overhead untuk operasi penyimpanan gaji dalam format FHE (`euint256` via Inco Lightning v1) tidak boleh melebihi 5 kali lipat gas yang diperlukan untuk operasi penyimpanan `uint256` plaintext yang setara, dan harus tetap di bawah biaya setara USD 0,01 per transaksi di jaringan Base pada kondisi gas price normal (< 1 gwei). Operasi `setEncryptedSalary()` membebankan ETH fee tambahan ke Inco co-processor (`inco.getFee()`) di luar biaya gas Base Sepolia.
 Rasional       : Gas overhead yang terlalu tinggi akan membuat fitur Salary Privacy tidak ekonomis untuk digunakan secara reguler oleh perusahaan dengan ratusan karyawan, menghambat adopsi fitur privasi.
 
 ID Requirement : NFR-PAYANA-20
-Deskripsi      : Data gaji karyawan dalam format terenkripsi FHE (ciphertext euint64) harus dapat didekripsi hanya oleh pemegang viewing key yang berwenang (karyawan bersangkutan dan HR Admin dengan delegated key). Pengujian harus memverifikasi bahwa query dari alamat karyawan yang berbeda menghasilkan ciphertext yang tidak dapat didekripsi tanpa kunci yang sesuai.
+Deskripsi      : Data gaji karyawan dalam format terenkripsi FHE (ciphertext euint256) harus dapat didekripsi hanya oleh pemegang viewing key yang berwenang (karyawan bersangkutan dan HR Admin dengan delegated key). Pengujian harus memverifikasi bahwa query dari alamat karyawan yang berbeda menghasilkan ciphertext yang tidak dapat didekripsi tanpa kunci yang sesuai.
 Rasional       : Blockchain publik mengekspos semua state secara default. FHE adalah satu-satunya mekanisme yang memungkinkan privasi data gaji di level smart contract tanpa memerlukan server terpusat yang mengelola enkripsi.
 
 ---
@@ -2274,16 +2274,20 @@ Keterangan kolom kunci:
 
 ### A.2 Alamat Kontrak Ter-Deploy
 
-> Jaringan: Base Sepolia (Chain ID: 84532) — Deployment tanggal 26 Mei 2026, blok #41981117
+> Jaringan: Base Sepolia (Chain ID: 84532) — Redeployment tanggal 4 Juni 2026, blok #42397510
 
 | Kontrak | Alamat |
 |---------|--------|
-| PayrollFactory | 0x0B4BDD8fF3f9a76CA67bD16d3b25A0922A3D1Fb5 |
-| EmployeeLiquidityContract | 0x50fcAc62A081a6212BF947298a18BdC6d1BFde4A |
-| EmploymentSBT | 0x009a7A5E0aFC42BE1b28d5b1907F6A32b1602e3E |
-| IDRX (Token) | 0x18Bc5bcC660cf2B9cE3cd51a404aFe1a0cBD3C22 |
+| PayrollFactory | 0x1B5A705Cb11BAF5798DC78fE27b8686C8c986BdF |
+| EmployeeLiquidityContract | 0xd9cd18C33Ef3922810bD1b43B4F09693399d14a9 |
+| EmploymentSBT | 0xF0D52Bc9f3455F0D200bCE6Cf9e8C4f0759a5128 |
+| MockIDRX (Testnet) | 0x0996e627cE22C4FE2D5c4788b159a83C065D6d09 |
+| ConfidentialCompanyVault (Demo) | 0x4560968670Dd852dACd73c7B8748695eC427e203 |
+| Admin/Treasury | 0x906B34db1a8DD333ff9a84255e4AEc13C054f120 |
 
-Seluruh kontrak di atas telah diverifikasi di Basescan. MINTER_ROLE pada kontrak EmploymentSBT telah diberikan kepada PayrollFactory sehingga setiap vault yang dideploy oleh factory dapat menerbitkan SBT ketenagakerjaan.
+> Catatan: IDRX yang digunakan di testnet adalah MockIDRX. IDRX mainnet resmi beralamat `0x18Bc5bcC660cf2B9cE3cd51a404aFe1a0cBD3C22`.
+
+Seluruh kontrak di atas telah diverifikasi di Basescan.
 
 ### A.3 Catatan Teknis untuk Pembaca Non-Blockchain
 
