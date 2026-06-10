@@ -1,6 +1,8 @@
 # DESKRIPSI PERANCANGAN PERANGKAT LUNAK
 # Payana — Sistem Payroll Terdesentralisasi Berbasis Smart Contract
 
+**Nomor Dokumen:** DPPL-PAYANA-2026
+
 **Disusun oleh:**
 Bonaventura Octavito
 [NPM]
@@ -18,6 +20,7 @@ Universitas Atma Jaya Yogyakarta
 | A | Dokumen awal | Bonaventura Octavito | - | - |
 | B | Revisi berdasarkan kode aktual per Juni 2026, pembaruan alamat kontrak redeployment 2026-06-04 | Bonaventura Octavito | - | - |
 | C | Ekspansi rinci Bab 3 (Antarmuka), Bab 5.1 (Smart Contract), Bab 5.2 (Backend API), dan Bab 5.3 (Frontend); penambahan diagram alur, tabel antarmuka, dan algoritma per fungsi | Bonaventura Octavito | - | - |
+| D | Penambahan kelas diagram seluruh smart contract (Bab 2.2), Physical Data Model (Bab 4.4), dan tabel dekomposisi data untuk semua tabel off-chain, Ponder indexed, dan struct on-chain (Bab 4.5–4.7); pembaruan nomor dokumen dan metadata; tanggal: 2026-06-10 | Bonaventura Octavito | - | - |
 
 ---
 
@@ -199,7 +202,352 @@ graph TD
 
 **Narasi Alur EWA Gasless End-to-End.** Ketika seorang karyawan menekan tombol "Tarik Gaji", frontend memanggil hook `useAuth` untuk memastikan sesi JWT aktif (atau melakukan tanda tangan EIP-191 baru melalui embedded wallet Privy). Karyawan kemudian menandatangani sebuah `UserOperation` ERC-4337 yang berisi calldata `claimSalary()`. UserOperation tersebut dikirim ke endpoint `POST /bundler/relay`. Backend memverifikasi bahwa alamat JWT sama dengan `userOp.sender`, memvalidasi bahwa selektor calldata adalah `0x5b7e8209` (selektor `claimSalary()`), memeriksa batas laju klaim (maksimum 10 per jam per karyawan), lalu meneruskan UserOperation ke Pimlico Bundler. Pimlico melampirkan sponsor Paymaster dan mengirimkannya ke `EntryPoint` contract di Base. Kontrak `CompanyVault.claimSalary()` mengeksekusi distribusi atomik 93/5/2 (setelah pemotongan platform fee dan auto-repay koperasi), memancarkan event `SalaryClaimed` dan `PlatformFeePaid`. Alchemy mendeteksi event tersebut dan mengirimkannya ke `POST /webhook/alchemy`; backend memverifikasi tanda tangan HMAC, mencatat audit log, dan mem-broadcast pesan `SALARY_CLAIMED` melalui WebSocket ke dashboard karyawan, yang langsung menampilkan konfirmasi real-time. Secara paralel, Ponder mengindeks event tersebut ke tabel `salary_claim` untuk keperluan historis dan pelaporan kepatuhan.
 
-### 2.2 Perancangan Data Secara Keseluruhan
+### 2.2 Kelas Diagram
+
+Berikut adalah diagram kelas seluruh smart contract Payana:
+
+```mermaid
+classDiagram
+    direction TB
+
+    %% ── Library ──────────────────────────────────────────────────────────────
+    class PayrollMath {
+        <<library>>
+        +uint256 SECONDS_PER_MONTH
+        +uint256 BPS_DENOMINATOR
+        +calcAccrued(uint256 flowRate, uint256 elapsed) uint256
+        +monthlyToFlowRate(uint256 monthly) uint256
+        +bpsOf(uint256 amount, uint256 bps) uint256
+        +severanceMultiplier(uint256 tenureMonths) uint256
+        +validateSplits(uint16 emp, uint16 comp, uint16 sev) bool
+    }
+
+    %% ── Enumerations ─────────────────────────────────────────────────────────
+    class VaultStatus {
+        <<enumeration>>
+        Uninitialized
+        Active
+        Paused
+        Frozen
+    }
+
+    class StreamStatus {
+        <<enumeration>>
+        Inactive
+        Active
+        Paused
+        Cancelled
+    }
+
+    class SeveranceState {
+        <<enumeration>>
+        Locked
+        Returned
+        Released
+    }
+
+    class VestType {
+        <<enumeration>>
+        Retention
+        Probation
+        ESOP
+    }
+
+    class VestStatus {
+        <<enumeration>>
+        Locked
+        Claimed
+        Forfeited
+    }
+
+    class LoanStatus {
+        <<enumeration>>
+        None
+        Active
+        Repaid
+        Defaulted
+    }
+
+    %% ── PayrollFactory ───────────────────────────────────────────────────────
+    class PayrollFactory {
+        +bytes32 SUPERADMIN_ROLE
+        +uint16 MAX_PLATFORM_FEE_BPS
+        +address immutable IDRX
+        +address protocolTreasury
+        +uint16 platformFeeBps
+        +mapping companyVaults
+        +address[] allVaults
+        +setPlatformFee(uint16 newFeeBps)
+        +setProtocolTreasury(address treasury)
+        +deployVault(address hr, string name, address liq, address sbt) address
+        +emergencyFreezeAll()
+        +getTotalVaults() uint256
+    }
+
+    %% ── CompanyVault ─────────────────────────────────────────────────────────
+    class SplitConfig {
+        <<struct>>
+        +uint16 employeeBps
+        +uint16 complianceBps
+        +uint16 severanceBps
+    }
+
+    class EmployeeStream {
+        <<struct>>
+        +uint256 flowRate
+        +uint256 startTs
+        +uint256 lastWithdrawnTs
+        +uint256 settledBalance
+        +StreamStatus status
+        +SplitConfig splits
+    }
+
+    class SeveranceVault {
+        <<struct>>
+        +uint256 amount
+        +SeveranceState state
+        +uint256 tenureMonths
+        +uint256 lastUpdatedTs
+    }
+
+    class TerminationProposal {
+        <<struct>>
+        +address employee
+        +bool hrApproved
+        +bool legalApproved
+        +uint256 expiresAt
+        +bytes32 reasonHash
+        +uint256 flowRateSnapshot
+    }
+
+    class CliffVest {
+        <<struct>>
+        +address employee
+        +uint256 amount
+        +uint256 cliffTs
+        +VestType vestType
+        +VestStatus status
+    }
+
+    class CompanyVault {
+        +bytes32 HR_ROLE
+        +bytes32 LEGAL_ROLE
+        +uint16 DEFAULT_EMPLOYEE_BPS
+        +uint16 DEFAULT_COMPLIANCE_BPS
+        +uint16 DEFAULT_SEVERANCE_BPS
+        +uint256 TERMINATION_EXPIRY
+        +uint16 DEFAULT_POOL_RATE_BPS
+        +IERC20 immutable IDRX
+        +address immutable hrAuthority
+        +IEmployeeLiquidity liquidityContract
+        +IEmploymentSBT sbtContract
+        +address priceOracle
+        +address factory
+        +string companyName
+        +VaultStatus status
+        +uint16 bpjsBps
+        +uint16 pph21Bps
+        +uint16 severanceBps
+        +uint16 lowBalanceThresholdBps
+        +uint256 vestCounter
+        +uint256 totalFlowRate
+        +uint256 vaultBalance
+        +uint256 complianceBalance
+        +mapping employeeStreams
+        +mapping severanceVaults
+        +mapping terminations
+        +mapping cliffVests
+        +mapping employeeComplianceAccumulated
+        +fundVault(uint256 amount)
+        +withdrawVault(uint256 amount, address recipient)
+        +setCompanyConfig(uint16 bpjs, uint16 pph21, uint16 threshold)
+        +pauseVault()
+        +resumeVault()
+        +freezeVault()
+        +startStream(address employee, uint256 flowRate, uint16 empBps, uint16 compBps, uint16 sevBps)
+        +pauseStream(address employee)
+        +resumeStream(address employee)
+        +updateFlowRate(address employee, uint256 newFlowRate)
+        +updateStreamSplits(address employee, uint16 empBps, uint16 compBps, uint16 sevBps)
+        +cancelStream(address employee)
+        +claimSalary()
+        +resignEmployee(address employee)
+        +proposeTermination(address employee, bytes32 reasonHash)
+        +approveTermination(address employee)
+        +executeTermination(address employee)
+        +cancelProposal(address employee)
+        +withdrawCompliance(uint256 amount, address recipient)
+        +createCliffVest(address employee, uint256 amount, uint256 cliffTs, VestType vestType)
+        +claimCliffVest(uint256 vestId)
+        +cancelCliffVest(address employee, uint256 vestId)
+        +getAccrued(address employee) uint256
+        +getVaultBalance() uint256
+        +getSeveranceBalance(address employee) uint256
+        +getStreamInfo(address employee) address_uint256
+        -_forfeitAllVests(address employee)
+        -_checkLowBalance()
+        -_revokeSBT(address employee)
+    }
+
+    %% ── ConfidentialCompanyVault ─────────────────────────────────────────────
+    class ConfidentialCompanyVault {
+        +mapping encryptedSalaries
+        +mapping hasEncryptedSalary
+        +mapping auditorExpiry
+        +address[] _encryptedEmployeeList
+        +mapping _inEncryptedList
+        +setEncryptedSalary(address employee, bytes ciphertext) payable
+        +getEncryptedSalary(address employee) euint256
+        +aggregateTotalPayroll() euint256
+        +grantViewingKey(address auditor, uint256 expiresAt)
+        +isAuditorActive(address auditor) bool
+        +revokeAuditorAccess(address auditor)
+        +encryptedEmployeeCount() uint256
+        +encryptedEmployeeAt(uint256 index) address
+    }
+
+    %% ── EmployeeLiquidityContract ────────────────────────────────────────────
+    class Pool {
+        <<struct>>
+        +uint256 totalDeposited
+        +uint256 totalLoansOutstanding
+        +uint16 interestRateBps
+        +bool initialized
+        +uint256 yieldPerShareX18
+    }
+
+    class LenderDeposit {
+        <<struct>>
+        +address companyAddress
+        +uint256 principal
+        +uint256 yieldEarned
+        +uint256 depositedTs
+        +uint256 yieldDebtX18
+    }
+
+    class LoanRecord {
+        <<struct>>
+        +address companyAddress
+        +uint256 principal
+        +uint256 interest
+        +uint256 repaidAmount
+        +uint256 dueTs
+        +LoanStatus status
+    }
+
+    class EmployeeLiquidityContract {
+        +bytes32 OPS_ROLE
+        +bytes32 PAYROLL_ROLE
+        +uint256 MAX_LOAN_BPS
+        +uint256 GRACE_PERIOD
+        +uint256 LOAN_TERM
+        +uint256 BPS_DENOMINATOR
+        +uint256 REPAY_FRACTION_BPS
+        +uint256 MINIMUM_DEPOSIT
+        +uint256 PROTOCOL_FEE_BPS
+        +IERC20 immutable IDRX
+        +mapping registeredVaults
+        +address protocolTreasury
+        +uint256 totalProtocolFee
+        +mapping pools
+        +mapping lenderDeposits
+        +mapping loanRecords
+        +registerVault(address vault)
+        +unregisterVault(address vault)
+        +claimProtocolFee()
+        +initializePool(address company, uint16 rateBps)
+        +depositToPool(address company, uint256 amount)
+        +depositToPoolFor(address company, uint256 amount)
+        +withdrawDeposit(uint256 amount)
+        +borrowFromPool(address company, uint256 amount)
+        +borrowFromPoolFor(address company, uint256 amount, uint256 flowRate)
+        +repayLoanManual(uint256 amount)
+        +autoRepay(address borrower, uint256 claimedAmount) uint256
+        +liquidateLoan(address borrower)
+        +getLoanBalance(address borrower) uint256_uint256_uint256
+        +getPoolLiquidity(address company) uint256_uint256
+        +getDepositBalance(address lender) uint256_uint256
+        -_doDeposit(address lender, uint256 amount)
+        -_doBorrow(address borrower, uint256 amount, uint256 flowRate)
+        -_applyRepayment(address borrower, LoanRecord record, uint256 amount)
+        -_syncYield(LenderDeposit deposit, Pool pool) uint256
+    }
+
+    %% ── EmploymentSBT ────────────────────────────────────────────────────────
+    class EmploymentRecord {
+        <<struct>>
+        +address hrAuthority
+        +string companyName
+        +uint256 startTs
+    }
+
+    class EmploymentSBT {
+        +bytes32 MINTER_ROLE
+        -uint256 _tokenIdCounter
+        -string _baseTokenURI
+        +mapping employmentRecords
+        +mapping employeeTokenId
+        +mint(address to, string companyName, address hrAuthority) uint256
+        +revoke(address employee)
+        +locked(uint256 tokenId) bool
+        +setBaseURI(string uri)
+        +supportsInterface(bytes4 interfaceId) bool
+        -_update(address to, uint256 tokenId, address auth) address
+        -_baseURI() string
+    }
+
+    %% ── IDRXPriceOracle ──────────────────────────────────────────────────────
+    class IDRXPriceOracle {
+        +AggregatorV3Interface priceFeed
+        +setPriceFeed(address feed)
+        +getLatestRate() uint256
+        +getIDRXPriceInUSD() uint256
+        +convertUSDtoIDRX(uint256 usdAmount) uint256
+        +convertIDRXtoUSD(uint256 idrxAmount) uint256
+    }
+
+    %% ── Inheritance ──────────────────────────────────────────────────────────
+    CompanyVault --|> ICompanyVault : implements
+    CompanyVault --|> ReentrancyGuard : extends
+    CompanyVault --|> AccessControl : extends
+    ConfidentialCompanyVault --|> CompanyVault : extends
+    EmployeeLiquidityContract --|> IEmployeeLiquidity : implements
+    EmployeeLiquidityContract --|> ReentrancyGuard : extends
+    EmployeeLiquidityContract --|> AccessControl : extends
+    EmploymentSBT --|> ERC721 : extends
+    EmploymentSBT --|> IERC5192 : implements
+    EmploymentSBT --|> AccessControl : extends
+    IDRXPriceOracle --|> Ownable : extends
+    PayrollFactory --|> AccessControl : extends
+
+    %% ── Composition (structs owned by contract) ──────────────────────────────
+    CompanyVault *-- EmployeeStream : contains
+    CompanyVault *-- SeveranceVault : contains
+    CompanyVault *-- TerminationProposal : contains
+    CompanyVault *-- CliffVest : contains
+    EmployeeStream *-- SplitConfig : contains
+    EmployeeLiquidityContract *-- Pool : contains
+    EmployeeLiquidityContract *-- LenderDeposit : contains
+    EmployeeLiquidityContract *-- LoanRecord : contains
+    EmploymentSBT *-- EmploymentRecord : contains
+
+    %% ── Associations (contract references) ──────────────────────────────────
+    PayrollFactory ..> CompanyVault : deploys
+    CompanyVault ..> EmployeeLiquidityContract : calls autoRepay
+    CompanyVault ..> EmploymentSBT : calls mint and revoke
+    CompanyVault ..> IDRXPriceOracle : reads price
+    CompanyVault ..> PayrollMath : uses
+
+    %% ── Enum usage ───────────────────────────────────────────────────────────
+    CompanyVault ..> VaultStatus : uses
+    CompanyVault ..> StreamStatus : uses
+    CompanyVault ..> SeveranceState : uses
+    CompanyVault ..> VestType : uses
+    CompanyVault ..> VestStatus : uses
+    EmployeeLiquidityContract ..> LoanStatus : uses
+```
+
+### 2.3 Perancangan Data Secara Keseluruhan
 
 Data dalam sistem Payana didistribusikan ke dalam tiga lapisan penyimpanan yang saling melengkapi:
 
@@ -209,7 +557,7 @@ Data dalam sistem Payana didistribusikan ke dalam tiga lapisan penyimpanan yang 
 
 3. **Ponder Indexed PostgreSQL (skema `public`).** Menyimpan salinan terindeks dari event on-chain dalam bentuk tabel relasional yang dapat dikueri cepat: `company`, `employee_stream`, `salary_claim`, `severance_vault`, `termination_proposal`, `cliff_vest`, `compliance_vault`, `liquidity_pool`, `lender_deposit`, `loan_record`, `employment_certificate`, `platform_fee_payment`, `encrypted_salary`, `auditor_grant`, dan `low_balance_alert`. Lapisan ini menghindarkan frontend dan backend dari kebutuhan iterasi RPC langsung untuk pembacaan agregat.
 
-### 2.3 Perancangan Antarmuka Secara Keseluruhan
+### 2.4 Perancangan Antarmuka Secara Keseluruhan
 
 Frontend Payana menyajikan empat portal yang dipisahkan berdasarkan hasil resolusi peran (hook `useRole`). Routing dilakukan dengan App Router Next.js, dan setiap portal dilindungi oleh role guard berbasis peran on-chain.
 
@@ -1530,6 +1878,570 @@ erDiagram
 | `employment_certificate` | `id` | `EmploymentCertified/Revoked` | `/verify` |
 | `encrypted_salary` | `employee` | `EncryptedSalarySet` | portal FHE |
 | `low_balance_alert` | `id` | `LowVaultBalance` | `/hr/vault` |
+
+---
+
+### 4.4 Physical Data Model (PDM)
+
+Berikut adalah Physical Data Model sistem Payana:
+
+```mermaid
+erDiagram
+
+    %% ════════════════════════════════════════════════════════════════
+    %% PONDER SCHEMA (public) — on-chain indexed tables
+    %% ════════════════════════════════════════════════════════════════
+
+    company {
+        hex id PK
+        text name
+        text status
+        bigint vaultBalance
+        bigint createdAt
+    }
+
+    employee_stream {
+        hex id PK
+        hex hrAuthority FK
+        bigint flowRate
+        bigint startTs
+        text status
+        int employeeBps
+        int complianceBps
+        int severanceBps
+    }
+
+    salary_claim {
+        text id PK
+        hex employee FK
+        hex hr_authority FK
+        bigint accrued
+        bigint net_to_employee
+        bigint to_compliance
+        bigint to_severance
+        bigint block_number
+        bigint timestamp
+    }
+
+    severance_vault {
+        hex id PK
+        hex hrAuthority FK
+        bigint amount
+        text state
+        bigint lastUpdated
+    }
+
+    termination_proposal {
+        hex id PK
+        hex hrAuthority FK
+        boolean hrApproved
+        boolean legalApproved
+        bigint expiresAt
+        bigint proposedAt
+        bigint executedAt
+        boolean cancelled
+    }
+
+    cliff_vest {
+        text id PK
+        hex employee FK
+        hex hrAuthority FK
+        bigint vestId
+        bigint amount
+        bigint cliffTs
+        text vestType
+        text status
+        bigint createdAt
+    }
+
+    compliance_vault {
+        hex id PK
+        bigint accumulated
+        bigint lastUpdated
+    }
+
+    liquidity_pool {
+        hex id PK
+        int interestRateBps
+        bigint totalDeposited
+        bigint totalLoansOutstanding
+        bigint createdAt
+    }
+
+    lender_deposit {
+        hex id PK
+        hex company_address FK
+        bigint principal
+        bigint yield_earned
+        bigint last_updated
+    }
+
+    loan_record {
+        hex id PK
+        hex company_address FK
+        bigint principal
+        bigint interest
+        bigint repaid_amount
+        bigint due_ts
+        text status
+        bigint created_at
+    }
+
+    employment_certificate {
+        hex id PK
+        bigint token_id
+        hex hr_authority FK
+        text company_name
+        bigint issued_at
+        bigint revoked_at
+        boolean active
+    }
+
+    platform_fee_payment {
+        text id PK
+        hex hr_authority FK
+        hex employee
+        bigint amount
+        bigint timestamp
+    }
+
+    encrypted_salary {
+        hex id PK
+        hex hr_authority FK
+        bigint set_at
+        bigint updated_at
+    }
+
+    auditor_grant {
+        text id PK
+        hex hr_authority FK
+        hex auditor
+        bigint expires_at
+        bigint granted_at
+        boolean active
+    }
+
+    low_balance_alert {
+        text id PK
+        hex hrAuthority FK
+        bigint balance
+        bigint monthlyNeed
+        bigint timestamp
+    }
+
+    %% ════════════════════════════════════════════════════════════════
+    %% APP SCHEMA (app) — off-chain backend tables
+    %% ════════════════════════════════════════════════════════════════
+
+    rate_limits {
+        text employee_address PK
+        int claim_count
+        timestamp window_start
+    }
+
+    audit_logs {
+        bigint id PK
+        text action
+        text actor
+        text tx_hash
+        text meta
+        timestamp created_at
+    }
+
+    webhook_events {
+        text id PK
+        text type
+        boolean processed
+        timestamp received_at
+    }
+
+    employees {
+        text address PK
+        text name
+        text nik
+        text phone
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    sessions {
+        text jti PK
+        text address FK
+        timestamp expires_at
+        timestamp created_at
+    }
+
+    pending_registrations {
+        text address PK
+        text email
+        text name
+        text hr_address
+        text status
+        timestamptz requested_at
+        timestamptz updated_at
+    }
+
+    %% ════════════════════════════════════════════════════════════════
+    %% RELATIONS
+    %% ════════════════════════════════════════════════════════════════
+
+    company ||--o{ employee_stream : "has"
+    company ||--o{ severance_vault : "holds"
+    company ||--o{ termination_proposal : "initiates"
+    company ||--o{ cliff_vest : "grants"
+    company ||--o{ salary_claim : "pays"
+    company ||--o| compliance_vault : "owns"
+    company ||--o| liquidity_pool : "manages"
+    company ||--o{ lender_deposit : "receives"
+    company ||--o{ loan_record : "lends"
+    company ||--o{ employment_certificate : "issues"
+    company ||--o{ platform_fee_payment : "incurs"
+    company ||--o{ encrypted_salary : "stores"
+    company ||--o{ auditor_grant : "delegates"
+    company ||--o{ low_balance_alert : "triggers"
+
+    employee_stream ||--o{ salary_claim : "generates"
+    employee_stream ||--o| severance_vault : "accrues"
+    employee_stream ||--o| employment_certificate : "certifies"
+    employee_stream ||--o| rate_limits : "limits"
+
+    employees ||--o| sessions : "authenticates"
+    employees ||--o{ salary_claim : "receives"
+    employees ||--o| rate_limits : "tracked_by"
+```
+
+---
+
+### 4.5 Dekomposisi Data — Off-Chain (Skema `app`)
+
+Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh Drizzle ORM. Semua data PII dienkripsi dengan AES-256-GCM sebelum disimpan.
+
+#### 4.5.1 Tabel `sessions`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `jti` | `text` | NOT NULL | PRIMARY KEY | UUID v4 | — | JWT unique identifier; digunakan untuk revokasi token |
+| `address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Wallet address karyawan/HR (lowercase) |
+| `expires_at` | `timestamp` | NOT NULL | — | > created_at | — | Waktu kedaluwarsa token JWT |
+| `created_at` | `timestamp` | NOT NULL | — | — | `now()` | Waktu token dibuat |
+
+#### 4.5.2 Tabel `employees`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `address` | `text` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Wallet address karyawan (lowercase) |
+| `name` | `text` | NOT NULL | — | — | — | Nama lengkap, terenkripsi AES-256-GCM |
+| `nik` | `text` | NOT NULL | — | 16 digit | — | Nomor Induk Kependudukan, terenkripsi AES-256-GCM |
+| `phone` | `text` | NOT NULL | — | — | — | Nomor telepon, terenkripsi AES-256-GCM |
+| `created_at` | `timestamp` | NOT NULL | — | — | `now()` | Waktu record dibuat |
+| `updated_at` | `timestamp` | NOT NULL | — | — | `now()` | Waktu record terakhir diperbarui |
+
+#### 4.5.3 Tabel `audit_logs`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `bigint` | NOT NULL | PRIMARY KEY GENERATED ALWAYS AS IDENTITY | ≥ 1 | auto | Auto-increment log ID |
+| `action` | `text` | NOT NULL | — | `BUNDLER_RELAY` \| `COMPLIANCE_EXPORT` \| dll. | — | Jenis aksi yang diaudit |
+| `actor` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Alamat wallet pelaku (HR atau karyawan) |
+| `tx_hash` | `text` | NULL | — | Hex 0x + 64 char | `NULL` | Hash transaksi on-chain (null jika belum on-chain) |
+| `meta` | `text` | NULL | — | JSON string | `NULL` | Konteks tambahan dalam format JSON |
+| `created_at` | `timestamp` | NOT NULL | — | — | `now()` | Waktu log dicatat |
+
+#### 4.5.4 Tabel `webhook_events`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `text` | NOT NULL | PRIMARY KEY | — | — | Alchemy webhook event ID (digunakan untuk deduplikasi) |
+| `type` | `text` | NOT NULL | — | — | — | Tipe event Alchemy (mis. `ADDRESS_ACTIVITY`) |
+| `processed` | `boolean` | NOT NULL | — | `true` \| `false` | `false` | Flag apakah event sudah diproses |
+| `received_at` | `timestamp` | NOT NULL | — | — | `now()` | Waktu event diterima backend |
+
+#### 4.5.5 Tabel `rate_limits`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `employee_address` | `text` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Alamat karyawan (lowercase) |
+| `claim_count` | `integer` | NOT NULL | — | ≥ 0 | `0` | Jumlah klaim dalam jendela aktif (maks 10 per jam) |
+| `window_start` | `timestamp` | NOT NULL | — | — | `now()` | Waktu mulai jendela 1 jam saat ini |
+
+#### 4.5.6 Tabel `pending_registrations`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `address` | `text` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Wallet address calon tenant HR (lowercase) |
+| `email` | `text` | NULL | — | Format email | `NULL` | Alamat email kontak (opsional) |
+| `name` | `text` | NULL | — | — | `NULL` | Nama tampilan dari form onboarding |
+| `hr_address` | `text` | NULL | — | Hex 0x + 40 char | `NULL` | Alamat HR yang memproses registrasi |
+| `status` | `text` | NOT NULL | — | `pending` \| `approved` \| `rejected` | `'pending'` | Status persetujuan registrasi |
+| `requested_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu pengajuan registrasi |
+| `updated_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu status terakhir diperbarui |
+
+---
+
+### 4.6 Dekomposisi Data — Ponder Indexed (Skema `public`)
+
+Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTable` berdasarkan event yang diindeks dari Base Sepolia. Tipe `hex` merujuk pada string alamat Ethereum (0x + 40 char). Tipe `bigint` merujuk pada `BigInt` PostgreSQL untuk representasi nilai wei dan Unix timestamp.
+
+#### 4.6.1 Tabel `company`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `hex` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Alamat `hrAuthority` / key unik per perusahaan |
+| `name` | `text` | NOT NULL | — | — | — | Nama perusahaan yang didaftarkan saat deploy vault |
+| `status` | `text` | NOT NULL | — | `Active` \| `Paused` \| `Frozen` | — | Status vault saat ini |
+| `vault_balance` | `bigint` | NOT NULL | — | ≥ 0 | — | Saldo vault IDRX (wei) |
+| `created_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp saat vault di-deploy |
+
+#### 4.6.2 Tabel `employee_stream`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `hex` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Alamat karyawan |
+| `hr_authority` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat HR / vault yang mengelola stream |
+| `flow_rate` | `bigint` | NOT NULL | — | ≥ 0 | — | IDRX wei per detik yang mengalir ke karyawan |
+| `start_ts` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp saat stream dimulai |
+| `status` | `text` | NOT NULL | — | `Active` \| `Paused` \| `Cancelled` | — | Status stream saat ini |
+| `employee_bps` | `integer` | NOT NULL | — | 0–10000 | — | Porsi karyawan dalam basis poin |
+| `compliance_bps` | `integer` | NOT NULL | — | 0–10000 | — | Porsi kepatuhan (BPJS/PPh21) dalam basis poin |
+| `severance_bps` | `integer` | NOT NULL | — | 0–10000 | — | Porsi dana pesangon dalam basis poin |
+
+#### 4.6.3 Tabel `salary_claim`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `text` | NOT NULL | PRIMARY KEY | `${txHash}-${logIndex}` | — | ID unik klaim gaji per event log |
+| `employee` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat karyawan yang mengklaim |
+| `hr_authority` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat HR vault sumber |
+| `accrued` | `bigint` | NOT NULL | — | ≥ 0 | — | Total IDRX wei yang terakrual pada klaim ini |
+| `net_to_employee` | `bigint` | NOT NULL | — | ≥ 0 | — | IDRX wei yang dikirim ke wallet karyawan |
+| `to_compliance` | `bigint` | NOT NULL | — | ≥ 0 | — | IDRX wei yang dialokasikan ke compliance vault |
+| `to_severance` | `bigint` | NOT NULL | — | ≥ 0 | — | IDRX wei yang ditambahkan ke severance vault |
+| `block_number` | `bigint` | NOT NULL | — | ≥ 0 | — | Nomor blok saat event ter-emit |
+| `timestamp` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp klaim |
+
+#### 4.6.4 Tabel `severance_vault`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `hex` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Alamat karyawan |
+| `hr_authority` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat HR vault pemilik dana pesangon |
+| `amount` | `bigint` | NOT NULL | — | ≥ 0 | — | Saldo pesangon IDRX wei |
+| `state` | `text` | NOT NULL | — | `Locked` \| `Returned` \| `Released` | — | Status dana pesangon |
+| `last_updated` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pembaruan terakhir |
+
+#### 4.6.5 Tabel `termination_proposal`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `hex` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Alamat karyawan yang diusulkan PHK |
+| `hr_authority` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat HR pengusul |
+| `hr_approved` | `boolean` | NOT NULL | — | `true` \| `false` | — | Status persetujuan HR |
+| `legal_approved` | `boolean` | NOT NULL | — | `true` \| `false` | — | Status persetujuan Legal |
+| `expires_at` | `bigint` | NOT NULL | — | > proposed_at | — | Unix timestamp kadaluarsa proposal (+ 7 hari) |
+| `proposed_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pengajuan proposal |
+| `executed_at` | `bigint` | NULL | — | > proposed_at | `NULL` | Unix timestamp eksekusi PHK (null jika belum) |
+| `cancelled` | `boolean` | NOT NULL | — | `true` \| `false` | — | Flag apakah proposal dibatalkan |
+
+#### 4.6.6 Tabel `cliff_vest`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `text` | NOT NULL | PRIMARY KEY | `${employee}-${vestId}` | — | ID unik vest |
+| `employee` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat karyawan penerima |
+| `hr_authority` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat HR pembuat vest |
+| `vest_id` | `bigint` | NOT NULL | — | ≥ 0 | — | ID vest unik dalam vault (counter) |
+| `amount` | `bigint` | NOT NULL | — | ≥ 0 | — | IDRX wei yang terkunci dalam vest |
+| `cliff_ts` | `bigint` | NOT NULL | — | > created_at | — | Unix timestamp saat vest dapat diklaim |
+| `vest_type` | `text` | NOT NULL | — | `Retention` \| `Probation` \| `ESOP` | — | Jenis vest |
+| `status` | `text` | NOT NULL | — | `Locked` \| `Claimed` \| `Forfeited` | — | Status vest saat ini |
+| `created_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pembuatan vest |
+
+#### 4.6.7 Tabel `compliance_vault`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `hex` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Alamat `hrAuthority` / satu per perusahaan |
+| `accumulated` | `bigint` | NOT NULL | — | ≥ 0 | — | Total akumulasi dana compliance IDRX wei |
+| `last_updated` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pembaruan terakhir |
+
+#### 4.6.8 Tabel `liquidity_pool`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `hex` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Alamat vault pemilik pool |
+| `interest_rate_bps` | `integer` | NOT NULL | — | 0–10000 | — | Suku bunga pinjaman (bps) per 30 hari |
+| `total_deposited` | `bigint` | NOT NULL | — | ≥ 0 | — | Total principal yang didepositkan IDRX wei |
+| `total_loans_outstanding` | `bigint` | NOT NULL | — | ≥ 0 | — | Total pinjaman aktif IDRX wei |
+| `created_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp inisialisasi pool |
+
+#### 4.6.9 Tabel `lender_deposit`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `hex` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Alamat lender (karyawan deposan) |
+| `company_address` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat vault / pool tempat deposit |
+| `principal` | `bigint` | NOT NULL | — | ≥ 0 | — | Principal aktif yang didepositkan IDRX wei |
+| `yield_earned` | `bigint` | NOT NULL | — | ≥ 0 | — | Yield terakumulasi menunggu penarikan IDRX wei |
+| `last_updated` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp sinkronisasi yield terakhir |
+
+#### 4.6.10 Tabel `loan_record`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `hex` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Alamat peminjam (karyawan) |
+| `company_address` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat vault pool sumber pinjaman |
+| `principal` | `bigint` | NOT NULL | — | ≥ 0 | — | Pokok pinjaman IDRX wei |
+| `interest` | `bigint` | NOT NULL | — | ≥ 0 | — | Bunga pre-computed IDRX wei |
+| `repaid_amount` | `bigint` | NOT NULL | — | ≥ 0 | — | Total yang telah dibayar kembali IDRX wei |
+| `due_ts` | `bigint` | NOT NULL | — | > created_at | — | Unix timestamp jatuh tempo pinjaman |
+| `status` | `text` | NOT NULL | — | `Active` \| `Repaid` \| `Defaulted` | — | Status pinjaman saat ini |
+| `created_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pinjaman dibuat |
+
+#### 4.6.11 Tabel `employment_certificate`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `hex` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Alamat karyawan pemegang SBT |
+| `token_id` | `bigint` | NOT NULL | — | ≥ 1 | — | ID token ERC-721 SBT |
+| `hr_authority` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat HR penerbit sertifikat |
+| `company_name` | `text` | NOT NULL | — | — | — | Nama perusahaan saat penerbitan |
+| `issued_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp penerbitan SBT |
+| `revoked_at` | `bigint` | NULL | — | > issued_at | `NULL` | Unix timestamp pencabutan SBT (null = masih aktif) |
+| `active` | `boolean` | NOT NULL | — | `true` \| `false` | — | Status aktif sertifikat |
+
+#### 4.6.12 Tabel `platform_fee_payment`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `text` | NOT NULL | PRIMARY KEY | `${txHash}-${logIndex}` | — | ID unik per event pembayaran fee |
+| `hr_authority` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat HR vault sumber fee |
+| `employee` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat karyawan yang memicu klaim |
+| `amount` | `bigint` | NOT NULL | — | ≥ 0 | — | Jumlah platform fee IDRX wei |
+| `timestamp` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pembayaran |
+
+#### 4.6.13 Tabel `encrypted_salary`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `hex` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Alamat karyawan pemilik gaji terenkripsi |
+| `hr_authority` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat HR yang menetapkan gaji FHE |
+| `set_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pertama kali gaji dienkripsi |
+| `updated_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pembaruan ciphertext terakhir |
+
+#### 4.6.14 Tabel `auditor_grant`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `text` | NOT NULL | PRIMARY KEY | `${hrAuthority}-${auditor}` | — | ID unik grant per pasang HR–auditor |
+| `hr_authority` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat HR pemberi akses audit |
+| `auditor` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat auditor penerima akses FHE |
+| `expires_at` | `bigint` | NOT NULL | — | > granted_at | — | Unix timestamp kadaluarsa akses |
+| `granted_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pemberian akses |
+| `active` | `boolean` | NOT NULL | — | `true` \| `false` | — | Status aktif grant |
+
+#### 4.6.15 Tabel `low_balance_alert`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `text` | NOT NULL | PRIMARY KEY | `${txHash}-${logIndex}` | — | ID unik per event alert |
+| `hr_authority` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat HR vault yang memicu alert |
+| `balance` | `bigint` | NOT NULL | — | ≥ 0 | — | Saldo vault IDRX wei saat alert ter-emit |
+| `monthly_need` | `bigint` | NOT NULL | — | ≥ 0 | — | Estimasi kebutuhan payroll bulanan IDRX wei |
+| `timestamp` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp alert |
+
+---
+
+### 4.7 Dekomposisi Data — On-Chain (Solidity Structs)
+
+Bagian ini mendokumentasikan struct Solidity yang mendefinisikan state storage dalam smart contract. Kolom "Null" dan "Default" mengacu pada nilai awal variabel Solidity (uninitialized = zero value).
+
+#### 4.7.1 Struct `SplitConfig` (CompanyVault)
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `employeeBps` | `uint16` | NOT NULL | `employeeBps + complianceBps + severanceBps = 10000` | 0–10000 | `9300` | Porsi gaji bersih karyawan (basis poin) |
+| `complianceBps` | `uint16` | NOT NULL | sum = 10000 | 0–10000 | `500` | Porsi BPJS/PPh21 (basis poin) |
+| `severanceBps` | `uint16` | NOT NULL | sum = 10000 | 0–10000 | `200` | Porsi dana pesangon (basis poin) |
+
+#### 4.7.2 Struct `EmployeeStream` (CompanyVault)
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `flowRate` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | IDRX wei per detik; hasil konversi gaji bulanan |
+| `startTs` | `uint256` | NOT NULL | ≥ 0 | Unix timestamp | `0` | Block.timestamp saat stream dimulai |
+| `lastWithdrawnTs` | `uint256` | NOT NULL | ≥ 0 | ≥ startTs | `0` | Timestamp klaim atau settle terakhir |
+| `settledBalance` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Akrual tersimpan saat pause/cancel stream |
+| `status` | `StreamStatus` | NOT NULL | — | `Inactive`\|`Active`\|`Paused`\|`Cancelled` | `Inactive` | Status stream saat ini |
+| `splits` | `SplitConfig` | NOT NULL | — | — | default splits | Konfigurasi split akrual |
+
+#### 4.7.3 Struct `SeveranceVault` (CompanyVault)
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `amount` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Total pesangon terakumulasi IDRX wei |
+| `state` | `SeveranceState` | NOT NULL | — | `Locked`\|`Returned`\|`Released` | `Locked` | Status dana pesangon |
+| `tenureMonths` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Masa kerja dalam bulan saat klaim terakhir |
+| `lastUpdatedTs` | `uint256` | NOT NULL | ≥ 0 | Unix timestamp | `0` | Block.timestamp pembaruan terakhir |
+
+#### 4.7.4 Struct `TerminationProposal` (CompanyVault)
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `employee` | `address` | NOT NULL | ≠ address(0) | Hex 0x + 40 char | `address(0)` | Alamat karyawan yang diusulkan PHK |
+| `hrApproved` | `bool` | NOT NULL | — | `true`\|`false` | `true` | Selalu `true` saat proposal dibuat oleh HR |
+| `legalApproved` | `bool` | NOT NULL | — | `true`\|`false` | `false` | Di-set `true` oleh LEGAL_ROLE via `approveTermination()` |
+| `expiresAt` | `uint256` | NOT NULL | > block.timestamp saat dibuat | Unix timestamp | `0` | `block.timestamp + TERMINATION_EXPIRY (7 days)` |
+| `reasonHash` | `bytes32` | NOT NULL | — | keccak256 hash | `bytes32(0)` | Hash keccak256 dari alasan PHK (off-chain document) |
+| `flowRateSnapshot` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Flow rate saat proposal diajukan (untuk hitung pesangon) |
+
+#### 4.7.5 Struct `CliffVest` (CompanyVault)
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `employee` | `address` | NOT NULL | ≠ address(0) | Hex 0x + 40 char | `address(0)` | Alamat karyawan penerima vest |
+| `amount` | `uint256` | NOT NULL | > 0 | ≥ 0 | `0` | IDRX wei yang terkunci dalam vest |
+| `cliffTs` | `uint256` | NOT NULL | > block.timestamp saat dibuat | Unix timestamp | `0` | Block.timestamp saat vest boleh diklaim |
+| `vestType` | `VestType` | NOT NULL | — | `Retention`\|`Probation`\|`ESOP` | `Retention` | Jenis vest |
+| `status` | `VestStatus` | NOT NULL | — | `Locked`\|`Claimed`\|`Forfeited` | `Locked` | Status vest |
+
+#### 4.7.6 Struct `Pool` (EmployeeLiquidityContract)
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `totalDeposited` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Total principal yang didepositkan lender IDRX wei |
+| `totalLoansOutstanding` | `uint256` | NOT NULL | ≤ totalDeposited | 0–totalDeposited | `0` | Total pinjaman aktif IDRX wei |
+| `interestRateBps` | `uint16` | NOT NULL | 0–10000 | 0–10000 | `150` | Suku bunga per LOAN_TERM (30 hari) dalam basis poin |
+| `initialized` | `bool` | NOT NULL | — | `true`\|`false` | `false` | Flag apakah pool sudah diinisialisasi |
+| `yieldPerShareX18` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Indeks yield kumulatif dalam skala 1e18 (EIP-4626-style) |
+
+#### 4.7.7 Struct `LenderDeposit` (EmployeeLiquidityContract)
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `companyAddress` | `address` | NOT NULL | ≠ address(0) | Hex 0x + 40 char | `address(0)` | Alamat vault pool tempat deposit |
+| `principal` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Principal aktif yang masih didepositkan IDRX wei |
+| `yieldEarned` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Yield yang sudah termaterialisasi IDRX wei |
+| `depositedTs` | `uint256` | NOT NULL | ≥ 0 | Unix timestamp | `0` | Block.timestamp deposit pertama |
+| `yieldDebtX18` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Snapshot `yieldPerShareX18` saat sinkronisasi terakhir |
+
+#### 4.7.8 Struct `LoanRecord` (EmployeeLiquidityContract)
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `companyAddress` | `address` | NOT NULL | ≠ address(0) | Hex 0x + 40 char | `address(0)` | Alamat vault pool sumber pinjaman |
+| `principal` | `uint256` | NOT NULL | > 0 | ≥ 0 | `0` | Pokok pinjaman IDRX wei |
+| `interest` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Bunga pre-computed IDRX wei (`principal × bps / 10000`) |
+| `repaidAmount` | `uint256` | NOT NULL | ≤ principal + interest | ≥ 0 | `0` | Total yang telah dibayar kembali IDRX wei |
+| `dueTs` | `uint256` | NOT NULL | > block.timestamp saat borrow | Unix timestamp | `0` | `block.timestamp + LOAN_TERM (30 days)` |
+| `status` | `LoanStatus` | NOT NULL | — | `None`\|`Active`\|`Repaid`\|`Defaulted` | `Active` | Status pinjaman saat ini |
+
+#### 4.7.9 Struct `EmploymentRecord` (EmploymentSBT)
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `hrAuthority` | `address` | NOT NULL | ≠ address(0) | Hex 0x + 40 char | `address(0)` | Alamat HR yang menerbitkan sertifikat |
+| `companyName` | `string` | NOT NULL | — | — | `""` | Nama perusahaan saat penerbitan SBT |
+| `startTs` | `uint256` | NOT NULL | ≥ 0 | Unix timestamp | `0` | Block.timestamp saat stream karyawan dimulai |
 
 ---
 
