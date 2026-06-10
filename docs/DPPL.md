@@ -72,7 +72,7 @@ Rancangan yang berada **di luar ruang lingkup** dokumen ini mengikuti batasan SK
 | Ponder | Framework indeksasi event blockchain ke PostgreSQL. |
 | Privy | Wallet-as-a-Service (WaaS) untuk embedded wallet berbasis email. |
 
-#### Akronim dan Singkatan
+#### 1.3.1 Akronim dan Singkatan
 
 | Akronim | Kepanjangan |
 |---------|-------------|
@@ -669,9 +669,14 @@ classDiagram
 
 **Modifier:** `onlyHR` (cek `HR_ROLE`), `vaultActive` (status harus `Active`), `validTermination(employee)` (hrApproved && legalApproved && belum kadaluarsa).
 
-##### constructor
+**[constructor(idrx, hrAuthority, companyName, liquidityContract, sbtContract)]**
+| | |
+|---|---|
+| Input | idrx: address, hrAuthority: address, companyName: string, liquidityContract: address, sbtContract: address |
+| Output | - |
+| Deskripsi | internal; dipanggil oleh `PayrollFactory.deployVault()` untuk inisialisasi vault baru |
 
-Disetel oleh `PayrollFactory`. Set `IDRX`, `factory=msg.sender`, `hrAuthority`, `companyName`, `status=Active`. Berikan `DEFAULT_ADMIN_ROLE`, `HR_ROLE`, dan `LEGAL_ROLE` ke `hrAuthority`. Inisialisasi pool koperasi via `liquidityContract.initializePool(address(this), DEFAULT_POOL_RATE_BPS)` (dibungkus try/catch). Emit `VaultInitialized`.
+Algoritma: Disetel oleh `PayrollFactory`. Set `IDRX`, `factory=msg.sender`, `hrAuthority`, `companyName`, `status=Active`. Berikan `DEFAULT_ADMIN_ROLE`, `HR_ROLE`, dan `LEGAL_ROLE` ke `hrAuthority`. Inisialisasi pool koperasi via `liquidityContract.initializePool(address(this), DEFAULT_POOL_RATE_BPS)` (dibungkus try/catch). Emit `VaultInitialized`.
 
 **[fundVault(amount)]**
 | | |
@@ -933,13 +938,13 @@ sequenceDiagram
 
 **Algoritma:** Check vest ada dan `Locked`; set `amount=0`, status `Forfeited`; `vaultBalance += amount`; emit `CliffVestForfeited`.
 
-##### Fungsi Internal
+**Fungsi Internal**
 
 - `_forfeitAllVests(employee)`: iterasi `0..vestCounter`; setiap vest `Locked` dengan `amount>0` di-forfeit dan dikembalikan ke `vaultBalance` (O(vestCounter)).
 - `_checkLowBalance()`: no-op jika `totalFlowRate==0`; hitung `monthlyNeed = totalFlowRate * SECONDS_PER_MONTH` dan `threshold = bpsOf(monthlyNeed, lowBalanceThresholdBps)`; emit `LowVaultBalance` jika `vaultBalance < threshold`.
 - `_revokeSBT(employee)`: jika ada `tokenId`, panggil `sbtContract.revoke(employee)` (try/catch); emit `EmploymentRevoked`.
 
-##### Fungsi View
+**Fungsi View**
 
 | Fungsi | Return | FR Terkait |
 |--------|--------|-----------|
@@ -1118,12 +1123,12 @@ sequenceDiagram
 1. **Check:** pinjaman `Active` (`NoActiveLoan`); `now > dueTs + GRACE_PERIOD` (`GracePeriodNotExpired`).
 2. **Effect:** `outstanding = principal + interest - repaidAmount`; `pool.totalLoansOutstanding -= principal`; kurangi `pool.totalDeposited` sebesar outstanding (loss disosialisasikan ke seluruh lender); set status `Defaulted`; emit `LoanDefaulted`.
 
-##### Fungsi Internal
+**Fungsi Internal**
 
 - `_applyRepayment(borrower, loan, amount)`: `actualRepaid = min(amount, outstanding)`; `loan.repaidAmount += actualRepaid`; pada pelunasan penuh kurangi `totalLoansOutstanding`, hitung `fee = interest * 1% `, `totalProtocolFee += fee`, distribusikan `netInterest` ke `yieldPerShareX18` (jika `totalDeposited > 0`), set status `Repaid`.
 - `_syncYield(dep, pool)`: `accrued = principal * (yieldPerShareX18 - yieldDebtX18)/1e18`; `yieldEarned += accrued`; perbarui `yieldDebtX18`.
 
-##### Fungsi View
+**Fungsi View**
 
 | Fungsi | Return | FR Terkait |
 |--------|--------|-----------|
@@ -1356,7 +1361,7 @@ Data dalam sistem Payana didistribusikan ke dalam tiga lapisan penyimpanan yang 
 
 3. **Ponder Indexed PostgreSQL (skema `public`).** Menyimpan salinan terindeks dari event on-chain dalam bentuk tabel relasional yang dapat dikueri cepat: `company`, `employee_stream`, `salary_claim`, `severance_vault`, `termination_proposal`, `cliff_vest`, `compliance_vault`, `liquidity_pool`, `lender_deposit`, `loan_record`, `employment_certificate`, `platform_fee_payment`, `encrypted_salary`, `auditor_grant`, dan `low_balance_alert`. Lapisan ini menghindarkan frontend dan backend dari kebutuhan iterasi RPC langsung untuk pembacaan agregat.
 
-### 4.1 ERD On-Chain (Solidity Structs & Mappings)
+##### ERD On-Chain (Solidity Structs & Mappings)
 
 State on-chain disimpan dalam struct dan mapping pada masing-masing kontrak. Diagram berikut menggambarkan relasi konseptual antar entitas on-chain (kunci pemetaan adalah alamat Ethereum).
 
@@ -1461,7 +1466,7 @@ erDiagram
 - `LoanStatus`: Active, Repaid, Defaulted.
 - `SplitConfig`: { employeeBps, complianceBps, severanceBps } — total harus 10.000.
 
-### 4.2 ERD Off-Chain (PostgreSQL — skema `app`)
+##### ERD Off-Chain (PostgreSQL — skema `app`)
 
 Tabel off-chain dikelola Drizzle ORM dalam skema `app`. Tabel-tabel ini independen (tidak ada foreign key relasional formal antar tabel; keterhubungan logis melalui kolom `address`).
 
@@ -1522,7 +1527,7 @@ erDiagram
 | `rate_limits` | `employeeAddress` (PK) | Counter klaim per jam | FR-404 |
 | `pending_registrations` | `address` (PK) | Antrian persetujuan tenant | FR-107, 108, 109 |
 
-### 4.3 ERD Ponder Indexed (PostgreSQL — skema `public`)
+##### ERD Ponder Indexed (PostgreSQL — skema `public`)
 
 Tabel terindeks Ponder direpresentasikan dengan `onchainTable`. Kolom yang dipakai langsung oleh SQL backend (mis. `salary_claim`) di-pin secara eksplisit ke snake_case agar kompatibel dengan kueri SQL mentah pada backend compliance dan liquidation.
 
@@ -1606,11 +1611,11 @@ erDiagram
 
 ---
 
-### 4.5 Dekomposisi Data — Off-Chain (Skema `app`)
+##### Dekomposisi Data — Off-Chain (Skema `app`)
 
 Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh Drizzle ORM. Semua data PII dienkripsi dengan AES-256-GCM sebelum disimpan.
 
-#### 4.5.1 Tabel `sessions`
+**Tabel `sessions`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1619,7 +1624,7 @@ Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh
 | `expires_at` | `timestamp` | NOT NULL | — | > created_at | — | Waktu kedaluwarsa token JWT |
 | `created_at` | `timestamp` | NOT NULL | — | — | `now()` | Waktu token dibuat |
 
-#### 4.5.2 Tabel `employees`
+**Tabel `employees`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1630,7 +1635,7 @@ Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh
 | `created_at` | `timestamp` | NOT NULL | — | — | `now()` | Waktu record dibuat |
 | `updated_at` | `timestamp` | NOT NULL | — | — | `now()` | Waktu record terakhir diperbarui |
 
-#### 4.5.3 Tabel `audit_logs`
+**Tabel `audit_logs`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1641,7 +1646,7 @@ Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh
 | `meta` | `text` | NULL | — | JSON string | `NULL` | Konteks tambahan dalam format JSON |
 | `created_at` | `timestamp` | NOT NULL | — | — | `now()` | Waktu log dicatat |
 
-#### 4.5.4 Tabel `webhook_events`
+**Tabel `webhook_events`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1650,7 +1655,7 @@ Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh
 | `processed` | `boolean` | NOT NULL | — | `true` \| `false` | `false` | Flag apakah event sudah diproses |
 | `received_at` | `timestamp` | NOT NULL | — | — | `now()` | Waktu event diterima backend |
 
-#### 4.5.5 Tabel `rate_limits`
+**Tabel `rate_limits`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1658,7 +1663,7 @@ Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh
 | `claim_count` | `integer` | NOT NULL | — | ≥ 0 | `0` | Jumlah klaim dalam jendela aktif (maks 10 per jam) |
 | `window_start` | `timestamp` | NOT NULL | — | — | `now()` | Waktu mulai jendela 1 jam saat ini |
 
-#### 4.5.6 Tabel `pending_registrations`
+**Tabel `pending_registrations`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1672,11 +1677,11 @@ Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh
 
 ---
 
-### 4.6 Dekomposisi Data — Ponder Indexed (Skema `public`)
+##### Dekomposisi Data — Ponder Indexed (Skema `public`)
 
 Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTable` berdasarkan event yang diindeks dari Base Sepolia. Tipe `hex` merujuk pada string alamat Ethereum (0x + 40 char). Tipe `bigint` merujuk pada `BigInt` PostgreSQL untuk representasi nilai wei dan Unix timestamp.
 
-#### 4.6.1 Tabel `company`
+**Tabel `company`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1686,7 +1691,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `vault_balance` | `bigint` | NOT NULL | — | ≥ 0 | — | Saldo vault IDRX (wei) |
 | `created_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp saat vault di-deploy |
 
-#### 4.6.2 Tabel `employee_stream`
+**Tabel `employee_stream`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1699,7 +1704,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `compliance_bps` | `integer` | NOT NULL | — | 0–10000 | — | Porsi kepatuhan (BPJS/PPh21) dalam basis poin |
 | `severance_bps` | `integer` | NOT NULL | — | 0–10000 | — | Porsi dana pesangon dalam basis poin |
 
-#### 4.6.3 Tabel `salary_claim`
+**Tabel `salary_claim`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1713,7 +1718,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `block_number` | `bigint` | NOT NULL | — | ≥ 0 | — | Nomor blok saat event ter-emit |
 | `timestamp` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp klaim |
 
-#### 4.6.4 Tabel `severance_vault`
+**Tabel `severance_vault`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1723,7 +1728,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `state` | `text` | NOT NULL | — | `Locked` \| `Returned` \| `Released` | — | Status dana pesangon |
 | `last_updated` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pembaruan terakhir |
 
-#### 4.6.5 Tabel `termination_proposal`
+**Tabel `termination_proposal`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1736,7 +1741,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `executed_at` | `bigint` | NULL | — | > proposed_at | `NULL` | Unix timestamp eksekusi PHK (null jika belum) |
 | `cancelled` | `boolean` | NOT NULL | — | `true` \| `false` | — | Flag apakah proposal dibatalkan |
 
-#### 4.6.6 Tabel `cliff_vest`
+**Tabel `cliff_vest`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1750,7 +1755,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `status` | `text` | NOT NULL | — | `Locked` \| `Claimed` \| `Forfeited` | — | Status vest saat ini |
 | `created_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pembuatan vest |
 
-#### 4.6.7 Tabel `compliance_vault`
+**Tabel `compliance_vault`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1758,7 +1763,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `accumulated` | `bigint` | NOT NULL | — | ≥ 0 | — | Total akumulasi dana compliance IDRX wei |
 | `last_updated` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pembaruan terakhir |
 
-#### 4.6.8 Tabel `liquidity_pool`
+**Tabel `liquidity_pool`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1768,7 +1773,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `total_loans_outstanding` | `bigint` | NOT NULL | — | ≥ 0 | — | Total pinjaman aktif IDRX wei |
 | `created_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp inisialisasi pool |
 
-#### 4.6.9 Tabel `lender_deposit`
+**Tabel `lender_deposit`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1778,7 +1783,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `yield_earned` | `bigint` | NOT NULL | — | ≥ 0 | — | Yield terakumulasi menunggu penarikan IDRX wei |
 | `last_updated` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp sinkronisasi yield terakhir |
 
-#### 4.6.10 Tabel `loan_record`
+**Tabel `loan_record`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1791,7 +1796,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `status` | `text` | NOT NULL | — | `Active` \| `Repaid` \| `Defaulted` | — | Status pinjaman saat ini |
 | `created_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pinjaman dibuat |
 
-#### 4.6.11 Tabel `employment_certificate`
+**Tabel `employment_certificate`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1803,7 +1808,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `revoked_at` | `bigint` | NULL | — | > issued_at | `NULL` | Unix timestamp pencabutan SBT (null = masih aktif) |
 | `active` | `boolean` | NOT NULL | — | `true` \| `false` | — | Status aktif sertifikat |
 
-#### 4.6.12 Tabel `platform_fee_payment`
+**Tabel `platform_fee_payment`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1813,7 +1818,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `amount` | `bigint` | NOT NULL | — | ≥ 0 | — | Jumlah platform fee IDRX wei |
 | `timestamp` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pembayaran |
 
-#### 4.6.13 Tabel `encrypted_salary`
+**Tabel `encrypted_salary`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1822,7 +1827,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `set_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pertama kali gaji dienkripsi |
 | `updated_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pembaruan ciphertext terakhir |
 
-#### 4.6.14 Tabel `auditor_grant`
+**Tabel `auditor_grant`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1833,7 +1838,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `granted_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pemberian akses |
 | `active` | `boolean` | NOT NULL | — | `true` \| `false` | — | Status aktif grant |
 
-#### 4.6.15 Tabel `low_balance_alert`
+**Tabel `low_balance_alert`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1845,11 +1850,11 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 
 ---
 
-### 4.7 Dekomposisi Data — On-Chain (Solidity Structs)
+##### Dekomposisi Data — On-Chain (Solidity Structs)
 
 Bagian ini mendokumentasikan struct Solidity yang mendefinisikan state storage dalam smart contract. Kolom "Null" dan "Default" mengacu pada nilai awal variabel Solidity (uninitialized = zero value).
 
-#### 4.7.1 Struct `SplitConfig` (CompanyVault)
+**Struct `SplitConfig` (CompanyVault)**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1857,7 +1862,7 @@ Bagian ini mendokumentasikan struct Solidity yang mendefinisikan state storage d
 | `complianceBps` | `uint16` | NOT NULL | sum = 10000 | 0–10000 | `500` | Porsi BPJS/PPh21 (basis poin) |
 | `severanceBps` | `uint16` | NOT NULL | sum = 10000 | 0–10000 | `200` | Porsi dana pesangon (basis poin) |
 
-#### 4.7.2 Struct `EmployeeStream` (CompanyVault)
+**Struct `EmployeeStream` (CompanyVault)**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1868,7 +1873,7 @@ Bagian ini mendokumentasikan struct Solidity yang mendefinisikan state storage d
 | `status` | `StreamStatus` | NOT NULL | — | `Inactive`\|`Active`\|`Paused`\|`Cancelled` | `Inactive` | Status stream saat ini |
 | `splits` | `SplitConfig` | NOT NULL | — | — | default splits | Konfigurasi split akrual |
 
-#### 4.7.3 Struct `SeveranceVault` (CompanyVault)
+**Struct `SeveranceVault` (CompanyVault)**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1877,7 +1882,7 @@ Bagian ini mendokumentasikan struct Solidity yang mendefinisikan state storage d
 | `tenureMonths` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Masa kerja dalam bulan saat klaim terakhir |
 | `lastUpdatedTs` | `uint256` | NOT NULL | ≥ 0 | Unix timestamp | `0` | Block.timestamp pembaruan terakhir |
 
-#### 4.7.4 Struct `TerminationProposal` (CompanyVault)
+**Struct `TerminationProposal` (CompanyVault)**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1888,7 +1893,7 @@ Bagian ini mendokumentasikan struct Solidity yang mendefinisikan state storage d
 | `reasonHash` | `bytes32` | NOT NULL | — | keccak256 hash | `bytes32(0)` | Hash keccak256 dari alasan PHK (off-chain document) |
 | `flowRateSnapshot` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Flow rate saat proposal diajukan (untuk hitung pesangon) |
 
-#### 4.7.5 Struct `CliffVest` (CompanyVault)
+**Struct `CliffVest` (CompanyVault)**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1898,7 +1903,7 @@ Bagian ini mendokumentasikan struct Solidity yang mendefinisikan state storage d
 | `vestType` | `VestType` | NOT NULL | — | `Retention`\|`Probation`\|`ESOP` | `Retention` | Jenis vest |
 | `status` | `VestStatus` | NOT NULL | — | `Locked`\|`Claimed`\|`Forfeited` | `Locked` | Status vest |
 
-#### 4.7.6 Struct `Pool` (EmployeeLiquidityContract)
+**Struct `Pool` (EmployeeLiquidityContract)**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1908,7 +1913,7 @@ Bagian ini mendokumentasikan struct Solidity yang mendefinisikan state storage d
 | `initialized` | `bool` | NOT NULL | — | `true`\|`false` | `false` | Flag apakah pool sudah diinisialisasi |
 | `yieldPerShareX18` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Indeks yield kumulatif dalam skala 1e18 (EIP-4626-style) |
 
-#### 4.7.7 Struct `LenderDeposit` (EmployeeLiquidityContract)
+**Struct `LenderDeposit` (EmployeeLiquidityContract)**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1918,7 +1923,7 @@ Bagian ini mendokumentasikan struct Solidity yang mendefinisikan state storage d
 | `depositedTs` | `uint256` | NOT NULL | ≥ 0 | Unix timestamp | `0` | Block.timestamp deposit pertama |
 | `yieldDebtX18` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Snapshot `yieldPerShareX18` saat sinkronisasi terakhir |
 
-#### 4.7.8 Struct `LoanRecord` (EmployeeLiquidityContract)
+**Struct `LoanRecord` (EmployeeLiquidityContract)**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1929,7 +1934,7 @@ Bagian ini mendokumentasikan struct Solidity yang mendefinisikan state storage d
 | `dueTs` | `uint256` | NOT NULL | > block.timestamp saat borrow | Unix timestamp | `0` | `block.timestamp + LOAN_TERM (30 days)` |
 | `status` | `LoanStatus` | NOT NULL | — | `None`\|`Active`\|`Repaid`\|`Defaulted` | `Active` | Status pinjaman saat ini |
 
-#### 4.7.9 Struct `EmploymentRecord` (EmploymentSBT)
+**Struct `EmploymentRecord` (EmploymentSBT)**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -3247,7 +3252,7 @@ sequenceDiagram
 
 ---
 
-## A. Lampiran
+## A. Lampiran A — Informasi Tambahan
 
 ### A.1 Daftar Singkatan
 
@@ -3363,11 +3368,11 @@ Catatan: `CompanyVault` per tenant tidak memiliki alamat tetap karena di-deploy 
 
 ---
 
-*Bersambung ke Lampiran A.4–A.8 (pelengkap rinci Bab 5 dan Bab 3).*
+*Bersambung ke Lampiran A.4–A.8 (pelengkap rinci Subbab 2.2.2, Lampiran B, Lampiran C, dan Subbab 2.4).*
 
-### A.4 Katalog Struktur Data On-Chain (Pelengkap Bab 5.1)
+### A.4 Katalog Struktur Data On-Chain
 
-Bagian ini merinci seluruh struct, enum, dan mapping yang menjadi state on-chain, sebagai pelengkap deskripsi fungsional pada Bab 5.1.
+Bagian ini merinci seluruh struct, enum, dan mapping yang menjadi state on-chain, sebagai pelengkap deskripsi fungsional pada Subbab 2.2.2.
 
 #### A.4.1 Struct CompanyVault
 
@@ -3510,9 +3515,9 @@ Tabel berikut memetakan event ke pemicu fungsi, konsumen indeksasi (Ponder), dan
 
 *Bersambung ke Lampiran A.8 (detail implementasi halaman frontend).*
 
-### A.8 Detail Implementasi Halaman Frontend (Pelengkap Bab 3 dan 5.3)
+### A.8 Detail Implementasi Halaman Frontend
 
-Bagian ini merinci variabel state React, komputasi turunan, aturan validasi, dan pemanggilan data aktual per halaman, sebagai pelengkap deskripsi pada Bab 3. Seluruh detail diturunkan langsung dari implementasi kode.
+Bagian ini merinci variabel state React, komputasi turunan, aturan validasi, dan pemanggilan data aktual per halaman, sebagai pelengkap deskripsi pada Subbab 2.4. Seluruh detail diturunkan langsung dari implementasi kode.
 
 #### A.8.1 /hr/onboarding (Wizard Setup Vault)
 
@@ -3685,7 +3690,7 @@ Backend Express 5 mengekspos REST API. Middleware global: `helmet`, `cors` (orig
 | `/registration` | campuran | `/request` & `/status` publik; lainnya JWT + Owner |
 | `/webhook` | HMAC Alchemy | tanpa JWT |
 
-#### 5.2.1 Grup Autentikasi (`/auth`)
+### B.1 Grup Autentikasi (`/auth`)
 
 **[POST /auth/login]**
 | | |
@@ -3815,7 +3820,7 @@ Backend Express 5 mengekspos REST API. Middleware global: `helmet`, `cors` (orig
 
 **Algoritma:** Ambil baris `employees` milik caller; dekripsi `name/nik/phone` via `decrypt()`; kembalikan plaintext.
 
-#### 5.2.2 Grup Bundler Relay (`/bundler`)
+### B.2 Grup Bundler Relay (`/bundler`)
 
 **[POST /bundler/relay]**
 | | |
@@ -3873,7 +3878,7 @@ Backend Express 5 mengekspos REST API. Middleware global: `helmet`, `cors` (orig
 
 **Algoritma:** Panggil `eth_getUserOperationReceipt` ke bundler; kembalikan `receipt`. Polling oleh frontend.
 
-#### 5.2.3 Grup Compliance (`/compliance`)
+### B.3 Grup Compliance (`/compliance`)
 
 **[GET /compliance/export/:hr?month=YYYY-MM]**
 | | |
@@ -3932,7 +3937,7 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
 
 **Algoritma:** Verifikasi kepemilikan; jalankan agregat total (`COUNT(DISTINCT employee)`, `SUM(...)`) dan rincian per karyawan dari `salary_claim`; kembalikan JSON.
 
-#### 5.2.4 Grup Registrasi (`/registration`)
+### B.4 Grup Registrasi (`/registration`)
 
 **[POST /registration/request]**
 | | |
@@ -3993,7 +3998,7 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
 
 **Algoritma:** Set `status = "rejected"` (soft reject, tidak menghapus baris).
 
-#### 5.2.5 Grup Webhook (`/webhook`)
+### B.5 Grup Webhook (`/webhook`)
 
 **[POST /webhook/alchemy]**
 | | |
@@ -4027,7 +4032,7 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
    - `EncryptedSalarySet` → audit `ENCRYPTED_SALARY_SET` + broadcast `ENCRYPTED_SALARY_SET` (tanpa plaintext).
 4. Tandai event `processed = true`.
 
-#### 5.2.6 Layanan Background
+### B.6 Layanan Background
 
 **[Liquidation Cron (`liquidation.ts`)]**
 | | |
@@ -4055,7 +4060,7 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
 2. Jika `>= ALERT_THRESHOLD` (default 0,05 ETH), berhenti.
 3. Jika di bawah ambang, catat `PAYMASTER_LOW_BALANCE` dan kirim alert ke `OPS_ALERT_WEBHOOK_URL`.
 
-#### 5.2.7 Layanan WebSocket (`wsServer.ts`)
+### B.7 Layanan WebSocket (`wsServer.ts`)
 
 `WebSocketServer` dilampirkan ke server HTTP yang sama (`ws://host:PORT`). Fungsi `broadcast(type, payload)` mengirim pesan JSON ke seluruh klien `OPEN`.
 
@@ -4068,7 +4073,7 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
 
 **Algoritma `broadcast`:** Jika server belum dibuat, no-op + peringatan. Jika ada, serialisasi `{type, payload}` dan kirim ke setiap klien dengan `readyState == OPEN`.
 
-#### 5.2.8 Layanan Pendukung
+### B.8 Layanan Pendukung
 
 - **`encryption.ts`:** `encrypt(text)` menghasilkan `iv_hex:authTag_hex:ciphertext_hex` (AES-256-GCM, IV 12-byte acak, kunci SHA-256 dari `ENCRYPTION_KEY`); `decrypt(cipherText)` membalik proses dengan verifikasi auth tag.
 - **`rateLimiter.ts`:** `checkAndIncrement(addr)` mengelola jendela 1 jam per karyawan di tabel `rate_limits`; reset jendela jika kedaluwarsa; tolak jika `claimCount >= MAX_CLAIMS` (default 10).
@@ -4083,7 +4088,7 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
 
 Frontend dibangun dengan Next.js 16 (App Router), React 19, Tailwind CSS 4, Shadcn/UI, wagmi 2.15, viem 2.47, dan Privy `@privy-io/react-auth` 2.10. Pembacaan on-chain memakai `publicClient` (viem) terhadap kontrak di `CONTRACTS`; pembacaan agregat memakai Ponder via `lib/api.ts`.
 
-#### 5.3.1 Klien Data (`lib/api.ts`)
+### C.1 Klien Data (`lib/api.ts`)
 
 `lib/api.ts` mengekspos tiga klien:
 
@@ -4093,7 +4098,7 @@ Frontend dibangun dengan Next.js 16 (App Router), React 19, Tailwind CSS 4, Shad
 | `backend` | `getComplianceSummary`, `getProfile`, `updateProfile` | Backend REST + JWT | `/hr/compliance`, `/employee/settings` |
 | `registration` | `submit`, `getStatus`, `getPending`, `approve`, `reject` | Backend `/registration` | `/onboarding`, `/owner` |
 
-#### 5.3.2 Custom Hook Web3
+### C.2 Custom Hook Web3
 
 **[useAuth (`hooks/useAuth.ts`)]**
 | | |
@@ -4150,7 +4155,7 @@ Frontend dibangun dengan Next.js 16 (App Router), React 19, Tailwind CSS 4, Shad
 
 **Algoritma:** Jika dalam `TxToastContext`, gunakan provider; jika tidak, kelola state lokal. `addToast` menghasilkan id acak; toast `success`/`error` otomatis hilang setelah 5 detik; `updateToast` memperbarui pesan/tipe berdasarkan id.
 
-#### 5.3.3 Komponen Bersama (`components/shared`)
+### C.3 Komponen Bersama (`components/shared`)
 
 | Komponen | Props Utama | Return/Render | Dipakai di |
 |----------|-------------|---------------|-----------|
@@ -4162,7 +4167,7 @@ Frontend dibangun dengan Next.js 16 (App Router), React 19, Tailwind CSS 4, Shad
 
 **Algoritma `StreamCounter`:** Mulai dari `seedWei` (hasil `getAccrued`); tambahkan `flowRateWei` per detik melalui interval; resinkronisasi dengan seed terbaru saat parent melakukan polling 10 detik (NFR-10).
 
-#### 5.3.4 Integrasi Privy dan ERC-4337
+### C.4 Integrasi Privy dan ERC-4337
 
 Diagram urutan EWA gasless end-to-end menggabungkan Privy (tanda tangan silent), backend relay, Pimlico Bundler, dan webhook konfirmasi real-time.
 
@@ -4209,7 +4214,7 @@ Catatan: untuk aksi HR/Owner/Legal (mis. `startStream`, `proposeTermination`, `f
 ## D. Lampiran D — Perancangan Keamanan
 
 
-### 6.1 Keamanan Smart Contract
+### D.1 Keamanan Smart Contract
 
 1. **Pola CEI (Checks-Effects-Interactions):** `claimSalary()`, `withdrawDeposit()`, `executeTermination()`, dan `withdrawVault()` melakukan seluruh perubahan state sebelum transfer eksternal untuk mencegah reentrancy.
 2. **ReentrancyGuard:** modifier `nonReentrant` pada fungsi yang melakukan transfer IDRX (`claimSalary`, `withdrawVault`, `executeTermination`, `resignEmployee`, `withdrawCompliance`, `claimCliffVest`, serta fungsi koperasi `depositToPool`, `withdrawDeposit`, `borrowFromPool`, `repayLoanManual`, `autoRepay`).
@@ -4221,7 +4226,7 @@ Catatan: untuk aksi HR/Owner/Legal (mis. `startStream`, `proposeTermination`, `f
 8. **try/catch Defensif:** mint/revoke SBT dan inisialisasi pool dibungkus try/catch agar kegagalan dependensi tidak membatalkan operasi inti.
 9. **Privasi via FHE:** `ConfidentialCompanyVault` menyimpan gaji sebagai `euint256` dengan ACL Inco; tidak ada plaintext di calldata, storage, atau event.
 
-### 6.2 Keamanan Backend
+### D.2 Keamanan Backend
 
 1. **JWT + JTI:** access token 15 menit, refresh token 7 hari; setiap sesi memiliki `jti` tersimpan di tabel `sessions` sehingga logout/revocation bersifat deterministik (bukan sekadar bergantung kadaluarsa).
 2. **AES-256-GCM untuk PII:** nama, NIK, dan telepon dienkripsi dengan IV acak 12-byte dan auth tag (format `iv:tag:ciphertext`); kunci diturunkan via SHA-256 dari `ENCRYPTION_KEY` (UU PDP).
@@ -4231,7 +4236,7 @@ Catatan: untuk aksi HR/Owner/Legal (mis. `startStream`, `proposeTermination`, `f
 6. **Otorisasi Granular:** endpoint compliance dan registration memverifikasi kepemilikan data (HR hanya data sendiri) dan peran Owner (`requireOwner`).
 7. **Helmet & CORS:** header keamanan HTTP dan pembatasan origin ke `FRONTEND_URL`.
 
-### 6.3 Keamanan Frontend
+### D.3 Keamanan Frontend
 
 1. **Privy WaaS:** kunci privat dikelola Privy (embedded wallet); pengguna tidak menyimpan seed phrase. Penandatanganan dilakukan secara silent untuk klaim gaji.
 2. **Role Guard:** `useRole` menentukan peran dari kondisi on-chain; akses portal dibatasi sesuai peran, dengan prioritas Owner → HR → Legal → Karyawan.
