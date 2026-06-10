@@ -5,7 +5,7 @@
 
 **Disusun oleh:**
 Bonaventura Octavito
-[NPM]
+210711233
 
 Program Studi Informatika
 Fakultas Teknologi Industri
@@ -21,6 +21,7 @@ Universitas Atma Jaya Yogyakarta
 | B | Revisi berdasarkan kode aktual per Juni 2026, pembaruan alamat kontrak redeployment 2026-06-04 | Bonaventura Octavito | - | - |
 | C | Ekspansi rinci Bab 3 (Antarmuka), Bab 5.1 (Smart Contract), Bab 5.2 (Backend API), dan Bab 5.3 (Frontend); penambahan diagram alur, tabel antarmuka, dan algoritma per fungsi | Bonaventura Octavito | - | - |
 | D | Penambahan kelas diagram seluruh smart contract (Bab 2.2), Physical Data Model (Bab 4.4), dan tabel dekomposisi data untuk semua tabel off-chain, Ponder indexed, dan struct on-chain (Bab 4.5–4.7); pembaruan nomor dokumen dan metadata; tanggal: 2026-06-10 | Bonaventura Octavito | - | - |
+| E | Restrukturisasi bab sesuai template UAJY, reformatkan deskripsi kelas dan atribut ke format Input/Output/Deskripsi, pemindahan Bab 5.2/5.3/6 ke lampiran | Bonaventura Octavito | - | - |
 
 ---
 
@@ -91,41 +92,32 @@ Rancangan yang berada **di luar ruang lingkup** dokumen ini mengikuti batasan SK
 | ABI | Application Binary Interface |
 | ACL | Access Control List |
 
+
 ### 1.4 Referensi
 
-| No | Dokumen / Standar | Keterangan |
-|----|-------------------|------------|
-| 1 | SKPL Payana (revisi B) | Dokumen sumber kebutuhan fungsional FR-PAYANA-xxx. |
-| 2 | IEEE 1016-2009 | Standar perancangan perangkat lunak. |
-| 3 | EIP-191: Signed Data Standard | Standar tanda tangan login. |
-| 4 | EIP-721 / EIP-5192 | Standar NFT dan Soulbound Token (`EmploymentSBT`). |
-| 5 | EIP-4337: Account Abstraction | Mekanisme gasless via Bundler dan Paymaster. |
-| 6 | OpenZeppelin Contracts v5 | `AccessControl`, `ReentrancyGuard`, `SafeERC20`, `ERC721`. |
-| 7 | UU No. 6 Tahun 2023 (Cipta Kerja) Pasal 156 | Formula pesangon (`PayrollMath.severanceMultiplier`). |
-| 8 | UU No. 27 Tahun 2022 (UU PDP) | Kewajiban enkripsi PII off-chain. |
-| 9 | Inco Lightning v1 Documentation | FHE co-processor untuk `ConfidentialCompanyVault`. |
-| 10 | Base Network Developer Documentation | Jaringan Base L2 (Chain ID 84532 / 8453). |
-| 11 | Foundry Book | Toolkit kompilasi dan deployment smart contract. |
-
-### 1.5 Ikhtisar Dokumen
-
-Dokumen ini disusun dalam enam bab utama dan satu lampiran.
-
-- **Bab 1 — Pendahuluan** menjelaskan tujuan, ruang lingkup, definisi, dan referensi.
-- **Bab 2 — Perancangan Sistem Secara Keseluruhan** memberikan gambaran arsitektur, data, dan antarmuka secara makro.
-- **Bab 3 — Perancangan Antarmuka** merinci seluruh halaman frontend per portal.
-- **Bab 4 — Perancangan Data** menyajikan ERD on-chain, off-chain, dan Ponder indexed.
-- **Bab 5 — Perancangan Komponen** merinci smart contract, backend API, dan frontend.
-- **Bab 6 — Perancangan Keamanan** menjabarkan strategi keamanan di setiap lapisan.
-- **Lampiran** memuat daftar singkatan, pemetaan FR ke komponen, dan alamat kontrak ter-deploy.
+1. SKPL Payana (Revisi B), Spesifikasi Kebutuhan Perangkat Lunak Payana, Bonaventura Octavito, 2026.
+2. IEEE Std 1016-2009, IEEE Standard for Information Technology — Systems Design — Software Design Descriptions, IEEE, 2009.
+3. EIP-191: Signed Data Standard, Ethereum Improvement Proposal, Ethereum Foundation, 2016.
+4. EIP-721 / EIP-5192, Non-Fungible Token Standard / Minimal Soulbound NFTs, Ethereum Foundation.
+5. EIP-4337: Account Abstraction Using Alt Mempool, Ethereum Improvement Proposal, Ethereum Foundation, 2021.
+6. OpenZeppelin Contracts v5, AccessControl, ReentrancyGuard, SafeERC20, ERC721, OpenZeppelin, 2024.
+7. Undang-Undang Nomor 6 Tahun 2023 tentang Cipta Kerja (Pasal 156 Formula Pesangon), Pemerintah Republik Indonesia, 2023.
+8. Undang-Undang Nomor 27 Tahun 2022 tentang Pelindungan Data Pribadi, Pemerintah Republik Indonesia, 2022.
+9. Inco Lightning v1 Documentation, FHE Co-processor, Inco Network, 2024.
+10. Base Network Developer Documentation, Base L2 (Chain ID 84532 / 8453), Coinbase, 2024.
+11. Foundry Book, Toolkit Kompilasi dan Deployment Smart Contract, Paradigm, 2024.
 
 ---
 
-## 2. Perancangan Sistem Secara Keseluruhan
+## 2. Perancangan Sistem
 
-### 2.1 Arsitektur Sistem
+### 2.1 Perancangan Arsitektur
+
+#### 2.1.1 Overview Sistem
 
 Sistem Payana dibangun di atas empat lapisan arsitektur yang saling bergantung, dilengkapi sejumlah layanan eksternal. Lapisan paling fundamental adalah Smart Contract di jaringan Base; di atasnya berdiri Ponder Indexer yang membaca event on-chain; lapisan Backend API menangani autentikasi, relay gasless, dan logika off-chain; dan lapisan Frontend menyajikan antarmuka pengguna per peran.
+
+#### 2.1.2 Arsitektur Perangkat Lunak
 
 ```mermaid
 graph TD
@@ -202,7 +194,9 @@ graph TD
 
 **Narasi Alur EWA Gasless End-to-End.** Ketika seorang karyawan menekan tombol "Tarik Gaji", frontend memanggil hook `useAuth` untuk memastikan sesi JWT aktif (atau melakukan tanda tangan EIP-191 baru melalui embedded wallet Privy). Karyawan kemudian menandatangani sebuah `UserOperation` ERC-4337 yang berisi calldata `claimSalary()`. UserOperation tersebut dikirim ke endpoint `POST /bundler/relay`. Backend memverifikasi bahwa alamat JWT sama dengan `userOp.sender`, memvalidasi bahwa selektor calldata adalah `0x5b7e8209` (selektor `claimSalary()`), memeriksa batas laju klaim (maksimum 10 per jam per karyawan), lalu meneruskan UserOperation ke Pimlico Bundler. Pimlico melampirkan sponsor Paymaster dan mengirimkannya ke `EntryPoint` contract di Base. Kontrak `CompanyVault.claimSalary()` mengeksekusi distribusi atomik 93/5/2 (setelah pemotongan platform fee dan auto-repay koperasi), memancarkan event `SalaryClaimed` dan `PlatformFeePaid`. Alchemy mendeteksi event tersebut dan mengirimkannya ke `POST /webhook/alchemy`; backend memverifikasi tanda tangan HMAC, mencatat audit log, dan mem-broadcast pesan `SALARY_CLAIMED` melalui WebSocket ke dashboard karyawan, yang langsung menampilkan konfirmasi real-time. Secara paralel, Ponder mengindeks event tersebut ke tabel `salary_claim` untuk keperluan historis dan pelaporan kepatuhan.
 
-### 2.2 Kelas Diagram
+### 2.2 Perancangan Rinci
+
+#### 2.2.1 Kelas Diagram
 
 Berikut adalah diagram kelas seluruh smart contract Payana:
 
@@ -547,7 +541,812 @@ classDiagram
     EmployeeLiquidityContract ..> LoanStatus : uses
 ```
 
-### 2.3 Perancangan Data Secara Keseluruhan
+
+#### 2.2.2 Deskripsi Kelas dan Atribut
+
+
+Seluruh kontrak dikompilasi dengan Solidity 0.8.26 dan OpenZeppelin Contracts v5. Seluruh nilai moneter dinyatakan dalam IDRX (18 desimal, 1 IDRX = 1 IDR). Pustaka `PayrollMath` menyediakan konstanta `SECONDS_PER_MONTH`, fungsi `calcAccrued(flowRate, lastTs)`, `bpsOf(amount, bps)`, `validateSplits(...)`, dan `severanceMultiplier(tenureMonths)`.
+
+Pola keamanan yang diterapkan secara konsisten:
+
+- **Checks-Effects-Interactions (CEI):** seluruh perubahan state dilakukan sebelum transfer eksternal.
+- **ReentrancyGuard:** modifier `nonReentrant` pada fungsi yang mentransfer IDRX.
+- **AccessControl berbasis peran:** modifier per peran (`onlyHR`, `onlyOps`, `onlyPayroll`, `onlyRole`).
+- **SafeERC20:** `safeTransfer`/`safeTransferFrom` untuk seluruh perpindahan token.
+- **Custom errors:** revert hemat gas dengan pesan terstruktur.
+
+##### 2.2.2.1 PayrollFactory
+
+Kontrak entry-point SaaS yang men-deploy `CompanyVault` terisolasi per tenant (Factory Pattern). Mewarisi `AccessControl`.
+
+```mermaid
+classDiagram
+    class PayrollFactory {
+        +bytes32 SUPERADMIN_ROLE
+        +uint16 MAX_PLATFORM_FEE_BPS = 100
+        +address IDRX
+        +address protocolTreasury
+        +uint16 platformFeeBps
+        +mapping companyVaults
+        +address[] allVaults
+        +constructor(idrx, superAdmin, protocolTreasury)
+        +setPlatformFee(uint16 bps)
+        +setProtocolTreasury(address newTreasury)
+        +deployVault(hrAuthority, companyName, liquidityContract, sbtContract) address
+        +emergencyFreezeAll()
+        +getTotalVaults() uint256
+    }
+```
+
+**State Variables:** `IDRX` (immutable), `protocolTreasury`, `platformFeeBps`, `companyVaults` (HR → vault), `allVaults` (array seluruh vault).
+
+**Events:** `VaultDeployed(hrAuthority, vaultAddress, companyName)`, `PlatformFeeUpdated(newBps)`, `ProtocolTreasuryUpdated(newTreasury)`.
+
+**[deployVault(hrAuthority, companyName, liquidityContract, sbtContract)]**
+| | |
+|---|---|
+| Input | hrAuthority: address, companyName: string, liquidityContract: address, sbtContract: address |
+| Output | `address` (alamat vault baru) |
+| Deskripsi | external; modifier `onlyRole(SUPERADMIN_ROLE)`; sesuai FR-PAYANA-201, FR-PAYANA-1001 |
+
+**Algoritma (Check → Effect → Interaction):**
+
+1. **Check:** tolak `hrAuthority == address(0)` (`InvalidHRAddress`); tolak jika `companyVaults[hrAuthority] != 0` (`HRAlreadyHasVault`).
+2. **Effect/Interaction:** deploy `new CompanyVault(IDRX, hrAuthority, companyName, liquidityContract, sbtContract)`.
+3. **Effect:** catat alamat ke `companyVaults[hrAuthority]` dan `allVaults.push(vault)`.
+4. **Effect:** emit `VaultDeployed(hrAuthority, vault, companyName)`; kembalikan alamat vault.
+
+**[setPlatformFee(bps)]**
+| | |
+|---|---|
+| Input | newFeeBps: uint16 |
+| Output | - |
+| Deskripsi | external; modifier `onlyRole(SUPERADMIN_ROLE)`; sesuai FR-PAYANA-1006 |
+
+**Algoritma:** Check `bps <= MAX_PLATFORM_FEE_BPS (100)` (`FeeTooHigh`); set `platformFeeBps = bps`; emit `PlatformFeeUpdated`.
+
+**[setProtocolTreasury(newTreasury)]**
+| | |
+|---|---|
+| Input | newTreasury: address |
+| Output | - |
+| Deskripsi | external; modifier `onlyRole(SUPERADMIN_ROLE)`; sesuai FR-PAYANA-1008 |
+
+**Algoritma:** Check `newTreasury != address(0)`; set `protocolTreasury`; emit `ProtocolTreasuryUpdated`. Memungkinkan migrasi ke multisig.
+
+**[emergencyFreezeAll()]**
+| | |
+|---|---|
+| Input | - |
+| Output | - |
+| Deskripsi | external; modifier `onlyRole(SUPERADMIN_ROLE)`; sesuai FR-PAYANA-1004 |
+
+**Algoritma:** Iterasi `allVaults`; untuk setiap vault panggil `freezeVault()`. Biaya gas linear terhadap jumlah vault.
+
+**[getTotalVaults()]**
+| | |
+|---|---|
+| Input | - |
+| Output | `uint256` |
+| Deskripsi | external view; sesuai FR-PAYANA-1002 |
+
+**Algoritma:** Kembalikan `allVaults.length`.
+
+##### 2.2.2.2 CompanyVault
+
+Kontrak payroll per perusahaan: streaming gaji, split 93/5/2, PHK multi-sig, cliff vesting, dan kepatuhan. Mewarisi `ICompanyVault`, `ReentrancyGuard`, `AccessControl`.
+
+```mermaid
+classDiagram
+    class CompanyVault {
+        +bytes32 HR_ROLE
+        +bytes32 LEGAL_ROLE
+        +uint16 DEFAULT_EMPLOYEE_BPS = 9300
+        +uint16 DEFAULT_COMPLIANCE_BPS = 500
+        +uint16 DEFAULT_SEVERANCE_BPS = 200
+        +uint256 TERMINATION_EXPIRY = 7 days
+        +uint16 DEFAULT_POOL_RATE_BPS = 150
+        +IERC20 IDRX
+        +address hrAuthority
+        +VaultStatus status
+        +uint256 vaultBalance
+        +uint256 complianceBalance
+        +uint256 totalFlowRate
+        +mapping employeeStreams
+        +mapping severanceVaults
+        +mapping terminations
+        +mapping cliffVests
+    }
+    CompanyVault <|-- ConfidentialCompanyVault
+    CompanyVault ..> IEmployeeLiquidity : autoRepay
+    CompanyVault ..> IEmploymentSBT : mint/revoke
+    CompanyVault ..> IPayrollFactory : platformFeeBps
+```
+
+**Konstanta:** `DEFAULT_EMPLOYEE_BPS=9300`, `DEFAULT_COMPLIANCE_BPS=500`, `DEFAULT_SEVERANCE_BPS=200`, `TERMINATION_EXPIRY=7 days`, `DEFAULT_POOL_RATE_BPS=150`.
+
+**Custom Errors:** `VaultFrozen`, `InsufficientVaultBalance`, `StreamAlreadyActive`, `StreamNotActive`, `NotWhitelisted`, `NothingToClaim`, `SplitInvalid`, `TerminationAlreadyProposed`, `TerminationNotFound`, `ProposalExpired`, `AlreadyApproved`, `NotVestedYet`, `AlreadyClaimed`, `VestNotFound`, `SeveranceAlreadySettled`, `InsufficientComplianceBalance`, `CliffNotReached`, `VestAlreadySettled`, `Unauthorized`, `NoActiveProposal`.
+
+**Modifier:** `onlyHR` (cek `HR_ROLE`), `vaultActive` (status harus `Active`), `validTermination(employee)` (hrApproved && legalApproved && belum kadaluarsa).
+
+##### constructor
+
+Disetel oleh `PayrollFactory`. Set `IDRX`, `factory=msg.sender`, `hrAuthority`, `companyName`, `status=Active`. Berikan `DEFAULT_ADMIN_ROLE`, `HR_ROLE`, dan `LEGAL_ROLE` ke `hrAuthority`. Inisialisasi pool koperasi via `liquidityContract.initializePool(address(this), DEFAULT_POOL_RATE_BPS)` (dibungkus try/catch). Emit `VaultInitialized`.
+
+**[fundVault(amount)]**
+| | |
+|---|---|
+| Input | amount: uint256 |
+| Output | - |
+| Deskripsi | external override; modifier `onlyHR`; sesuai FR-PAYANA-202 |
+
+**Algoritma:** `safeTransferFrom(msg.sender, this, amount)`; `vaultBalance += amount`; emit `VaultFunded`.
+
+**[withdrawVault(amount, recipient)]**
+| | |
+|---|---|
+| Input | amount: uint256, recipient: address |
+| Output | - |
+| Deskripsi | external override; modifier `onlyHR nonReentrant`; sesuai FR-PAYANA-203 |
+
+**Algoritma (CEI):**
+
+1. **Check:** `vaultBalance >= amount` (`InsufficientVaultBalance`).
+2. **Effect:** `vaultBalance -= amount`; panggil `_checkLowBalance()`.
+3. **Interaction:** `safeTransfer(recipient, amount)`; emit `VaultWithdrawn`.
+
+**[setCompanyConfig(bpjsBps, pph21Bps, lowBalanceThresholdBps)]**
+| | |
+|---|---|
+| Input | bpjsBps: uint16, pph21Bps: uint16, lowBalanceThresholdBps: uint16 |
+| Output | - |
+| Deskripsi | external override; modifier `onlyHR`; sesuai FR-PAYANA-204, FR-PAYANA-802 |
+
+**Algoritma:** Set `bpjsBps`, `pph21Bps`, `lowBalanceThresholdBps`. Nilai BPJS/PPh21 bersifat informatif (tidak memengaruhi split langsung).
+
+**[pauseVault() / resumeVault() / freezeVault()]**
+| | |
+|---|---|
+| Input | - |
+| Output | - |
+| Deskripsi | external override; modifier `pauseVault`/`resumeVault`: `onlyHR`; `freezeVault`: factory atau `DEFAULT_ADMIN_ROLE`; sesuai FR-PAYANA-205, FR-PAYANA-206 |
+
+**Algoritma:**
+
+- `pauseVault`: tolak jika `status == Frozen`; set `status = Paused`; emit `VaultPaused`.
+- `resumeVault`: tolak jika `status == Frozen`; set `status = Active`; emit `VaultResumed`.
+- `freezeVault`: hanya `factory` atau pemegang `DEFAULT_ADMIN_ROLE` (`Unauthorized`); set `status = Frozen` (irreversible); emit `VaultFreeze`.
+
+**[startStream(employee, flowRate, employeeSplitBps, complianceSplitBps, severanceSplitBps)]**
+| | |
+|---|---|
+| Input | employee: address, flowRate: uint256, employeeSplitBps: uint16, complianceSplitBps: uint16, severanceSplitBps: uint16 |
+| Output | - |
+| Deskripsi | external override; modifier `onlyHR vaultActive`; sesuai FR-PAYANA-301, FR-PAYANA-901 |
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor HR
+    participant V as CompanyVault
+    participant SBT as EmploymentSBT
+    HR->>V: startStream(employee, flowRate, splits)
+    V->>V: validateSplits == 10000 (SplitInvalid)
+    V->>V: cek stream belum Active (StreamAlreadyActive)
+    V->>V: simpan employeeStreams + severanceVaults(Locked)
+    V->>V: totalFlowRate += flowRate
+    V->>SBT: mint(employee, companyName, msg.sender) [try/catch]
+    SBT-->>V: tokenId + Locked
+    V-->>HR: StreamCreated + EmploymentCertified
+```
+
+**Algoritma:**
+
+1. **Check:** `PayrollMath.validateSplits(...)` harus total 10.000 bps (`SplitInvalid`); stream belum `Active` (`StreamAlreadyActive`).
+2. **Effect:** buat `EmployeeStream` (status `Active`, `startTs/lastWithdrawnTs = now`, `settledBalance=0`, splits); buat `SeveranceVault` (`Locked`); `totalFlowRate += flowRate`.
+3. **Effect:** emit `StreamCreated`.
+4. **Interaction:** `sbtContract.mint(employee, companyName, msg.sender)` (try/catch); emit `EmploymentCertified` jika berhasil.
+
+**[pauseStream / resumeStream / updateFlowRate / updateStreamSplits / cancelStream]**
+| | |
+|---|---|
+| Input | employee: address (+ parameter tambahan sesuai fungsi) |
+| Output | - |
+| Deskripsi | external override; modifier `onlyHR`; sesuai FR-PAYANA-302 s.d. FR-PAYANA-306 |
+
+**Algoritma:**
+
+- `pauseStream(employee)`: stream harus `Active` (`StreamNotActive`); settle `settledBalance += calcAccrued(flowRate, lastWithdrawnTs)`; `lastWithdrawnTs = now`; set `Paused`; emit `StreamPaused`.
+- `resumeStream(employee)`: stream harus `Paused`; `lastWithdrawnTs = now`; set `Active`; emit `StreamResumed`.
+- `updateFlowRate(employee, newFlowRate)`: stream harus `Active`; settle dahulu pada rate lama; `totalFlowRate = totalFlowRate - old + new`; set `flowRate = newFlowRate`; emit `FlowRateUpdated`.
+- `updateStreamSplits(employee, ...)`: stream `Active`/`Paused`; validasi split = 10.000; settle jika `Active`; set splits baru; emit `StreamSplitsUpdated`.
+- `cancelStream(employee)`: tolak jika sudah `Cancelled`/`Inactive`; jika `Active` settle dan kurangi `totalFlowRate`; set `Cancelled`; emit `StreamCancelled`.
+
+**[claimSalary()]**
+| | |
+|---|---|
+| Input | - |
+| Output | - |
+| Deskripsi | external override; modifier `nonReentrant vaultActive`; sesuai FR-PAYANA-401, FR-PAYANA-1007 |
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor E as Karyawan
+    participant V as CompanyVault
+    participant F as PayrollFactory
+    participant L as EmployeeLiquidityContract
+    participant T as protocolTreasury
+    E->>V: claimSalary()
+    V->>V: hitung accrued (settled + live)
+    V->>V: cek accrued>0 & vaultBalance>=accrued
+    V->>V: Effects: settledBalance=0, vaultBalance-=accrued, _checkLowBalance()
+    V->>F: platformFeeBps()
+    F-->>V: feeBps
+    V->>L: autoRepay(employee, accrued)
+    L-->>V: repaid (maks 20%)
+    V->>V: net = accrued - platformCut - repaid; split 93/5/2
+    V->>T: safeTransfer(platformCut) + PlatformFeePaid
+    V->>L: safeTransfer(repaid)
+    V->>E: safeTransfer(toEmployee)
+    V-->>E: SalaryClaimed
+```
+
+**Algoritma (CEI):**
+
+1. **Check:** stream tidak `Inactive` (`NotWhitelisted`) dan tidak `Paused` (`StreamNotActive`).
+2. **Check:** hitung `accrued = settledBalance + calcAccrued(flowRate, lastWithdrawnTs)` (atau hanya `settledBalance` bila tidak aktif); tolak `accrued == 0` (`NothingToClaim`) dan `vaultBalance < accrued` (`InsufficientVaultBalance`).
+3. **Effect:** `settledBalance = 0`; perbarui `lastWithdrawnTs` jika aktif; `vaultBalance -= accrued`; `_checkLowBalance()`.
+4. **Effect:** hitung `platformCut = bpsOf(accrued, feeBps)` jika `feeBps > 0`.
+5. **Interaction (akuntansi):** `repaid = liquidityContract.autoRepay(msg.sender, accrued)`.
+6. **Effect:** `net = accrued - platformCut - repaid`; bagi `toEmployee/toCompliance/toSeverance` via `bpsOf`; sisa pembulatan (dust) ke karyawan.
+7. **Effect:** tambah `complianceBalance` dan `employeeComplianceAccumulated`; tambah `severanceVaults.amount`; perbarui `tenureMonths = (now - startTs)/SECONDS_PER_MONTH`.
+8. **Interaction:** `safeTransfer(platformCut)` ke treasury (+`PlatformFeePaid`), `safeTransfer(repaid)` ke koperasi, `safeTransfer(toEmployee)` ke karyawan; emit `SalaryClaimed`.
+
+**[resignEmployee(employee)]**
+| | |
+|---|---|
+| Input | employee: address |
+| Output | - |
+| Deskripsi | external override; modifier `onlyHR nonReentrant`; sesuai FR-PAYANA-505 |
+
+**Algoritma:**
+
+1. **Check:** stream tidak `Inactive` (`NotWhitelisted`); severance harus `Locked` (`SeveranceAlreadySettled`).
+2. **Effect:** settle stream jika `Active`, kurangi `totalFlowRate`, set `Cancelled`.
+3. **Effect:** pesangon dikembalikan ke `vaultBalance` (bukan ke karyawan); set state `Returned`.
+4. **Interaction:** `_forfeitAllVests(employee)`; `_revokeSBT(employee)`; emit `StreamCancelled` + `SeveranceReturned`.
+
+**[proposeTermination(employee, reasonHash)]**
+| | |
+|---|---|
+| Input | employee: address, reasonHash: bytes32 |
+| Output | - |
+| Deskripsi | external override; modifier `onlyHR`; sesuai FR-PAYANA-501 |
+
+**Algoritma:**
+
+1. **Check:** stream tidak `Inactive` (`NotWhitelisted`); tidak ada proposal aktif yang belum kadaluarsa (`TerminationAlreadyProposed`).
+2. **Effect:** buat `TerminationProposal` (`hrApproved=true`, `legalApproved=false`, `expiresAt=now+7 days`, `reasonHash`, `flowRateSnapshot=flowRate`); emit `TerminationProposed`.
+
+**[approveTermination(employee)]**
+| | |
+|---|---|
+| Input | employee: address |
+| Output | - |
+| Deskripsi | external override; modifier — (cek peran internal); sesuai FR-PAYANA-502 |
+
+**Algoritma:**
+
+1. **Check:** proposal ada (`TerminationNotFound`) dan belum kadaluarsa (`ProposalExpired`).
+2. **Effect:** jika pemanggil `HR_ROLE` set `hrApproved` (tolak ganda `AlreadyApproved`); jika `LEGAL_ROLE` set `legalApproved`; selain itu `Unauthorized`; emit `TerminationApproved`.
+
+**[executeTermination(employee)]**
+| | |
+|---|---|
+| Input | employee: address |
+| Output | - |
+| Deskripsi | external override; modifier `validTermination(employee) nonReentrant`; sesuai FR-PAYANA-503, FR-PAYANA-504, FR-PAYANA-506 |
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor HR
+    participant V as CompanyVault
+    participant SBT as EmploymentSBT
+    participant E as Karyawan
+    HR->>V: executeTermination(employee)
+    V->>V: validTermination (hr & legal approved, belum kadaluarsa)
+    V->>V: settle stream + totalFlowRate -= flowRate; status Cancelled
+    V->>V: statutory = severanceMultiplier(tenureMonths) * (snapshot * SECONDS_PER_MONTH)
+    alt accumulated < statutory
+        V->>V: topUp dari vaultBalance (atau parsial + SeveranceShortfall)
+    end
+    V->>V: amount = accumulated + topUp; state Released
+    V->>V: _forfeitAllVests + delete proposal
+    V->>SBT: revoke(employee) [try/catch]
+    V->>E: safeTransfer(amount)
+    V-->>HR: SeveranceReleased + TerminationExecuted
+```
+
+**Algoritma (CEI):**
+
+1. **Check:** modifier `validTermination` memastikan kedua persetujuan dan belum kadaluarsa.
+2. **Effect:** settle stream jika `Active`, kurangi `totalFlowRate`, set `Cancelled`.
+3. **Effect:** hitung `monthlyGross = flowRateSnapshot * SECONDS_PER_MONTH`; `statutory = severanceMultiplier(tenureMonths) * monthlyGross`.
+4. **Effect:** jika `accumulated < statutory`, ambil `topUp` dari `vaultBalance`; jika tidak cukup, `topUp = vaultBalance` (parsial, `hasShortfall=true`); `vaultBalance -= topUp`.
+5. **Effect:** `amount = accumulated + topUp`; set `state = Released`; `_forfeitAllVests(employee)`; `_revokeSBT(employee)`; `delete terminations[employee]`.
+6. **Interaction:** `safeTransfer(employee, amount)`; emit `StreamCancelled`, `SeveranceReleased`, `SeveranceShortfall` (jika ada), `TerminationExecuted`.
+
+**[cancelProposal(employee)]**
+| | |
+|---|---|
+| Input | employee: address |
+| Output | - |
+| Deskripsi | external override; modifier `onlyHR`; sesuai FR-PAYANA-501 |
+
+**Algoritma:** Check proposal masih aktif (hrApproved && !legalApproved && belum kadaluarsa) (`NoActiveProposal`); `delete terminations[employee]`; emit `TerminationCancelled`.
+
+**[withdrawCompliance(amount, recipient)]**
+| | |
+|---|---|
+| Input | amount: uint256, recipient: address |
+| Output | - |
+| Deskripsi | external override; modifier `onlyHR nonReentrant`; sesuai FR-PAYANA-803 |
+
+**Algoritma (CEI):** Check `complianceBalance >= amount` (`InsufficientComplianceBalance`); `complianceBalance -= amount`; `safeTransfer(recipient, amount)`; emit `ComplianceWithdrawn`.
+
+**[createCliffVest(employee, amount, cliffTs, vestType)]**
+| | |
+|---|---|
+| Input | employee: address, amount: uint256, cliffTs: uint256, vestType: VestType |
+| Output | - |
+| Deskripsi | external override; modifier `onlyHR`; sesuai FR-PAYANA-601, FR-PAYANA-605 |
+
+**Algoritma:**
+
+1. **Check:** `cliffTs > now` (`"CliffInPast"`); `vaultBalance >= amount` (`InsufficientVaultBalance`).
+2. **Effect:** `vestId = vestCounter++`; simpan `CliffVest` (`Locked`); `vaultBalance -= amount`; `_checkLowBalance()`; emit `CliffVestCreated`.
+
+**[claimCliffVest(vestId)]**
+| | |
+|---|---|
+| Input | vestId: uint256 |
+| Output | - |
+| Deskripsi | external override; modifier `nonReentrant`; sesuai FR-PAYANA-602 |
+
+**Algoritma (CEI):**
+
+1. **Check:** vest ada (`VestNotFound`); status `Locked` (`VestAlreadySettled`); `now >= cliffTs` (`CliffNotReached`).
+2. **Effect:** `amount = vest.amount`; `vest.amount = 0`; `status = Claimed`.
+3. **Interaction:** `safeTransfer(msg.sender, amount)`; emit `CliffVestClaimed`.
+
+**[cancelCliffVest(employee, vestId)]**
+| | |
+|---|---|
+| Input | employee: address, vestId: uint256 |
+| Output | - |
+| Deskripsi | external override; modifier `onlyHR`; sesuai FR-PAYANA-603 |
+
+**Algoritma:** Check vest ada dan `Locked`; set `amount=0`, status `Forfeited`; `vaultBalance += amount`; emit `CliffVestForfeited`.
+
+##### Fungsi Internal
+
+- `_forfeitAllVests(employee)`: iterasi `0..vestCounter`; setiap vest `Locked` dengan `amount>0` di-forfeit dan dikembalikan ke `vaultBalance` (O(vestCounter)).
+- `_checkLowBalance()`: no-op jika `totalFlowRate==0`; hitung `monthlyNeed = totalFlowRate * SECONDS_PER_MONTH` dan `threshold = bpsOf(monthlyNeed, lowBalanceThresholdBps)`; emit `LowVaultBalance` jika `vaultBalance < threshold`.
+- `_revokeSBT(employee)`: jika ada `tokenId`, panggil `sbtContract.revoke(employee)` (try/catch); emit `EmploymentRevoked`.
+
+##### Fungsi View
+
+| Fungsi | Return | FR Terkait |
+|--------|--------|-----------|
+| `getAccrued(employee)` | saldo terakumulasi (settled + live) | FR-PAYANA-402 |
+| `getVaultBalance()` | `vaultBalance` | FR-PAYANA-202 |
+| `getSeveranceBalance(employee)` | `severanceVaults[employee].amount` | FR-PAYANA-506 |
+| `getStreamInfo(employee)` | `(address(this), flowRate)` — kunci pool koperasi | FR-PAYANA-703 |
+
+##### 2.2.2.3 EmployeeLiquidityContract
+
+Pool likuiditas koperasi closed-loop per perusahaan (Koperasi Karyawan). Mewarisi `IEmployeeLiquidity`, `ReentrancyGuard`, `AccessControl`. Satu pool per `CompanyVault`, keyed alamat vault, sebagai pemenuhan model closed-loop (OJK).
+
+```mermaid
+classDiagram
+    class EmployeeLiquidityContract {
+        +bytes32 OPS_ROLE
+        +bytes32 PAYROLL_ROLE
+        +uint256 MAX_LOAN_BPS = 8000
+        +uint256 GRACE_PERIOD = 7 days
+        +uint256 LOAN_TERM = 30 days
+        +uint256 REPAY_FRACTION_BPS = 2000
+        +uint256 MINIMUM_DEPOSIT = 100
+        +uint256 PROTOCOL_FEE_BPS = 100
+        +IERC20 IDRX
+        +address protocolTreasury
+        +uint256 totalProtocolFee
+        +mapping registeredVaults
+        +mapping pools
+        +mapping lenderDeposits
+        +mapping loanRecords
+    }
+```
+
+**Konstanta:** `MAX_LOAN_BPS=8000` (80%), `GRACE_PERIOD=7 days`, `LOAN_TERM=30 days`, `REPAY_FRACTION_BPS=2000` (20%), `MINIMUM_DEPOSIT=100`, `PROTOCOL_FEE_BPS=100` (1%), `BPS_DENOMINATOR=10.000`, hard cap pinjam `8.000.000 IDRX`.
+
+**Custom Errors:** `VaultNotRegistered`, `PoolAlreadyInitialized`, `PoolNotInitialized`, `InsufficientPoolLiquidity`, `LoanLimitExceeded`, `ActiveLoanExists`, `NoActiveLoan`, `GracePeriodNotExpired`, `NothingToWithdraw`, `NotPoolMember`.
+
+**Modifier:** `onlyOps` (`OPS_ROLE`), `onlyPayroll` (`PAYROLL_ROLE`), `poolExists(company)`.
+
+**Akuntansi Yield:** indeks kumulatif `yieldPerShareX18` (skala 1e18). Pending yield lender = `principal * (yieldPerShareX18 - yieldDebtX18) / 1e18`.
+
+**[registerVault(vault) / unregisterVault(vault)]**
+| | |
+|---|---|
+| Input | vault: address |
+| Output | - |
+| Deskripsi | external; modifier `onlyRole(DEFAULT_ADMIN_ROLE)`; sesuai FR-PAYANA-1001 |
+
+**Algoritma:** `registerVault`: tolak alamat nol; `registeredVaults[vault]=true`; `_grantRole(PAYROLL_ROLE, vault)`; emit `VaultRegistered`. `unregisterVault`: set false; `_revokeRole(PAYROLL_ROLE, vault)`; emit `VaultUnregistered`.
+
+**[claimProtocolFee()]**
+| | |
+|---|---|
+| Input | - |
+| Output | - |
+| Deskripsi | external; modifier `onlyRole(DEFAULT_ADMIN_ROLE)`; sesuai FR-PAYANA-1003 |
+
+**Algoritma:** Check `totalProtocolFee > 0`; set `totalProtocolFee=0`; `safeTransfer(protocolTreasury, amount)`.
+
+**[initializePool(companyAddress, interestRateBps)]**
+| | |
+|---|---|
+| Input | companyAddress: address, interestRateBps: uint16 |
+| Output | - |
+| Deskripsi | external override; modifier `DEFAULT_ADMIN_ROLE` atau `PAYROLL_ROLE`; sesuai FR-PAYANA-706 |
+
+**Algoritma:** Check belum diinisialisasi (`PoolAlreadyInitialized`); buat `Pool` dengan `interestRateBps` (default 150 dari konstruktor vault); emit `PoolInitialized`.
+
+**[depositToPool(vaultAddress, amount) / depositToPoolFor(companyAddress, amount)]**
+| | |
+|---|---|
+| Input | companyAddress: address, amount: uint256 |
+| Output | - |
+| Deskripsi | external override / external; modifier `nonReentrant` (`depositToPoolFor` + `poolExists`); sesuai FR-PAYANA-701 |
+
+**Algoritma:**
+
+1. **Check:** `amount >= MINIMUM_DEPOSIT` (`"BelowMinDeposit"`).
+2. **Check (deposit pertama):** vault terdaftar (`VaultNotRegistered`) dan pemanggil memiliki stream aktif (`getStreamInfo` mengembalikan vault non-nol); pool terinisialisasi (`PoolNotInitialized`).
+3. **Effect/Interaction:** `_doDeposit`: jika pertama set `companyAddress`, `depositedTs`, `yieldDebtX18`; jika ulang `_syncYield` lebih dahulu; `safeTransferFrom(amount)`; `principal += amount`; `pool.totalDeposited += amount`; emit `Deposited`.
+
+**[withdrawDeposit(amount)]**
+| | |
+|---|---|
+| Input | amount: uint256 |
+| Output | - |
+| Deskripsi | external override; modifier `nonReentrant`; sesuai FR-PAYANA-702 |
+
+**Algoritma (CEI):**
+
+1. **Check:** ada deposit (`NothingToWithdraw`); `_syncYield` (emit `YieldAccrued` jika ada); cek principal/yield tidak nol; likuiditas idle `totalDeposited - totalLoansOutstanding >= amount` (`InsufficientPoolLiquidity`).
+2. **Effect:** `principal -= amount`; `yieldEarned = 0`; `pool.totalDeposited -= amount`.
+3. **Interaction:** `safeTransfer(msg.sender, amount + yieldToSend)`; emit `Withdrawn`.
+
+**[borrowFromPool(vaultAddress, amount) / borrowFromPoolFor(companyAddress, amount, expectedMonthlySalary)]**
+| | |
+|---|---|
+| Input | companyAddress: address, amount: uint256, expectedMonthlySalary: uint256 |
+| Output | - |
+| Deskripsi | external override / external; modifier `nonReentrant` (`borrowFromPoolFor`: `onlyOps poolExists`); sesuai FR-PAYANA-703 |
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor E as Karyawan
+    participant L as EmployeeLiquidityContract
+    participant V as CompanyVault
+    E->>L: borrowFromPool(vaultAddress, amount)
+    L->>L: cek vault terdaftar (VaultNotRegistered)
+    L->>V: getStreamInfo(employee)
+    V-->>L: (vault, flowRate)
+    L->>L: expectedMonthlySalary = flowRate * SECONDS_PER_MONTH
+    L->>L: _doBorrow: cek 1 loan aktif, cap 80%, hard cap 8jt, likuiditas
+    L->>L: interest = amount * interestRateBps / 10000; dueTs = now+30d
+    L->>L: pool.totalLoansOutstanding += amount
+    L->>E: safeTransfer(amount)
+    L-->>E: LoanCreated
+```
+
+**Algoritma `_doBorrow`:**
+
+1. **Check:** tidak ada pinjaman `Active` (`ActiveLoanExists`); `amount <= 80% expectedMonthlySalary` (`LoanLimitExceeded`); `amount <= 8.000.000 IDRX` (`LoanLimitExceeded`); likuiditas idle cukup (`InsufficientPoolLiquidity`).
+2. **Effect:** `interest = amount * interestRateBps / 10000`; buat `LoanRecord` (`Active`, `dueTs = now + 30 days`); `pool.totalLoansOutstanding += amount`.
+3. **Interaction:** `safeTransfer(msg.sender, amount)`; emit `LoanCreated`.
+
+**[repayLoanManual(amount)]**
+| | |
+|---|---|
+| Input | amount: uint256 |
+| Output | - |
+| Deskripsi | external override; modifier `nonReentrant`; sesuai FR-PAYANA-705 |
+
+**Algoritma:** Check ada pinjaman `Active` (`NoActiveLoan`) dan `amount > 0`; `safeTransferFrom(msg.sender, this, amount)`; `_applyRepayment(msg.sender, loan, amount)`.
+
+**[autoRepay(employee, accrued)]**
+| | |
+|---|---|
+| Input | employee: address, accrued: uint256 |
+| Output | `uint256 repaid` |
+| Deskripsi | external override; modifier `onlyPayroll nonReentrant`; sesuai FR-PAYANA-704 |
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    participant V as CompanyVault
+    participant L as EmployeeLiquidityContract
+    V->>L: autoRepay(employee, accrued)
+    alt tidak ada pinjaman aktif
+        L-->>V: return 0
+    else ada pinjaman
+        L->>L: outstanding = principal + interest - repaidAmount
+        L->>L: fraction = accrued * 20% ; repaid = min(fraction, outstanding)
+        L->>L: _applyRepayment(employee, loan, repaid)
+        Note over L: jika lunas penuh: bunga bersih (setelah fee 1%)<br/>didistribusikan ke yieldPerShareX18
+        L-->>V: return repaid + LoanRepaid
+    end
+```
+
+**Algoritma:**
+
+1. **Check:** jika tidak ada pinjaman `Active`, kembalikan 0.
+2. **Effect:** `outstanding = principal + interest - repaidAmount`; `fraction = accrued * 20% / 10000`; `repaid = min(fraction, outstanding)`; jika 0 kembalikan 0.
+3. **Effect:** `_applyRepayment(employee, loan, repaid)`; emit `LoanRepaid(employee, repaid, lunas?)`. CompanyVault bertanggung jawab memotong `repaid` dari net gaji.
+
+**[liquidateLoan(borrower)]**
+| | |
+|---|---|
+| Input | borrower: address |
+| Output | - |
+| Deskripsi | external override; modifier `onlyOps`; sesuai FR-PAYANA-704 (lanjutan) |
+
+**Algoritma:**
+
+1. **Check:** pinjaman `Active` (`NoActiveLoan`); `now > dueTs + GRACE_PERIOD` (`GracePeriodNotExpired`).
+2. **Effect:** `outstanding = principal + interest - repaidAmount`; `pool.totalLoansOutstanding -= principal`; kurangi `pool.totalDeposited` sebesar outstanding (loss disosialisasikan ke seluruh lender); set status `Defaulted`; emit `LoanDefaulted`.
+
+##### Fungsi Internal
+
+- `_applyRepayment(borrower, loan, amount)`: `actualRepaid = min(amount, outstanding)`; `loan.repaidAmount += actualRepaid`; pada pelunasan penuh kurangi `totalLoansOutstanding`, hitung `fee = interest * 1% `, `totalProtocolFee += fee`, distribusikan `netInterest` ke `yieldPerShareX18` (jika `totalDeposited > 0`), set status `Repaid`.
+- `_syncYield(dep, pool)`: `accrued = principal * (yieldPerShareX18 - yieldDebtX18)/1e18`; `yieldEarned += accrued`; perbarui `yieldDebtX18`.
+
+##### Fungsi View
+
+| Fungsi | Return | FR Terkait |
+|--------|--------|-----------|
+| `getLoanBalance(borrower)` | `(principal, interest, repaid)` | FR-PAYANA-705 |
+| `getPoolLiquidity(company)` | `(total, available)` | FR-PAYANA-706 |
+| `getDepositBalance(lender)` | `(principal, yieldEarned+pending)` | FR-PAYANA-701/702 |
+
+##### 2.2.2.4 EmploymentSBT
+
+Sertifikat ketenagakerjaan Soulbound (ERC-5192). Mewarisi `ERC721`, `IERC5192`, `AccessControl`. Nama token: "Finley Employment Certificate" (FEMP).
+
+```mermaid
+classDiagram
+    class EmploymentSBT {
+        +bytes32 MINTER_ROLE
+        +mapping employmentRecords
+        +mapping employeeTokenId
+        +mint(employee, companyName, hrAuthority) uint256
+        +revoke(employee)
+        +locked(tokenId) bool
+        +setBaseURI(newBaseURI)
+        +supportsInterface(interfaceId) bool
+        -_update(to, tokenId, auth) address
+    }
+```
+
+**Custom Errors:** `AlreadyHasToken(employee)`, `NoTokenFound(employee)`, `SoulboundTransferNotAllowed`.
+
+**[mint(employee, companyName, hrAuthority)]**
+| | |
+|---|---|
+| Input | employee: address, companyName: string, hrAuthority: address |
+| Output | uint256 (tokenId) |
+| Deskripsi | external; modifier `onlyRole(MINTER_ROLE)`; sesuai FR-901, FR-902 |
+
+Algoritma: Tolak jika sudah punya token (`AlreadyHasToken`); tokenId monoton mulai 1; simpan `EmploymentRecord{hrAuthority, companyName, startTs}`; emit `Locked(tokenId)`; kembalikan tokenId.
+
+**[revoke(employee)]**
+| | |
+|---|---|
+| Input | employee: address |
+| Output | - |
+| Deskripsi | external; modifier `onlyRole(MINTER_ROLE)`; sesuai FR-903 |
+
+Algoritma: Hapus `employeeTokenId` dan `employmentRecords`; burn token.
+
+**[locked(tokenId)]**
+| | |
+|---|---|
+| Input | tokenId: uint256 |
+| Output | bool |
+| Deskripsi | external view; sesuai FR-905 |
+
+Algoritma: Selalu `true` (ERC-5192).
+
+**[setBaseURI(newBaseURI)]**
+| | |
+|---|---|
+| Input | newBaseURI: string |
+| Output | - |
+| Deskripsi | external; modifier `onlyRole(DEFAULT_ADMIN_ROLE)` |
+
+Algoritma: Perbarui base URI metadata.
+
+**[supportsInterface(interfaceId)]**
+| | |
+|---|---|
+| Input | interfaceId: bytes4 |
+| Output | bool |
+| Deskripsi | public view; sesuai FR-905 |
+
+Algoritma: Deklarasi dukungan `IERC5192`.
+
+**[_update(to, tokenId, auth)] [internal]**
+| | |
+|---|---|
+| Input | to: address, tokenId: uint256, auth: address |
+| Output | address |
+| Deskripsi | internal override; sesuai FR-905 |
+
+Algoritma: Blokir transfer P2P (`SoulboundTransferNotAllowed`); hanya mint (from=0) dan burn (to=0) diizinkan.
+
+##### 2.2.2.5 IDRXPriceOracle
+
+Oracle harga berbasis Chainlink untuk tampilan treasury berdenominasi USD (opsional). Mewarisi `Ownable`.
+
+```mermaid
+classDiagram
+    class IDRXPriceOracle {
+        +AggregatorV3Interface priceFeed
+        +setPriceFeed(priceFeed)
+        +getLatestRate() uint256
+        +getIDRXPriceInUSD() uint256
+        +convertUSDtoIDRX(usdAmount) uint256
+        +convertIDRXtoUSD(idrxAmount) uint256
+    }
+```
+
+**[getLatestRate()]**
+| | |
+|---|---|
+| Input | - |
+| Output | uint256 (rate 8 desimal) |
+| Deskripsi | external view |
+
+Algoritma: Baca `latestRoundData()`; validasi `answer > 0` (`OracleNegativeRate`), `answeredInRound >= roundId` (`OracleStaleData`), `updatedAt > 0` (`OracleRoundIncomplete`); kembalikan rate 8 desimal.
+
+**[getIDRXPriceInUSD()]**
+| | |
+|---|---|
+| Input | - |
+| Output | uint256 (18 desimal) |
+| Deskripsi | external view |
+
+Algoritma: `10^26 / rate` (18 desimal).
+
+**[convertUSDtoIDRX(usdAmount)]**
+| | |
+|---|---|
+| Input | usdAmount: uint256 |
+| Output | uint256 |
+| Deskripsi | external view |
+
+Algoritma: `usdAmount * rate / 10^8`.
+
+**[convertIDRXtoUSD(idrxAmount)]**
+| | |
+|---|---|
+| Input | idrxAmount: uint256 |
+| Output | uint256 |
+| Deskripsi | external view |
+
+Algoritma: `idrxAmount * 10^8 / rate`.
+
+**[setPriceFeed(feed)]**
+| | |
+|---|---|
+| Input | feed: address |
+| Output | - |
+| Deskripsi | external; modifier `onlyOwner` |
+
+Algoritma: Perbarui `priceFeed`; emit `PriceFeedUpdated`.
+
+##### 2.2.2.6 ConfidentialCompanyVault (Ekstensi FHE)
+
+Ekstensi opsional `CompanyVault` yang menyimpan gaji sebagai ciphertext `euint256` Inco Lightning. Lapisan streaming tetap plaintext; hanya nominal gaji yang dienkripsi.
+
+```mermaid
+classDiagram
+    class ConfidentialCompanyVault {
+        +mapping encryptedSalaries "euint256"
+        +mapping hasEncryptedSalary
+        +mapping auditorExpiry
+        +setEncryptedSalary(employee, encryptedSalary) payable
+        +getEncryptedSalary(employee) euint256
+        +aggregateTotalPayroll() euint256
+        +grantViewingKey(auditor, expiresAt)
+        +isAuditorActive(auditor) bool
+        +revokeAuditorAccess(auditor)
+    }
+```
+
+**[setEncryptedSalary(employee, ciphertext)]**
+| | |
+|---|---|
+| Input | employee: address, ciphertext: bytes |
+| Output | - |
+| Deskripsi | external payable; modifier `onlyHR`; sesuai FR-1102 |
+
+Algoritma: Bayar `inco.getFee()`; verifikasi input proof via `newEuint256(msg.sender)`; beri ACL ke contract/HR/karyawan; emit `EncryptedSalarySet` tanpa plaintext.
+
+**[getEncryptedSalary(employee)]**
+| | |
+|---|---|
+| Input | employee: address |
+| Output | euint256 (handle ciphertext) |
+| Deskripsi | external view; sesuai FR-1103 |
+
+Algoritma: Hanya karyawan sendiri atau HR; kembalikan handle ciphertext untuk dekripsi client-side.
+
+**[aggregateTotalPayroll()]**
+| | |
+|---|---|
+| Input | - |
+| Output | euint256 |
+| Deskripsi | external; sesuai FR-1104 |
+
+Algoritma: Penjumlahan homomorfik O(n) via `.add()`; ACL hasil ke HR.
+
+**[grantViewingKey(auditor, expiresAt)]**
+| | |
+|---|---|
+| Input | auditor: address, expiresAt: uint256 |
+| Output | - |
+| Deskripsi | external; modifier `onlyHR`; sesuai FR-1105 |
+
+Algoritma: Beri ACL Inco ke auditor dengan batas waktu Solidity-level (`auditorExpiry`).
+
+**[isAuditorActive(auditor)]**
+| | |
+|---|---|
+| Input | auditor: address |
+| Output | bool |
+| Deskripsi | external view; sesuai FR-1105 |
+
+Algoritma: `now < auditorExpiry[auditor]`.
+
+**[revokeAuditorAccess(auditor)]**
+| | |
+|---|---|
+| Input | auditor: address |
+| Output | - |
+| Deskripsi | external; modifier `onlyHR`; sesuai FR-1105 |
+
+Algoritma: Set `auditorExpiry[auditor]=0`.
+
+---
+
+
+### 2.3 Perancangan Data
+
+#### 2.3.1 Dekomposisi Data
+
 
 Data dalam sistem Payana didistribusikan ke dalam tiga lapisan penyimpanan yang saling melengkapi:
 
@@ -556,1080 +1355,6 @@ Data dalam sistem Payana didistribusikan ke dalam tiga lapisan penyimpanan yang 
 2. **Off-Chain PostgreSQL (skema `app`, Azure Indonesia Central).** Menyimpan data yang tidak boleh atau tidak efisien disimpan on-chain: sesi JWT (`sessions`), profil PII karyawan terenkripsi AES-256-GCM (`employees`), audit log backend (`audit_logs`), deduplikasi event webhook (`webhook_events`), counter rate limit (`rate_limits`), dan antrian registrasi tenant (`pending_registrations`). Penyimpanan PII off-chain merupakan pemenuhan UU PDP No. 27/2022.
 
 3. **Ponder Indexed PostgreSQL (skema `public`).** Menyimpan salinan terindeks dari event on-chain dalam bentuk tabel relasional yang dapat dikueri cepat: `company`, `employee_stream`, `salary_claim`, `severance_vault`, `termination_proposal`, `cliff_vest`, `compliance_vault`, `liquidity_pool`, `lender_deposit`, `loan_record`, `employment_certificate`, `platform_fee_payment`, `encrypted_salary`, `auditor_grant`, dan `low_balance_alert`. Lapisan ini menghindarkan frontend dan backend dari kebutuhan iterasi RPC langsung untuk pembacaan agregat.
-
-### 2.4 Perancangan Antarmuka Secara Keseluruhan
-
-Frontend Payana menyajikan empat portal yang dipisahkan berdasarkan hasil resolusi peran (hook `useRole`). Routing dilakukan dengan App Router Next.js, dan setiap portal dilindungi oleh role guard berbasis peran on-chain.
-
-| Portal | Prefiks URL | Aktor | Mekanisme Deteksi Peran |
-|--------|-------------|-------|--------------------------|
-| Autentikasi & Onboarding | `/`, `/login`, `/onboarding`, `/verify` | Publik / calon HR | Belum terautentikasi atau belum memiliki peran |
-| Portal HR | `/hr/*` | HR Admin | `PayrollFactory.companyVaults(address) != 0` |
-| Portal Karyawan | `/employee/*` | Karyawan | Stream aktif/paused di Ponder |
-| Portal Owner SaaS | `/owner` | Owner SaaS | `address == NEXT_PUBLIC_OWNER_ADDRESS` |
-| Portal Legal Officer | (memanfaatkan `/hr/phk`) | Legal Officer | `CompanyVault.hasRole(LEGAL_ROLE, address)` |
-
-Urutan prioritas deteksi peran (sesuai FR-PAYANA-106): Owner → HR → Legal → Karyawan. Pengguna yang tidak memenuhi kriteria peran apa pun diarahkan ke halaman onboarding.
-
----
-
-## 3. Perancangan Antarmuka
-
-Bab ini merinci rancangan antarmuka pengguna Payana per portal. Setiap halaman dideskripsikan beserta rute App Router, fungsi utama, aktor pengakses, kebutuhan fungsional terkait, alur interaksi (sequence diagram), deskripsi komponen antarmuka, serta method/algoritma utama yang menggerakkan halaman tersebut. Seluruh halaman menggunakan komponen Shadcn/UI di atas Tailwind CSS 4, animasi `framer-motion`, grafik `recharts`, dan ikon `lucide-react`.
-
-Setiap halaman mengikuti satu dari dua pola interaksi on-chain:
-
-1. **Pola tulis langsung (`useContractWrite`)** untuk aksi HR, Owner, dan Legal. Transaksi ditandatangani dan biaya gasnya dibayar oleh wallet pengguna melalui embedded wallet Privy. Hook melakukan `switchChain(84532)` sebelum penandatanganan, lalu memanggil `walletClient.writeContract`.
-2. **Pola relay gasless (ERC-4337)** yang dikhususkan untuk `claimSalary()` karyawan. UserOperation ditandatangani secara silent oleh Privy lalu direlay melalui `POST /bundler/relay` dan disponsori Paymaster.
-
-Pembacaan data terbagi menjadi dua sumber: (a) pembacaan agregat historis melalui klien `ponder` di `lib/api.ts`, dan (b) pembacaan nilai real-time on-chain (mis. `getAccrued`) melalui `publicClient.readContract` (viem).
-
-### 3.A Halaman Autentikasi dan Onboarding
-
-#### 3.A.1 Halaman Landing (`/`)
-
-**Deskripsi:** Halaman pemasaran publik yang memperkenalkan proposisi nilai Payana (penggajian real-time, gasless, zero Web3 knowledge) dan menyediakan jalur masuk ke aplikasi.
-**Aktor:** Publik (tanpa autentikasi).
-**FR Terkait:** — (halaman informatif; pendukung FR-PAYANA-101).
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    participant U as Pengunjung
-    participant FE as Frontend (Landing)
-    U->>FE: Buka root URL "/"
-    FE-->>U: Render konten pemasaran statis
-    U->>FE: Klik "Masuk"
-    FE-->>U: Navigasi ke /login
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Hero Section | Section statis | Headline proposisi nilai dan ringkasan fitur Payana. |
-| Tombol "Masuk" | Tautan (`<Link>`) | Mengarahkan ke `/login`. |
-| Bagian Fitur | Grid kartu | Menjelaskan EWA real-time, gasless, dan kepatuhan otomatis. |
-
-**Method/Algoritma Utama:**
-
-1. Render konten statis tanpa pemanggilan kontrak atau backend.
-2. Saat tombol "Masuk" ditekan, navigasi App Router ke `/login`.
-
-#### 3.A.2 Halaman Login (`/login`)
-
-**Deskripsi:** Autentikasi tanpa kata sandi berbasis tanda tangan kriptografi EIP-191 menggunakan embedded wallet Privy.
-**Aktor:** Seluruh pengguna (HR, Karyawan, Legal, Owner).
-**FR Terkait:** FR-PAYANA-101, FR-PAYANA-102, FR-PAYANA-106.
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor U as Pengguna
-    participant FE as Frontend (useAuth)
-    participant PV as Privy Wallet
-    participant BE as Backend /auth/login
-    participant DB as PostgreSQL (sessions)
-    U->>FE: Klik "Masuk"
-    FE->>PV: login() (email/social)
-    PV-->>FE: embedded wallet siap
-    FE->>FE: refreshToken tersimpan? coba /auth/refresh
-    alt tanda tangan baru
-        FE->>FE: bentuk "Sign in to Payana\nTimestamp: <unix>"
-        FE->>PV: switchChain(84532) + personal_sign(message)
-        PV-->>FE: signature
-        FE->>BE: POST {address, message, signature, timestamp}
-        BE->>BE: cek skew <= 5 menit + verifyMessage (viem)
-        BE->>DB: INSERT session (jti, address, expiresAt)
-        BE-->>FE: {token, refreshToken, address}
-    end
-    FE->>FE: useRole() resolve peran
-    FE-->>U: redirect ke portal sesuai peran
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Tombol "Masuk" | Tombol | Memicu `login()` Privy (modal email/social). |
-| Indikator status | Teks/spinner | Menampilkan progres "menandatangani" dan "memverifikasi". |
-| Redirect handler | Efek samping | Mengarahkan ke portal berdasarkan hasil `useRole`. |
-
-**Method/Algoritma Utama:**
-
-1. Panggil `login()` Privy; tunggu `authenticated` dan ketersediaan `walletAddress`.
-2. Jika ada `payana_refresh_token` di `localStorage`, coba `POST /auth/refresh` terlebih dahulu untuk menghindari tanda tangan ulang.
-3. Jika refresh gagal, bentuk pesan `Sign in to Payana\nTimestamp: <unix_seconds>`, panggil `switchChain(84532)`, lalu `personal_sign`.
-4. Kirim `{address, message, signature, timestamp}` ke `POST /auth/login`; simpan `token` (akses) dan `refreshToken`.
-5. Jalankan `useRole()` untuk menentukan peran dan mengarahkan ke `/owner`, `/hr/*`, `/hr/phk` (Legal), atau `/employee/*`.
-
-#### 3.A.3 Halaman Onboarding HR (`/onboarding`)
-
-**Deskripsi:** Formulir pengajuan permohonan akses platform bagi calon HR Admin, lengkap dengan pemantauan status persetujuan.
-**Aktor:** Calon HR Admin.
-**FR Terkait:** FR-PAYANA-107.
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor HR as Calon HR
-    participant FE as Frontend /onboarding
-    participant BE as Backend /registration
-    participant DB as PostgreSQL (pending_registrations)
-    HR->>FE: Isi alamat, email, nama
-    FE->>BE: POST /registration/request {address, email, name}
-    BE->>DB: upsert by address (status=pending)
-    BE-->>FE: {ok: true}
-    HR->>FE: Buka kembali halaman
-    FE->>BE: GET /registration/status/:address
-    BE->>DB: SELECT status
-    BE-->>FE: {status, requestedAt}
-    FE-->>HR: Tampilkan badge pending/approved/rejected
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Input alamat dompet | Field teks | Alamat EVM calon HR. |
-| Input email | Field email | Email PIC HR. |
-| Input nama | Field teks | Nama PIC/perusahaan. |
-| Tombol "Ajukan" | Tombol | Memanggil `registration.submit`. |
-| Badge status | Komponen status | Menampilkan `pending`/`approved`/`rejected`/`none`. |
-
-**Method/Algoritma Utama:**
-
-1. Validasi field tidak kosong; submit ke `POST /registration/request` (upsert by address).
-2. Polling/`GET /registration/status/:address` untuk menampilkan status terkini.
-3. Jika status `approved`, arahkan pengguna untuk login dan melanjutkan deployment vault (dilakukan oleh Owner pada `/owner`).
-
-#### 3.A.4 Halaman Verifikasi SBT (`/verify`)
-
-**Deskripsi:** Verifikasi publik keaslian Sertifikat Ketenagakerjaan (Employment SBT) oleh pihak ketiga.
-**Aktor:** Publik (verifikator eksternal, mis. bank, calon pemberi kerja).
-**FR Terkait:** FR-PAYANA-905, FR-PAYANA-904.
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor V as Verifikator
-    participant FE as Frontend /verify
-    participant SC as EmploymentSBT
-    V->>FE: Masukkan alamat karyawan
-    FE->>SC: employeeTokenId(address)
-    SC-->>FE: tokenId
-    FE->>SC: employmentRecords(tokenId)
-    SC-->>FE: {hrAuthority, companyName, startTs}
-    FE->>SC: locked(tokenId)
-    SC-->>FE: true (ERC-5192)
-    FE-->>V: Tampilkan detail sertifikat + status terkunci
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Input alamat | Field teks | Alamat dompet karyawan yang diverifikasi. |
-| Kartu sertifikat | Panel hasil | Menampilkan `companyName`, `startTs`, `hrAuthority`. |
-| Badge "Soulbound" | Indikator | Menegaskan token non-transferable (`locked == true`). |
-
-**Method/Algoritma Utama:**
-
-1. Baca `employeeTokenId(address)`; jika 0, tampilkan "sertifikat tidak ditemukan".
-2. Baca `employmentRecords(tokenId)` untuk metadata perusahaan dan tanggal mulai.
-3. Baca `locked(tokenId)` (selalu `true`) untuk mengonfirmasi sifat soulbound.
-
-### 3.B Portal HR (`/hr/*`)
-
-Seluruh halaman portal HR dibungkus oleh layout `hr/layout.tsx` yang menyediakan navigasi sisi dan role guard berbasis `useRole`. Pengguna yang bukan HR diarahkan keluar dari portal ini.
-
-#### 3.B.1 Dashboard HR Onboarding (`/hr/onboarding`)
-
-**Deskripsi:** Wizard tiga langkah untuk men-deploy `CompanyVault`, mengonfigurasi parameter potongan (BPS), dan melakukan deposit awal IDRX.
-**Aktor:** HR Admin.
-**FR Terkait:** FR-PAYANA-201, FR-PAYANA-202, FR-PAYANA-901.
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor HR
-    participant FE as Frontend /hr/onboarding
-    participant F as PayrollFactory
-    participant PO as Ponder
-    participant IDRX as IDRX ERC-20
-    participant V as CompanyVault
-    HR->>FE: Langkah 1 isi nama, NPWP, email
-    HR->>FE: Langkah 2 isi BPS BPJS/pesangon
-    HR->>FE: Klik "Deploy Vault"
-    FE->>F: deployVault(hr, name, liquidity, sbt)
-    F-->>FE: tx terkirim
-    loop polling hingga terindeks
-        FE->>PO: getCompany(hr)
-        PO-->>FE: company.id (alamat vault)
-    end
-    HR->>FE: Langkah 3 isi nominal deposit
-    FE->>IDRX: approve(vault, amountWei)
-    FE->>V: fundVault(amountWei)
-    V-->>FE: VaultFunded
-    FE-->>HR: Langkah 4 "Sistem Siap Digunakan"
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Stepper | Indikator langkah | Empat tahap: Registrasi, Konfigurasi, Deposit, Selesai. |
-| Input Nama Perusahaan / NPWP / Email | Field teks | Metadata perusahaan; nama digunakan untuk metadata SBT. |
-| Input BPS BPJS / Pesangon | Field angka | Konfigurasi potongan (informatif untuk `setCompanyConfig`). |
-| Tombol "Deploy Vault" | Tombol tulis | Memanggil `PayrollFactory.deployVault`. |
-| Kartu alamat vault | Panel hasil | Menampilkan alamat vault terindeks + tombol salin. |
-| Input Deposit (IDRX) | Field angka | Nominal deposit awal. |
-| Tombol "Approve & Deposit" | Tombol tulis | Memanggil `approve` lalu `fundVault`. |
-
-**Method/Algoritma Utama:**
-
-1. `handleDeploy`: panggil `deployVault(address, companyName, EMPLOYEE_LIQUIDITY, EMPLOYMENT_SBT)` via `useContractWrite`.
-2. Polling `ponder.getCompany(address)` hingga 20 kali (interval 3 detik) sampai alamat vault terindeks; simpan ke `deployedVault`.
-3. `handleDeposit`: konversi nominal ke wei (`BigInt(amount) * 1e18`), panggil `approve(deployedVault, amountWei)` pada IDRX, lalu `fundVault(amountWei)` pada vault.
-4. Tampilkan langkah selesai dengan tautan ke `/hr/vault`.
-
-#### 3.B.2 Manajemen Karyawan (`/hr/employees` dan `/hr/employees/[id]`)
-
-**Deskripsi:** Daftar seluruh karyawan beserta status stream, flow rate, dan saldo terakumulasi; halaman detail menyediakan kontrol penuh atas stream individual.
-**Aktor:** HR Admin.
-**FR Terkait:** FR-PAYANA-301 s.d. FR-PAYANA-306, FR-PAYANA-505.
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor HR
-    participant FE as Frontend /hr/employees
-    participant PO as Ponder
-    participant V as CompanyVault
-    HR->>FE: Buka daftar karyawan
-    FE->>PO: getStreams(hrAuthority)
-    PO-->>FE: daftar stream
-    HR->>FE: Pilih karyawan, buka detail [id]
-    FE->>V: getAccrued(employee)
-    V-->>FE: saldo terakumulasi
-    HR->>FE: Klik aksi (pause/resume/updateFlowRate/...)
-    FE->>V: pauseStream / resumeStream / updateFlowRate / updateStreamSplits / cancelStream
-    V-->>FE: event status berubah
-    FE-->>HR: Perbarui tampilan
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Tabel karyawan | Tabel data | Kolom alamat, status, flow rate, saldo terakumulasi. |
-| Badge status stream | Indikator | Active / Paused / Cancelled / Inactive. |
-| Kontrol stream | Grup tombol | `pauseStream`, `resumeStream`, `updateFlowRate`, `updateStreamSplits`, `cancelStream`. |
-| Input flow rate / split | Field angka | Nilai baru untuk pembaruan stream. |
-| Tombol Resign | Tombol tulis | `resignEmployee(employee)` (pesangon kembali ke vault). |
-
-**Method/Algoritma Utama:**
-
-1. Muat daftar via `ponder.getStreams(hrAuthority)`; render tabel.
-2. Pada detail `[id]`, baca `getAccrued(employee)` on-chain untuk saldo real-time.
-3. Aksi kontrol memanggil fungsi kontrak terkait melalui `useContractWrite`; validasi split = 10.000 bps sebelum `updateStreamSplits`.
-
-#### 3.B.3 Manajemen Vault (`/hr/vault`)
-
-**Deskripsi:** Manajemen treasury perusahaan: pemantauan saldo, peringatan saldo rendah real-time, deposit, dan penarikan.
-**Aktor:** HR Admin.
-**FR Terkait:** FR-PAYANA-202, FR-PAYANA-203, FR-PAYANA-205, FR-PAYANA-207.
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor HR
-    participant FE as Frontend /hr/vault
-    participant V as CompanyVault
-    participant IDRX as IDRX ERC-20
-    participant WS as WebSocket
-    FE->>V: getVaultBalance()
-    V-->>FE: vaultBalance
-    WS-->>FE: LOW_VAULT_BALANCE (jika di bawah threshold)
-    HR->>FE: Deposit nominal
-    FE->>IDRX: approve(vault, amount)
-    FE->>V: fundVault(amount)
-    HR->>FE: Tarik nominal
-    FE->>V: withdrawVault(amount, recipient)
-    V-->>FE: VaultWithdrawn
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Kartu saldo vault | Panel data | Menampilkan `vaultBalance` dan estimasi burn rate bulanan. |
-| Banner peringatan | Alert real-time | Muncul saat pesan WebSocket `LOW_VAULT_BALANCE` diterima. |
-| Form deposit | Field + tombol | `approve` lalu `fundVault(amount)`. |
-| Form penarikan | Field + tombol | `withdrawVault(amount, recipient)`. |
-| Tombol pause/resume vault | Tombol tulis | `pauseVault()` / `resumeVault()`. |
-
-**Method/Algoritma Utama:**
-
-1. Baca `getVaultBalance()` dan `totalFlowRate` untuk estimasi kebutuhan bulanan.
-2. Berlangganan WebSocket; tampilkan banner saat tipe `LOW_VAULT_BALANCE` diterima.
-3. Deposit: `approve(vault, amount)` → `fundVault(amount)`. Penarikan: `withdrawVault(amount, recipient)`.
-
-#### 3.B.4 Absensi HR (`/hr/attendance`)
-
-**Deskripsi:** Tampilan dan pengelolaan data kehadiran karyawan untuk rekonsiliasi payroll.
-**Aktor:** HR Admin.
-**FR Terkait:** — (fitur pelengkap antarmuka tingkat aplikasi; tidak memengaruhi logika stream on-chain).
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor HR
-    participant FE as Frontend /hr/attendance
-    HR->>FE: Buka rekap absensi
-    FE-->>HR: Render tabel kehadiran (data aplikasi off-chain)
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Tabel kehadiran | Tabel data | Daftar clock-in/clock-out per karyawan. |
-| Filter periode | Dropdown | Memilih rentang tanggal rekap. |
-
-**Method/Algoritma Utama:**
-
-1. Muat data absensi tingkat aplikasi (off-chain).
-2. Render tabel; sediakan filter periode untuk rekonsiliasi manual.
-
-#### 3.B.5 Reimburse HR (`/hr/reimburse`)
-
-**Deskripsi:** Manajemen klaim reimbursement yang diajukan karyawan: daftar, persetujuan, dan pencatatan pembayaran.
-**Aktor:** HR Admin.
-**FR Terkait:** — (fitur pelengkap antarmuka tingkat aplikasi).
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor HR
-    participant FE as Frontend /hr/reimburse
-    HR->>FE: Tinjau klaim masuk
-    HR->>FE: Setujui/tolak klaim
-    FE-->>HR: Perbarui status klaim
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Daftar klaim | Tabel data | Keterangan, jumlah, status, bukti. |
-| Tombol setujui/tolak | Grup tombol | Memutuskan klaim reimbursement. |
-
-**Method/Algoritma Utama:**
-
-1. Muat daftar klaim reimbursement tingkat aplikasi.
-2. Aksi persetujuan/penolakan memperbarui status klaim dan mencatat pembayaran.
-
-#### 3.B.6 Bounty HR (`/hr/bounty`)
-
-**Deskripsi:** Manajemen program bounty/insentif kinerja: pembuatan papan bounty, penetapan hadiah IDRX, dan pencatatan klaim disetujui.
-**Aktor:** HR Admin.
-**FR Terkait:** — (fitur pelengkap antarmuka tingkat aplikasi).
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor HR
-    participant FE as Frontend /hr/bounty
-    HR->>FE: Buat bounty + hadiah IDRX
-    HR->>FE: Tinjau klaim penyelesaian
-    FE-->>HR: Tandai bounty terbayar
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Form bounty | Field + tombol | Judul, deskripsi tugas, hadiah IDRX. |
-| Daftar bounty | Tabel data | Status: terbuka/diklaim/selesai. |
-
-**Method/Algoritma Utama:**
-
-1. Buat papan bounty dengan hadiah IDRX.
-2. Tinjau klaim penyelesaian dan catat pembayaran hadiah.
-
-#### 3.B.7 Compliance HR (`/hr/compliance`)
-
-**Deskripsi:** Laporan kepatuhan BPJS/PPh21: pratinjau ringkasan bulanan, unduhan CSV, dan penarikan akumulasi dana kepatuhan.
-**Aktor:** HR Admin.
-**FR Terkait:** FR-PAYANA-801, FR-PAYANA-803, FR-PAYANA-804, FR-PAYANA-805.
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor HR
-    participant FE as Frontend /hr/compliance
-    participant BE as Backend /compliance
-    participant PO as Ponder (salary_claim)
-    participant V as CompanyVault
-    HR->>FE: Pilih bulan
-    FE->>BE: GET /compliance/summary/:hr?month=YYYY-MM
-    BE->>PO: SUM(accrued/compliance/severance)
-    PO-->>BE: agregat + rincian
-    BE-->>FE: ringkasan JSON
-    HR->>FE: Unduh CSV
-    FE->>BE: GET /compliance/export/:hr?month=YYYY-MM
-    BE-->>FE: file CSV (PII didekripsi)
-    HR->>FE: Tarik dana kepatuhan
-    FE->>V: withdrawCompliance(amount, recipient)
-    V-->>FE: ComplianceWithdrawn
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Pemilih bulan | Input bulan | Format `YYYY-MM`. |
-| Kartu ringkasan | Panel data | Total accrued, compliance (BPJS/PPh21), severance, jumlah karyawan. |
-| Tombol Unduh CSV | Tombol | Memanggil `GET /compliance/export`. |
-| Form tarik kepatuhan | Field + tombol | `withdrawCompliance(amount, recipient)` ke agen pajak. |
-
-**Method/Algoritma Utama:**
-
-1. Ambil ringkasan via `backend.getComplianceSummary(hr, month, token)`.
-2. Tombol unduh memanggil endpoint export; berkas CSV dikembalikan sebagai attachment.
-3. Penarikan memanggil `withdrawCompliance(amount, recipient)` (hanya `complianceBalance`).
-
-#### 3.B.8 Koperasi HR (`/hr/koperasi`)
-
-**Deskripsi:** Pemantauan pool likuiditas koperasi perusahaan: total deposit, pinjaman berjalan, utilisasi, dan daftar peminjam aktif.
-**Aktor:** HR Admin.
-**FR Terkait:** FR-PAYANA-706.
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor HR
-    participant FE as Frontend /hr/koperasi
-    participant PO as Ponder
-    participant L as EmployeeLiquidityContract
-    FE->>PO: getPool(vaultAddress)
-    PO-->>FE: liquidity_pool (deposit, outstanding, rate)
-    FE->>L: getPoolLiquidity(vaultAddress)
-    L-->>FE: (total, available)
-    FE-->>HR: Tampilkan utilisasi + daftar peminjam (loan_record)
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Kartu likuiditas | Panel data | Total deposit, pinjaman berjalan, likuiditas idle. |
-| Indikator utilisasi | Progress bar | Rasio `totalLoansOutstanding / totalDeposited`. |
-| Tabel peminjam | Tabel data | Daftar `loan_record` aktif beserta status. |
-
-**Method/Algoritma Utama:**
-
-1. Baca `ponder.getPool(vaultAddress)` untuk data terindeks pool.
-2. Baca `getPoolLiquidity(vaultAddress)` on-chain untuk total dan likuiditas idle.
-3. Hitung utilisasi dan render daftar peminjam aktif.
-
-#### 3.B.9 Vesting HR (`/hr/vesting`)
-
-**Deskripsi:** Manajemen cliff vest: pembuatan vest baru bertipe Retention/Probation/ESOP dan pembatalan vest yang belum matang.
-**Aktor:** HR Admin.
-**FR Terkait:** FR-PAYANA-601, FR-PAYANA-603, FR-PAYANA-604, FR-PAYANA-605.
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor HR
-    participant FE as Frontend /hr/vesting
-    participant PO as Ponder (cliff_vest)
-    participant V as CompanyVault
-    FE->>PO: getVests(employee)
-    PO-->>FE: daftar vest
-    HR->>FE: Buat vest baru
-    FE->>V: createCliffVest(employee, amount, cliffTs, vestType)
-    V-->>FE: CliffVestCreated
-    HR->>FE: Batalkan vest
-    FE->>V: cancelCliffVest(employee, vestId)
-    V-->>FE: CliffVestForfeited
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Form vest baru | Field + dropdown | Alamat karyawan, jumlah, tanggal cliff, tipe vest. |
-| Dropdown tipe vest | Select | Retention / Probation / ESOP. |
-| Daftar vest | Tabel data | Jumlah, cliff, status (Locked/Claimed/Forfeited). |
-| Tombol batalkan | Tombol tulis | `cancelCliffVest(employee, vestId)`. |
-
-**Method/Algoritma Utama:**
-
-1. Validasi `cliffTs` di masa depan dan saldo vault mencukupi.
-2. Panggil `createCliffVest(employee, amount, cliffTs, vestType)`.
-3. Daftar vest dibaca dari `ponder.getVests`; pembatalan memanggil `cancelCliffVest`.
-
-#### 3.B.10 PHK (`/hr/phk`)
-
-**Deskripsi:** Antrian dan alur PHK multi-tanda tangan (HR mengajukan, Legal menyetujui, HR mengeksekusi), termasuk pembatalan proposal.
-**Aktor:** HR Admin dan Legal Officer (mode terbatas).
-**FR Terkait:** FR-PAYANA-501, FR-PAYANA-502, FR-PAYANA-503, FR-PAYANA-504.
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor HR
-    actor Legal as Legal Officer
-    participant V as CompanyVault
-    HR->>V: proposeTermination(employee, reasonHash)
-    V->>V: hrApproved=true, expiresAt=+7 hari, snapshot flowRate
-    V-->>HR: TerminationProposed
-    Legal->>V: approveTermination(employee)
-    V->>V: legalApproved=true (cek LEGAL_ROLE)
-    V-->>Legal: TerminationApproved
-    HR->>V: executeTermination(employee)
-    V->>V: hitung pesangon (UU Cipta Kerja) + top-up
-    V->>V: revoke SBT + forfeit vest + cancel stream
-    V-->>HR: SeveranceReleased + TerminationExecuted
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Form proposal | Field + tombol | Alamat karyawan + alasan (di-hash jadi `reasonHash`). |
-| Daftar proposal | Tabel data | Status `hrApproved`/`legalApproved`, kadaluarsa. |
-| Tombol setujui (Legal) | Tombol tulis | `approveTermination(employee)`. |
-| Tombol eksekusi | Tombol tulis | `executeTermination(employee)`. |
-| Tombol batalkan | Tombol tulis | `cancelProposal(employee)` sebelum disetujui Legal. |
-
-**Method/Algoritma Utama:**
-
-1. HR: hash alasan ke `reasonHash` (keccak256), panggil `proposeTermination(employee, reasonHash)`.
-2. Legal: panggil `approveTermination(employee)` (memerlukan `LEGAL_ROLE`).
-3. HR: panggil `executeTermination(employee)` (memerlukan kedua persetujuan dan belum kadaluarsa).
-4. Pembatalan memanggil `cancelProposal(employee)` selama belum disetujui Legal.
-
-#### 3.B.11 Audit HR (`/hr/audit`)
-
-**Deskripsi:** Riwayat aksi backend yang relevan dengan perusahaan (relay, ekspor kepatuhan, likuidasi, platform fee, peringatan saldo).
-**Aktor:** HR Admin.
-**FR Terkait:** FR-PAYANA-1002.
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor HR
-    participant FE as Frontend /hr/audit
-    participant BE as Backend (audit_logs)
-    FE->>BE: Ambil audit log perusahaan
-    BE-->>FE: daftar {action, actor, txHash, meta, createdAt}
-    FE-->>HR: Render riwayat aksi
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Tabel audit | Tabel data | Aksi (`BUNDLER_RELAY`, `COMPLIANCE_EXPORT`, `LOAN_LIQUIDATED`, `PLATFORM_FEE_PAID`, `LOW_VAULT_BALANCE_ALERT`), waktu, hash. |
-| Tautan transaksi | OnChainLink | Tautan ke Basescan untuk `txHash`. |
-
-**Method/Algoritma Utama:**
-
-1. Ambil entri `audit_logs` yang aktor/metanya terkait perusahaan HR.
-2. Render tabel terurut waktu dengan tautan transaksi.
-
-#### 3.B.12 Pengaturan HR (`/hr/settings`)
-
-**Deskripsi:** Konfigurasi parameter vault: BPS BPJS, BPS PPh21, dan threshold peringatan saldo rendah.
-**Aktor:** HR Admin.
-**FR Terkait:** FR-PAYANA-204, FR-PAYANA-802.
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor HR
-    participant FE as Frontend /hr/settings
-    participant V as CompanyVault
-    HR->>FE: Atur bpjsBps, pph21Bps, threshold
-    FE->>V: setCompanyConfig(bpjsBps, pph21Bps, lowBalanceThresholdBps)
-    V-->>FE: konfigurasi tersimpan
-    FE-->>HR: Konfirmasi
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Input BPJS Bps | Field angka | Tarif BPJS (informatif). |
-| Input PPh21 Bps | Field angka | Tarif PPh21 (informatif). |
-| Input Threshold Bps | Field angka | Ambang peringatan saldo rendah. |
-| Tombol Simpan | Tombol tulis | `setCompanyConfig(...)`. |
-
-**Method/Algoritma Utama:**
-
-1. Baca konfigurasi saat ini dari kontrak untuk prapengisian form.
-2. Panggil `setCompanyConfig(bpjsBps, pph21Bps, lowBalanceThresholdBps)` via `useContractWrite`.
-
-### 3.C Portal Karyawan (`/employee/*`)
-
-Seluruh halaman portal karyawan dibungkus oleh layout `employee/layout.tsx` dengan navigasi sisi karyawan dan role guard `useRole`. Karyawan diidentifikasi melalui stream aktif/paused pada Ponder.
-
-#### 3.C.1 EWA Dashboard (`/employee/ewa`)
-
-**Deskripsi:** Halaman utama karyawan yang menampilkan saldo gaji terakumulasi real-time, saldo Smart Account, vesting mendatang, dan riwayat klaim; menyediakan tombol "Tarik Gaji" gasless.
-**Aktor:** Karyawan.
-**FR Terkait:** FR-PAYANA-401, FR-PAYANA-402, FR-PAYANA-403, FR-PAYANA-405.
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor E as Karyawan
-    participant FE as Frontend /employee/ewa
-    participant PO as Ponder
-    participant V as CompanyVault
-    participant IDRX as IDRX ERC-20
-    FE->>PO: getStream / getClaims / getVests
-    PO-->>FE: data stream, klaim, vest
-    FE->>V: getAccrued(address)
-    V-->>FE: saldo terakumulasi (seed counter)
-    loop tiap 10 detik (NFR-10)
-        FE->>V: getAccrued(address)
-        V-->>FE: nilai terbaru
-    end
-    E->>FE: Klik "Tarik Gaji"
-    FE->>V: claimSalary() (jalur gasless ERC-4337)
-    V-->>FE: txHash + SalaryClaimed
-    FE->>IDRX: balanceOf(address) (refresh)
-    FE-->>E: Banner "Dana EWA berhasil ditarik"
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Kartu EWA gelap | Panel utama | `StreamCounter` real-time + flow rate per detik + status streaming. |
-| Tombol "Tarik Gaji" | Tombol tulis | Memicu `claimSalary()` (gasless); nonaktif jika `accruedWei == 0`. |
-| Kartu Smart Account | Panel data | Saldo IDRX (`balanceOf`) + alamat ringkas. |
-| Kartu Bonus Vesting | Panel data | Vest `Locked` terdekat + progress bar. |
-| Aktivitas Terakhir | Daftar | Lima klaim terakhir dari `getClaims`. |
-| Banner sukses | Alert + OnChainLink | Konfirmasi klaim + tautan transaksi. |
-
-**Method/Algoritma Utama:**
-
-1. Muat paralel `ponder.getStream`, `ponder.getClaims`, `ponder.getVests`; baca `balanceOf` IDRX.
-2. `fetchAccrued`: baca `getAccrued(address)` on-chain sebagai seed `StreamCounter`; polling tiap 10 detik (NFR-10).
-3. `handleClaim`: panggil `claimSalary()` melalui jalur write (gasless), tampilkan banner sukses, lalu refresh `getAccrued` dan `balanceOf`.
-
-#### 3.C.2 Absensi Karyawan (`/employee/attendance`)
-
-**Deskripsi:** Riwayat clock-in/clock-out dan status kehadiran harian karyawan.
-**Aktor:** Karyawan.
-**FR Terkait:** — (fitur pelengkap antarmuka tingkat aplikasi).
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor E as Karyawan
-    participant FE as Frontend /employee/attendance
-    E->>FE: Buka riwayat kehadiran
-    FE-->>E: Render tabel clock-in/out
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Tabel kehadiran | Tabel data | Tanggal, jam masuk, jam keluar, status. |
-| Tombol clock-in/out | Tombol | Mencatat kehadiran tingkat aplikasi. |
-
-**Method/Algoritma Utama:**
-
-1. Muat riwayat kehadiran tingkat aplikasi.
-2. Aksi clock-in/out memperbarui status harian.
-
-#### 3.C.3 Reimburse Karyawan (`/employee/reimburse`)
-
-**Deskripsi:** Formulir pengajuan reimbursement dan pemantauan status persetujuan HR.
-**Aktor:** Karyawan.
-**FR Terkait:** — (fitur pelengkap antarmuka tingkat aplikasi).
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor E as Karyawan
-    participant FE as Frontend /employee/reimburse
-    E->>FE: Isi keterangan, jumlah, unggah bukti
-    FE-->>E: Ajukan klaim
-    E->>FE: Pantau status persetujuan
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Form klaim | Field + unggah | Keterangan biaya, jumlah IDRX, bukti. |
-| Daftar status | Tabel data | Status persetujuan HR. |
-
-**Method/Algoritma Utama:**
-
-1. Submit klaim reimbursement tingkat aplikasi.
-2. Pantau status persetujuan dari HR.
-
-#### 3.C.4 Bounty Karyawan (`/employee/bounty`)
-
-**Deskripsi:** Daftar program bounty yang tersedia beserta tombol klaim hadiah IDRX setelah tugas selesai.
-**Aktor:** Karyawan.
-**FR Terkait:** — (fitur pelengkap antarmuka tingkat aplikasi).
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor E as Karyawan
-    participant FE as Frontend /employee/bounty
-    E->>FE: Lihat daftar bounty
-    E->>FE: Klaim hadiah setelah tugas selesai
-    FE-->>E: Status klaim diperbarui
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Daftar bounty | Grid kartu | Judul, deskripsi, hadiah IDRX. |
-| Tombol klaim | Tombol | Mengajukan klaim penyelesaian. |
-
-**Method/Algoritma Utama:**
-
-1. Muat daftar bounty terbuka.
-2. Ajukan klaim hadiah; tunggu verifikasi HR.
-
-#### 3.C.5 Koperasi Karyawan (`/employee/koperasi`)
-
-**Deskripsi:** Modul simpan-pinjam koperasi: deposit, penarikan, pinjam (maks 80% gaji bulanan), dan pelunasan manual.
-**Aktor:** Karyawan.
-**FR Terkait:** FR-PAYANA-701 s.d. FR-PAYANA-705.
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor E as Karyawan
-    participant FE as Frontend /employee/koperasi
-    participant PO as Ponder
-    participant IDRX as IDRX ERC-20
-    participant L as EmployeeLiquidityContract
-    FE->>PO: getPool / getDeposit / getLoan / getStream
-    PO-->>FE: data pool, deposit, pinjaman, stream
-    alt Simpan
-        E->>FE: Deposit nominal
-        FE->>IDRX: approve(liquidity, amount)
-        FE->>L: depositToPool(vaultAddress, amount)
-    else Pinjam
-        E->>FE: Pinjam (<= 80% gaji bulanan)
-        FE->>L: borrowFromPool(vaultAddress, amount)
-    else Lunasi
-        E->>FE: Bayar manual
-        FE->>IDRX: approve(liquidity, amount)
-        FE->>L: repayLoanManual(amount)
-    end
-    L-->>FE: event terkait
-    FE-->>E: Refresh saldo & pinjaman
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Tab Pinjam/Simpan | Tab navigasi | Beralih antara mode meminjam dan menyimpan. |
-| Kartu pool | Panel data | Total deposit, pinjaman berjalan, suku bunga. |
-| Slider/Input nominal | Field | Nominal pinjam/deposit; pinjam dibatasi `maxBorrow` (80% gaji bulanan). |
-| Indikator pelunasan | Progress bar | `repaidAmount / (principal + interest)`. |
-| Tombol aksi | Tombol tulis | `depositToPool`, `withdrawDeposit`, `borrowFromPool`, `repayLoanManual`. |
-
-**Method/Algoritma Utama:**
-
-1. Muat paralel `getPool(vaultAddress)`, `getDeposit(address)`, `getLoan(address)`, `getStream(address)`.
-2. Hitung `maxBorrow = floor(monthlySalary * 0.8)` dengan `monthlySalary = (flowRate/1e18) * 2.592.000`.
-3. Hitung `totalRepay = amount * (1 + interestRateBps/10000)` dan outstanding pinjaman.
-4. Aksi memanggil fungsi kontrak terkait (didahului `approve` untuk deposit/pelunasan), lalu `refreshData`.
-
-#### 3.C.6 Vesting Karyawan (`/employee/vesting`)
-
-**Deskripsi:** Daftar cliff vest milik karyawan beserta tombol klaim setelah cliff tercapai.
-**Aktor:** Karyawan.
-**FR Terkait:** FR-PAYANA-602, FR-PAYANA-604.
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor E as Karyawan
-    participant FE as Frontend /employee/vesting
-    participant PO as Ponder (cliff_vest)
-    participant V as CompanyVault
-    FE->>PO: getVests(address)
-    PO-->>FE: daftar vest + status
-    E->>FE: Klik klaim (cliff tercapai)
-    FE->>V: claimCliffVest(vestId)
-    V-->>FE: CliffVestClaimed + transfer IDRX
-    FE-->>E: Perbarui status menjadi Claimed
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Daftar vest | Tabel/grid | Jumlah terkunci, tanggal cliff, tipe, status. |
-| Badge status | Indikator | Locked / Claimed / Forfeited. |
-| Tombol klaim | Tombol tulis | `claimCliffVest(vestId)`; aktif hanya setelah cliff. |
-
-**Method/Algoritma Utama:**
-
-1. Muat `ponder.getVests(address)`; tampilkan status dan tanggal cliff.
-2. Tombol klaim aktif jika `block.timestamp >= cliffTs` dan status `Locked`.
-3. Panggil `claimCliffVest(vestId)`; perbarui status.
-
-#### 3.C.7 Transfer (`/employee/transfer`)
-
-**Deskripsi:** Transfer IDRX dari Smart Account karyawan ke alamat EVM eksternal menggunakan fungsi standar ERC-20.
-**Aktor:** Karyawan.
-**FR Terkait:** FR-PAYANA-401 (pendukung pencairan).
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor E as Karyawan
-    participant FE as Frontend /employee/transfer
-    participant IDRX as IDRX ERC-20
-    E->>FE: Isi alamat tujuan + nominal
-    FE->>IDRX: balanceOf(address) (validasi saldo)
-    E->>FE: Konfirmasi transfer
-    FE->>IDRX: transfer(recipient, amountWei)
-    IDRX-->>FE: Transfer event
-    FE-->>E: Konfirmasi pengiriman
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Input alamat tujuan | Field teks | Alamat EVM eksternal (mis. MetaMask/bursa). |
-| Input nominal | Field angka | Jumlah IDRX yang dikirim. |
-| Kartu saldo | Panel data | Saldo IDRX terkini. |
-| Tombol kirim | Tombol tulis | `transfer(recipient, amountWei)`. |
-
-**Method/Algoritma Utama:**
-
-1. Baca `balanceOf(address)` untuk validasi kecukupan saldo.
-2. Konversi nominal ke wei; panggil `transfer(recipient, amountWei)` pada IDRX.
-
-#### 3.C.8 Pesangon (`/employee/severance`)
-
-**Deskripsi:** Tampilan saldo pesangon yang terakumulasi on-chain (2% dari setiap klaim) beserta status dan estimasi besaran berdasarkan masa kerja.
-**Aktor:** Karyawan.
-**FR Terkait:** FR-PAYANA-505, FR-PAYANA-506.
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor E as Karyawan
-    participant FE as Frontend /employee/severance
-    participant V as CompanyVault
-    participant PO as Ponder (severance_vault)
-    FE->>V: getSeveranceBalance(address)
-    V-->>FE: amount terakumulasi
-    FE->>PO: severance_vault (state, tenureMonths)
-    PO-->>FE: status + masa kerja
-    FE-->>E: Tampilkan saldo + estimasi pesangon
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Kartu saldo pesangon | Panel data | `getSeveranceBalance(address)`. |
-| Badge status | Indikator | Locked / Released / Returned. |
-| Estimasi pesangon | Panel info | Estimasi berdasarkan masa kerja (UU Cipta Kerja). |
-
-**Method/Algoritma Utama:**
-
-1. Baca `getSeveranceBalance(address)` on-chain dan `severance_vault` terindeks.
-2. Tampilkan status (Locked/Released/Returned) dan estimasi statutori berdasarkan `tenureMonths`.
-
-#### 3.C.9 Audit Karyawan (`/employee/audit`)
-
-**Deskripsi:** Riwayat klaim gaji dan transaksi koperasi milik karyawan yang login.
-**Aktor:** Karyawan.
-**FR Terkait:** FR-PAYANA-1002 (transparansi pribadi).
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor E as Karyawan
-    participant FE as Frontend /employee/audit
-    participant PO as Ponder
-    FE->>PO: getClaims(address)
-    PO-->>FE: riwayat klaim
-    FE-->>E: Render daftar transaksi
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Tabel riwayat | Tabel data | Klaim gaji + transaksi koperasi, waktu, jumlah IDRX. |
-| Tautan transaksi | OnChainLink | Tautan Basescan per transaksi. |
-
-**Method/Algoritma Utama:**
-
-1. Ambil `ponder.getClaims(address)`; render terurut waktu.
-2. Sertakan tautan transaksi ke Basescan.
-
-#### 3.C.10 Pengaturan Karyawan (`/employee/settings`)
-
-**Deskripsi:** Pembaruan profil PII karyawan (nama, NIK 16 digit, telepon) yang disimpan terenkripsi.
-**Aktor:** Karyawan.
-**FR Terkait:** FR-PAYANA-104, FR-PAYANA-105.
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor E as Karyawan
-    participant FE as Frontend /employee/settings
-    participant BE as Backend /auth/profile
-    participant DB as PostgreSQL (employees, AES-GCM)
-    FE->>BE: GET /auth/profile (Bearer JWT)
-    BE->>DB: SELECT + decrypt
-    BE-->>FE: {name, nik, phone}
-    E->>FE: Perbarui field
-    FE->>BE: POST /auth/profile {name, nik, phone}
-    BE->>DB: encrypt (AES-256-GCM) + upsert
-    BE-->>FE: {success: true}
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Input nama | Field teks | Nama lengkap. |
-| Input NIK | Field teks | Harus tepat 16 digit numerik. |
-| Input telepon | Field teks | Nomor telepon. |
-| Tombol simpan | Tombol | `POST /auth/profile`. |
-
-**Method/Algoritma Utama:**
-
-1. Ambil profil terkini via `backend.getProfile(token)`; prapengisian form.
-2. Validasi NIK 16 digit; submit `POST /auth/profile` (server mengenkripsi AES-256-GCM).
-
-### 3.D Portal Owner SaaS (`/owner`)
-
-**Deskripsi:** Dashboard agregat operator platform: TVL, jumlah tenant aktif, estimasi pendapatan platform fee, antrian registrasi HR, serta konfigurasi platform fee dan fungsi darurat.
-**Aktor:** Owner SaaS.
-**FR Terkait:** FR-PAYANA-1002, FR-PAYANA-1004, FR-PAYANA-1006, FR-PAYANA-1008, FR-PAYANA-108, FR-PAYANA-109.
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor O as Owner
-    participant FE as Frontend /owner
-    participant BE as Backend /registration
-    participant PO as Ponder
-    participant F as PayrollFactory
-    FE->>FE: Owner guard (address == OWNER_ADDRESS)
-    FE->>BE: GET /registration/pending (Bearer JWT)
-    BE-->>FE: antrian registrasi
-    FE->>PO: getCompanies / getPlatformFees
-    PO-->>FE: tenant + estimasi pendapatan
-    O->>FE: Setujui registrasi
-    FE->>BE: PATCH /registration/:address/approve
-    O->>FE: Tolak registrasi
-    FE->>BE: DELETE /registration/:address
-    O->>FE: Set platform fee / freeze
-    FE->>F: setPlatformFee(bps) / emergencyFreezeAll()
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Kartu metrik | Panel data | TVL, jumlah tenant (`getCompanies`/`getTotalVaults`), estimasi fee. |
-| Grafik pendapatan | AreaChart | Tren pendapatan platform. |
-| Tab registrasi | Tab + tabel | Pending / Approved / Rejected. |
-| Tombol setujui/tolak | Grup tombol | `approve` / `reject` registrasi. |
-| Form platform fee | Field + tombol | `setPlatformFee(bps)` (maks 100 bps). |
-| Tombol freeze darurat | Tombol tulis | `emergencyFreezeAll()`. |
-
-**Method/Algoritma Utama:**
-
-1. Owner guard: bandingkan `address` dengan `NEXT_PUBLIC_OWNER_ADDRESS`; jika tidak cocok, redirect ke `/login`.
-2. Muat `registration.getPending(token)` dan `ponder.getCompanies()`/`ponder.getPlatformFees()`.
-3. `handleApprove`/`handleReject` memanggil endpoint registrasi lalu refresh.
-4. Konfigurasi fee via `setPlatformFee(bps)`; pembekuan via `emergencyFreezeAll()`.
-
-### 3.E Portal Legal Officer
-
-**Deskripsi:** Legal Officer tidak memiliki prefiks rute tersendiri; perannya difokuskan pada persetujuan PHK melalui antarmuka `/hr/phk` dalam mode terbatas.
-**Aktor:** Legal Officer.
-**FR Terkait:** FR-PAYANA-502.
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor Legal as Legal Officer
-    participant FE as Frontend /hr/phk (mode Legal)
-    participant V as CompanyVault
-    FE->>FE: useRole deteksi LEGAL_ROLE pada vault
-    FE-->>Legal: Tampilkan hanya proposal menunggu persetujuan
-    Legal->>V: approveTermination(employee)
-    V-->>Legal: TerminationApproved
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Daftar proposal menunggu | Tabel data | Hanya proposal yang `legalApproved == false`. |
-| Tombol setujui | Tombol tulis | `approveTermination(employee)`. |
-
-**Method/Algoritma Utama:**
-
-1. `useRole` mengiterasi `getCompanies()` dan memeriksa `hasRole(LEGAL_ROLE, address)` per vault.
-2. Pada mode Legal, antarmuka hanya menampilkan proposal menunggu dan tombol `approveTermination`.
-3. Legal Officer tidak dapat mengajukan proposal, mengelola stream, atau mengakses treasury.
-
----
-
-## 4. Perancangan Data
 
 ### 4.1 ERD On-Chain (Solidity Structs & Mappings)
 
@@ -1878,237 +1603,6 @@ erDiagram
 | `employment_certificate` | `id` | `EmploymentCertified/Revoked` | `/verify` |
 | `encrypted_salary` | `employee` | `EncryptedSalarySet` | portal FHE |
 | `low_balance_alert` | `id` | `LowVaultBalance` | `/hr/vault` |
-
----
-
-### 4.4 Physical Data Model (PDM)
-
-Berikut adalah Physical Data Model sistem Payana:
-
-```mermaid
-erDiagram
-
-    %% ════════════════════════════════════════════════════════════════
-    %% PONDER SCHEMA (public) — on-chain indexed tables
-    %% ════════════════════════════════════════════════════════════════
-
-    company {
-        hex id PK
-        text name
-        text status
-        bigint vaultBalance
-        bigint createdAt
-    }
-
-    employee_stream {
-        hex id PK
-        hex hrAuthority FK
-        bigint flowRate
-        bigint startTs
-        text status
-        int employeeBps
-        int complianceBps
-        int severanceBps
-    }
-
-    salary_claim {
-        text id PK
-        hex employee FK
-        hex hr_authority FK
-        bigint accrued
-        bigint net_to_employee
-        bigint to_compliance
-        bigint to_severance
-        bigint block_number
-        bigint timestamp
-    }
-
-    severance_vault {
-        hex id PK
-        hex hrAuthority FK
-        bigint amount
-        text state
-        bigint lastUpdated
-    }
-
-    termination_proposal {
-        hex id PK
-        hex hrAuthority FK
-        boolean hrApproved
-        boolean legalApproved
-        bigint expiresAt
-        bigint proposedAt
-        bigint executedAt
-        boolean cancelled
-    }
-
-    cliff_vest {
-        text id PK
-        hex employee FK
-        hex hrAuthority FK
-        bigint vestId
-        bigint amount
-        bigint cliffTs
-        text vestType
-        text status
-        bigint createdAt
-    }
-
-    compliance_vault {
-        hex id PK
-        bigint accumulated
-        bigint lastUpdated
-    }
-
-    liquidity_pool {
-        hex id PK
-        int interestRateBps
-        bigint totalDeposited
-        bigint totalLoansOutstanding
-        bigint createdAt
-    }
-
-    lender_deposit {
-        hex id PK
-        hex company_address FK
-        bigint principal
-        bigint yield_earned
-        bigint last_updated
-    }
-
-    loan_record {
-        hex id PK
-        hex company_address FK
-        bigint principal
-        bigint interest
-        bigint repaid_amount
-        bigint due_ts
-        text status
-        bigint created_at
-    }
-
-    employment_certificate {
-        hex id PK
-        bigint token_id
-        hex hr_authority FK
-        text company_name
-        bigint issued_at
-        bigint revoked_at
-        boolean active
-    }
-
-    platform_fee_payment {
-        text id PK
-        hex hr_authority FK
-        hex employee
-        bigint amount
-        bigint timestamp
-    }
-
-    encrypted_salary {
-        hex id PK
-        hex hr_authority FK
-        bigint set_at
-        bigint updated_at
-    }
-
-    auditor_grant {
-        text id PK
-        hex hr_authority FK
-        hex auditor
-        bigint expires_at
-        bigint granted_at
-        boolean active
-    }
-
-    low_balance_alert {
-        text id PK
-        hex hrAuthority FK
-        bigint balance
-        bigint monthlyNeed
-        bigint timestamp
-    }
-
-    %% ════════════════════════════════════════════════════════════════
-    %% APP SCHEMA (app) — off-chain backend tables
-    %% ════════════════════════════════════════════════════════════════
-
-    rate_limits {
-        text employee_address PK
-        int claim_count
-        timestamp window_start
-    }
-
-    audit_logs {
-        bigint id PK
-        text action
-        text actor
-        text tx_hash
-        text meta
-        timestamp created_at
-    }
-
-    webhook_events {
-        text id PK
-        text type
-        boolean processed
-        timestamp received_at
-    }
-
-    employees {
-        text address PK
-        text name
-        text nik
-        text phone
-        timestamp created_at
-        timestamp updated_at
-    }
-
-    sessions {
-        text jti PK
-        text address FK
-        timestamp expires_at
-        timestamp created_at
-    }
-
-    pending_registrations {
-        text address PK
-        text email
-        text name
-        text hr_address
-        text status
-        timestamptz requested_at
-        timestamptz updated_at
-    }
-
-    %% ════════════════════════════════════════════════════════════════
-    %% RELATIONS
-    %% ════════════════════════════════════════════════════════════════
-
-    company ||--o{ employee_stream : "has"
-    company ||--o{ severance_vault : "holds"
-    company ||--o{ termination_proposal : "initiates"
-    company ||--o{ cliff_vest : "grants"
-    company ||--o{ salary_claim : "pays"
-    company ||--o| compliance_vault : "owns"
-    company ||--o| liquidity_pool : "manages"
-    company ||--o{ lender_deposit : "receives"
-    company ||--o{ loan_record : "lends"
-    company ||--o{ employment_certificate : "issues"
-    company ||--o{ platform_fee_payment : "incurs"
-    company ||--o{ encrypted_salary : "stores"
-    company ||--o{ auditor_grant : "delegates"
-    company ||--o{ low_balance_alert : "triggers"
-
-    employee_stream ||--o{ salary_claim : "generates"
-    employee_stream ||--o| severance_vault : "accrues"
-    employee_stream ||--o| employment_certificate : "certifies"
-    employee_stream ||--o| rate_limits : "limits"
-
-    employees ||--o| sessions : "authenticates"
-    employees ||--o{ salary_claim : "receives"
-    employees ||--o| rate_limits : "tracked_by"
-```
 
 ---
 
@@ -2445,1295 +1939,1311 @@ Bagian ini mendokumentasikan struct Solidity yang mendefinisikan state storage d
 
 ---
 
-## 5. Perancangan Komponen
+#### 2.3.2 Physical Data Model
 
-Bab ini merinci rancangan tiap komponen perangkat lunak Payana pada tiga lapisan implementasi: smart contract (5.1), backend API (5.2), dan frontend (5.3). Setiap fungsi, endpoint, dan hook didokumentasikan beserta visibilitas/proteksi, kebutuhan fungsional terkait, dan algoritma bernomor. Untuk fungsi-fungsi kompleks disertakan diagram urutan.
 
-### 5.1 Perancangan Smart Contract
-
-Seluruh kontrak dikompilasi dengan Solidity 0.8.26 dan OpenZeppelin Contracts v5. Seluruh nilai moneter dinyatakan dalam IDRX (18 desimal, 1 IDRX = 1 IDR). Pustaka `PayrollMath` menyediakan konstanta `SECONDS_PER_MONTH`, fungsi `calcAccrued(flowRate, lastTs)`, `bpsOf(amount, bps)`, `validateSplits(...)`, dan `severanceMultiplier(tenureMonths)`.
-
-Pola keamanan yang diterapkan secara konsisten:
-
-- **Checks-Effects-Interactions (CEI):** seluruh perubahan state dilakukan sebelum transfer eksternal.
-- **ReentrancyGuard:** modifier `nonReentrant` pada fungsi yang mentransfer IDRX.
-- **AccessControl berbasis peran:** modifier per peran (`onlyHR`, `onlyOps`, `onlyPayroll`, `onlyRole`).
-- **SafeERC20:** `safeTransfer`/`safeTransferFrom` untuk seluruh perpindahan token.
-- **Custom errors:** revert hemat gas dengan pesan terstruktur.
-
-#### 5.1.1 PayrollFactory
-
-Kontrak entry-point SaaS yang men-deploy `CompanyVault` terisolasi per tenant (Factory Pattern). Mewarisi `AccessControl`.
+Berikut adalah Physical Data Model sistem Payana:
 
 ```mermaid
-classDiagram
-    class PayrollFactory {
-        +bytes32 SUPERADMIN_ROLE
-        +uint16 MAX_PLATFORM_FEE_BPS = 100
-        +address IDRX
-        +address protocolTreasury
-        +uint16 platformFeeBps
-        +mapping companyVaults
-        +address[] allVaults
-        +constructor(idrx, superAdmin, protocolTreasury)
-        +setPlatformFee(uint16 bps)
-        +setProtocolTreasury(address newTreasury)
-        +deployVault(hrAuthority, companyName, liquidityContract, sbtContract) address
-        +emergencyFreezeAll()
-        +getTotalVaults() uint256
+erDiagram
+
+    %% ════════════════════════════════════════════════════════════════
+    %% PONDER SCHEMA (public) — on-chain indexed tables
+    %% ════════════════════════════════════════════════════════════════
+
+    company {
+        hex id PK
+        text name
+        text status
+        bigint vaultBalance
+        bigint createdAt
     }
-```
 
-**State Variables:** `IDRX` (immutable), `protocolTreasury`, `platformFeeBps`, `companyVaults` (HR → vault), `allVaults` (array seluruh vault).
-
-**Events:** `VaultDeployed(hrAuthority, vaultAddress, companyName)`, `PlatformFeeUpdated(newBps)`, `ProtocolTreasuryUpdated(newTreasury)`.
-
-##### deployVault(hrAuthority, companyName, liquidityContract, sbtContract)
-
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external |
-| Modifier | `onlyRole(SUPERADMIN_ROLE)` |
-| Return | `address` (alamat vault baru) |
-| FR Terkait | FR-PAYANA-201, FR-PAYANA-1001 |
-
-**Algoritma (Check → Effect → Interaction):**
-
-1. **Check:** tolak `hrAuthority == address(0)` (`InvalidHRAddress`); tolak jika `companyVaults[hrAuthority] != 0` (`HRAlreadyHasVault`).
-2. **Effect/Interaction:** deploy `new CompanyVault(IDRX, hrAuthority, companyName, liquidityContract, sbtContract)`.
-3. **Effect:** catat alamat ke `companyVaults[hrAuthority]` dan `allVaults.push(vault)`.
-4. **Effect:** emit `VaultDeployed(hrAuthority, vault, companyName)`; kembalikan alamat vault.
-
-##### setPlatformFee(bps)
-
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external |
-| Modifier | `onlyRole(SUPERADMIN_ROLE)` |
-| FR Terkait | FR-PAYANA-1006 |
-
-**Algoritma:** Check `bps <= MAX_PLATFORM_FEE_BPS (100)` (`FeeTooHigh`); set `platformFeeBps = bps`; emit `PlatformFeeUpdated`.
-
-##### setProtocolTreasury(newTreasury)
-
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external |
-| Modifier | `onlyRole(SUPERADMIN_ROLE)` |
-| FR Terkait | FR-PAYANA-1008 |
-
-**Algoritma:** Check `newTreasury != address(0)`; set `protocolTreasury`; emit `ProtocolTreasuryUpdated`. Memungkinkan migrasi ke multisig.
-
-##### emergencyFreezeAll()
-
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external |
-| Modifier | `onlyRole(SUPERADMIN_ROLE)` |
-| FR Terkait | FR-PAYANA-1004 |
-
-**Algoritma:** Iterasi `allVaults`; untuk setiap vault panggil `freezeVault()`. Biaya gas linear terhadap jumlah vault.
-
-##### getTotalVaults()
-
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external view |
-| Return | `uint256` |
-| FR Terkait | FR-PAYANA-1002 |
-
-**Algoritma:** Kembalikan `allVaults.length`.
-
-#### 5.1.2 CompanyVault
-
-Kontrak payroll per perusahaan: streaming gaji, split 93/5/2, PHK multi-sig, cliff vesting, dan kepatuhan. Mewarisi `ICompanyVault`, `ReentrancyGuard`, `AccessControl`.
-
-```mermaid
-classDiagram
-    class CompanyVault {
-        +bytes32 HR_ROLE
-        +bytes32 LEGAL_ROLE
-        +uint16 DEFAULT_EMPLOYEE_BPS = 9300
-        +uint16 DEFAULT_COMPLIANCE_BPS = 500
-        +uint16 DEFAULT_SEVERANCE_BPS = 200
-        +uint256 TERMINATION_EXPIRY = 7 days
-        +uint16 DEFAULT_POOL_RATE_BPS = 150
-        +IERC20 IDRX
-        +address hrAuthority
-        +VaultStatus status
-        +uint256 vaultBalance
-        +uint256 complianceBalance
-        +uint256 totalFlowRate
-        +mapping employeeStreams
-        +mapping severanceVaults
-        +mapping terminations
-        +mapping cliffVests
+    employee_stream {
+        hex id PK
+        hex hrAuthority FK
+        bigint flowRate
+        bigint startTs
+        text status
+        int employeeBps
+        int complianceBps
+        int severanceBps
     }
-    CompanyVault <|-- ConfidentialCompanyVault
-    CompanyVault ..> IEmployeeLiquidity : autoRepay
-    CompanyVault ..> IEmploymentSBT : mint/revoke
-    CompanyVault ..> IPayrollFactory : platformFeeBps
+
+    salary_claim {
+        text id PK
+        hex employee FK
+        hex hr_authority FK
+        bigint accrued
+        bigint net_to_employee
+        bigint to_compliance
+        bigint to_severance
+        bigint block_number
+        bigint timestamp
+    }
+
+    severance_vault {
+        hex id PK
+        hex hrAuthority FK
+        bigint amount
+        text state
+        bigint lastUpdated
+    }
+
+    termination_proposal {
+        hex id PK
+        hex hrAuthority FK
+        boolean hrApproved
+        boolean legalApproved
+        bigint expiresAt
+        bigint proposedAt
+        bigint executedAt
+        boolean cancelled
+    }
+
+    cliff_vest {
+        text id PK
+        hex employee FK
+        hex hrAuthority FK
+        bigint vestId
+        bigint amount
+        bigint cliffTs
+        text vestType
+        text status
+        bigint createdAt
+    }
+
+    compliance_vault {
+        hex id PK
+        bigint accumulated
+        bigint lastUpdated
+    }
+
+    liquidity_pool {
+        hex id PK
+        int interestRateBps
+        bigint totalDeposited
+        bigint totalLoansOutstanding
+        bigint createdAt
+    }
+
+    lender_deposit {
+        hex id PK
+        hex company_address FK
+        bigint principal
+        bigint yield_earned
+        bigint last_updated
+    }
+
+    loan_record {
+        hex id PK
+        hex company_address FK
+        bigint principal
+        bigint interest
+        bigint repaid_amount
+        bigint due_ts
+        text status
+        bigint created_at
+    }
+
+    employment_certificate {
+        hex id PK
+        bigint token_id
+        hex hr_authority FK
+        text company_name
+        bigint issued_at
+        bigint revoked_at
+        boolean active
+    }
+
+    platform_fee_payment {
+        text id PK
+        hex hr_authority FK
+        hex employee
+        bigint amount
+        bigint timestamp
+    }
+
+    encrypted_salary {
+        hex id PK
+        hex hr_authority FK
+        bigint set_at
+        bigint updated_at
+    }
+
+    auditor_grant {
+        text id PK
+        hex hr_authority FK
+        hex auditor
+        bigint expires_at
+        bigint granted_at
+        boolean active
+    }
+
+    low_balance_alert {
+        text id PK
+        hex hrAuthority FK
+        bigint balance
+        bigint monthlyNeed
+        bigint timestamp
+    }
+
+    %% ════════════════════════════════════════════════════════════════
+    %% APP SCHEMA (app) — off-chain backend tables
+    %% ════════════════════════════════════════════════════════════════
+
+    rate_limits {
+        text employee_address PK
+        int claim_count
+        timestamp window_start
+    }
+
+    audit_logs {
+        bigint id PK
+        text action
+        text actor
+        text tx_hash
+        text meta
+        timestamp created_at
+    }
+
+    webhook_events {
+        text id PK
+        text type
+        boolean processed
+        timestamp received_at
+    }
+
+    employees {
+        text address PK
+        text name
+        text nik
+        text phone
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    sessions {
+        text jti PK
+        text address FK
+        timestamp expires_at
+        timestamp created_at
+    }
+
+    pending_registrations {
+        text address PK
+        text email
+        text name
+        text hr_address
+        text status
+        timestamptz requested_at
+        timestamptz updated_at
+    }
+
+    %% ════════════════════════════════════════════════════════════════
+    %% RELATIONS
+    %% ════════════════════════════════════════════════════════════════
+
+    company ||--o{ employee_stream : "has"
+    company ||--o{ severance_vault : "holds"
+    company ||--o{ termination_proposal : "initiates"
+    company ||--o{ cliff_vest : "grants"
+    company ||--o{ salary_claim : "pays"
+    company ||--o| compliance_vault : "owns"
+    company ||--o| liquidity_pool : "manages"
+    company ||--o{ lender_deposit : "receives"
+    company ||--o{ loan_record : "lends"
+    company ||--o{ employment_certificate : "issues"
+    company ||--o{ platform_fee_payment : "incurs"
+    company ||--o{ encrypted_salary : "stores"
+    company ||--o{ auditor_grant : "delegates"
+    company ||--o{ low_balance_alert : "triggers"
+
+    employee_stream ||--o{ salary_claim : "generates"
+    employee_stream ||--o| severance_vault : "accrues"
+    employee_stream ||--o| employment_certificate : "certifies"
+    employee_stream ||--o| rate_limits : "limits"
+
+    employees ||--o| sessions : "authenticates"
+    employees ||--o{ salary_claim : "receives"
+    employees ||--o| rate_limits : "tracked_by"
 ```
 
-**Konstanta:** `DEFAULT_EMPLOYEE_BPS=9300`, `DEFAULT_COMPLIANCE_BPS=500`, `DEFAULT_SEVERANCE_BPS=200`, `TERMINATION_EXPIRY=7 days`, `DEFAULT_POOL_RATE_BPS=150`.
+---
 
-**Custom Errors:** `VaultFrozen`, `InsufficientVaultBalance`, `StreamAlreadyActive`, `StreamNotActive`, `NotWhitelisted`, `NothingToClaim`, `SplitInvalid`, `TerminationAlreadyProposed`, `TerminationNotFound`, `ProposalExpired`, `AlreadyApproved`, `NotVestedYet`, `AlreadyClaimed`, `VestNotFound`, `SeveranceAlreadySettled`, `InsufficientComplianceBalance`, `CliffNotReached`, `VestAlreadySettled`, `Unauthorized`, `NoActiveProposal`.
 
-**Modifier:** `onlyHR` (cek `HR_ROLE`), `vaultActive` (status harus `Active`), `validTermination(employee)` (hrApproved && legalApproved && belum kadaluarsa).
+### 2.4 Perancangan Antarmuka
 
-##### constructor
 
-Disetel oleh `PayrollFactory`. Set `IDRX`, `factory=msg.sender`, `hrAuthority`, `companyName`, `status=Active`. Berikan `DEFAULT_ADMIN_ROLE`, `HR_ROLE`, dan `LEGAL_ROLE` ke `hrAuthority`. Inisialisasi pool koperasi via `liquidityContract.initializePool(address(this), DEFAULT_POOL_RATE_BPS)` (dibungkus try/catch). Emit `VaultInitialized`.
+Frontend Payana menyajikan empat portal yang dipisahkan berdasarkan hasil resolusi peran (hook `useRole`). Routing dilakukan dengan App Router Next.js, dan setiap portal dilindungi oleh role guard berbasis peran on-chain.
 
-##### fundVault(amount)
+| Portal | Prefiks URL | Aktor | Mekanisme Deteksi Peran |
+|--------|-------------|-------|--------------------------|
+| Autentikasi & Onboarding | `/`, `/login`, `/onboarding`, `/verify` | Publik / calon HR | Belum terautentikasi atau belum memiliki peran |
+| Portal HR | `/hr/*` | HR Admin | `PayrollFactory.companyVaults(address) != 0` |
+| Portal Karyawan | `/employee/*` | Karyawan | Stream aktif/paused di Ponder |
+| Portal Owner SaaS | `/owner` | Owner SaaS | `address == NEXT_PUBLIC_OWNER_ADDRESS` |
+| Portal Legal Officer | (memanfaatkan `/hr/phk`) | Legal Officer | `CompanyVault.hasRole(LEGAL_ROLE, address)` |
 
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external override |
-| Modifier | `onlyHR` |
-| FR Terkait | FR-PAYANA-202 |
+Urutan prioritas deteksi peran (sesuai FR-PAYANA-106): Owner → HR → Legal → Karyawan. Pengguna yang tidak memenuhi kriteria peran apa pun diarahkan ke halaman onboarding.
 
-**Algoritma:** `safeTransferFrom(msg.sender, this, amount)`; `vaultBalance += amount`; emit `VaultFunded`.
+---
 
-##### withdrawVault(amount, recipient)
 
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external override |
-| Modifier | `onlyHR nonReentrant` |
-| FR Terkait | FR-PAYANA-203 |
+Bab ini merinci rancangan antarmuka pengguna Payana per portal. Setiap halaman dideskripsikan beserta rute App Router, fungsi utama, aktor pengakses, kebutuhan fungsional terkait, alur interaksi (sequence diagram), deskripsi komponen antarmuka, serta method/algoritma utama yang menggerakkan halaman tersebut. Seluruh halaman menggunakan komponen Shadcn/UI di atas Tailwind CSS 4, animasi `framer-motion`, grafik `recharts`, dan ikon `lucide-react`.
 
-**Algoritma (CEI):**
+Setiap halaman mengikuti satu dari dua pola interaksi on-chain:
 
-1. **Check:** `vaultBalance >= amount` (`InsufficientVaultBalance`).
-2. **Effect:** `vaultBalance -= amount`; panggil `_checkLowBalance()`.
-3. **Interaction:** `safeTransfer(recipient, amount)`; emit `VaultWithdrawn`.
+1. **Pola tulis langsung (`useContractWrite`)** untuk aksi HR, Owner, dan Legal. Transaksi ditandatangani dan biaya gasnya dibayar oleh wallet pengguna melalui embedded wallet Privy. Hook melakukan `switchChain(84532)` sebelum penandatanganan, lalu memanggil `walletClient.writeContract`.
+2. **Pola relay gasless (ERC-4337)** yang dikhususkan untuk `claimSalary()` karyawan. UserOperation ditandatangani secara silent oleh Privy lalu direlay melalui `POST /bundler/relay` dan disponsori Paymaster.
 
-##### setCompanyConfig(bpjsBps, pph21Bps, lowBalanceThresholdBps)
+Pembacaan data terbagi menjadi dua sumber: (a) pembacaan agregat historis melalui klien `ponder` di `lib/api.ts`, dan (b) pembacaan nilai real-time on-chain (mis. `getAccrued`) melalui `publicClient.readContract` (viem).
 
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external override |
-| Modifier | `onlyHR` |
-| FR Terkait | FR-PAYANA-204, FR-PAYANA-802 |
+#### 2.4.1 Halaman Autentikasi dan Onboarding
 
-**Algoritma:** Set `bpjsBps`, `pph21Bps`, `lowBalanceThresholdBps`. Nilai BPJS/PPh21 bersifat informatif (tidak memengaruhi split langsung).
+##### 2.4.1.1 Halaman Landing (`/`)
 
-##### pauseVault() / resumeVault() / freezeVault()
-
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external override |
-| Modifier | `pauseVault`/`resumeVault`: `onlyHR`; `freezeVault`: factory atau `DEFAULT_ADMIN_ROLE` |
-| FR Terkait | FR-PAYANA-205, FR-PAYANA-206 |
-
-**Algoritma:**
-
-- `pauseVault`: tolak jika `status == Frozen`; set `status = Paused`; emit `VaultPaused`.
-- `resumeVault`: tolak jika `status == Frozen`; set `status = Active`; emit `VaultResumed`.
-- `freezeVault`: hanya `factory` atau pemegang `DEFAULT_ADMIN_ROLE` (`Unauthorized`); set `status = Frozen` (irreversible); emit `VaultFreeze`.
-
-##### startStream(employee, flowRate, employeeSplitBps, complianceSplitBps, severanceSplitBps)
-
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external override |
-| Modifier | `onlyHR vaultActive` |
-| FR Terkait | FR-PAYANA-301, FR-PAYANA-901 |
+**Deskripsi:** Halaman pemasaran publik yang memperkenalkan proposisi nilai Payana (penggajian real-time, gasless, zero Web3 knowledge) dan menyediakan jalur masuk ke aplikasi.
+**Aktor:** Publik (tanpa autentikasi).
+**FR Terkait:** — (halaman informatif; pendukung FR-PAYANA-101).
 
 **Alur Interaksi:**
 
 ```mermaid
 sequenceDiagram
-    actor HR
-    participant V as CompanyVault
-    participant SBT as EmploymentSBT
-    HR->>V: startStream(employee, flowRate, splits)
-    V->>V: validateSplits == 10000 (SplitInvalid)
-    V->>V: cek stream belum Active (StreamAlreadyActive)
-    V->>V: simpan employeeStreams + severanceVaults(Locked)
-    V->>V: totalFlowRate += flowRate
-    V->>SBT: mint(employee, companyName, msg.sender) [try/catch]
-    SBT-->>V: tokenId + Locked
-    V-->>HR: StreamCreated + EmploymentCertified
+    participant U as Pengunjung
+    participant FE as Frontend (Landing)
+    U->>FE: Buka root URL "/"
+    FE-->>U: Render konten pemasaran statis
+    U->>FE: Klik "Masuk"
+    FE-->>U: Navigasi ke /login
 ```
 
-**Algoritma:**
+**Deskripsi Antarmuka:**
 
-1. **Check:** `PayrollMath.validateSplits(...)` harus total 10.000 bps (`SplitInvalid`); stream belum `Active` (`StreamAlreadyActive`).
-2. **Effect:** buat `EmployeeStream` (status `Active`, `startTs/lastWithdrawnTs = now`, `settledBalance=0`, splits); buat `SeveranceVault` (`Locked`); `totalFlowRate += flowRate`.
-3. **Effect:** emit `StreamCreated`.
-4. **Interaction:** `sbtContract.mint(employee, companyName, msg.sender)` (try/catch); emit `EmploymentCertified` jika berhasil.
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Hero Section | Section statis | Headline proposisi nilai dan ringkasan fitur Payana. |
+| Tombol "Masuk" | Tautan (`<Link>`) | Mengarahkan ke `/login`. |
+| Bagian Fitur | Grid kartu | Menjelaskan EWA real-time, gasless, dan kepatuhan otomatis. |
 
-##### pauseStream / resumeStream / updateFlowRate / updateStreamSplits / cancelStream
+**Method/Algoritma Utama:**
 
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external override |
-| Modifier | `onlyHR` |
-| FR Terkait | FR-PAYANA-302 s.d. FR-PAYANA-306 |
+1. Render konten statis tanpa pemanggilan kontrak atau backend.
+2. Saat tombol "Masuk" ditekan, navigasi App Router ke `/login`.
 
-**Algoritma:**
+##### 2.4.1.2 Halaman Login (`/login`)
 
-- `pauseStream(employee)`: stream harus `Active` (`StreamNotActive`); settle `settledBalance += calcAccrued(flowRate, lastWithdrawnTs)`; `lastWithdrawnTs = now`; set `Paused`; emit `StreamPaused`.
-- `resumeStream(employee)`: stream harus `Paused`; `lastWithdrawnTs = now`; set `Active`; emit `StreamResumed`.
-- `updateFlowRate(employee, newFlowRate)`: stream harus `Active`; settle dahulu pada rate lama; `totalFlowRate = totalFlowRate - old + new`; set `flowRate = newFlowRate`; emit `FlowRateUpdated`.
-- `updateStreamSplits(employee, ...)`: stream `Active`/`Paused`; validasi split = 10.000; settle jika `Active`; set splits baru; emit `StreamSplitsUpdated`.
-- `cancelStream(employee)`: tolak jika sudah `Cancelled`/`Inactive`; jika `Active` settle dan kurangi `totalFlowRate`; set `Cancelled`; emit `StreamCancelled`.
-
-##### claimSalary()
-
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external override |
-| Modifier | `nonReentrant vaultActive` |
-| FR Terkait | FR-PAYANA-401, FR-PAYANA-1007 |
+**Deskripsi:** Autentikasi tanpa kata sandi berbasis tanda tangan kriptografi EIP-191 menggunakan embedded wallet Privy.
+**Aktor:** Seluruh pengguna (HR, Karyawan, Legal, Owner).
+**FR Terkait:** FR-PAYANA-101, FR-PAYANA-102, FR-PAYANA-106.
 
 **Alur Interaksi:**
 
 ```mermaid
 sequenceDiagram
-    actor E as Karyawan
-    participant V as CompanyVault
-    participant F as PayrollFactory
-    participant L as EmployeeLiquidityContract
-    participant T as protocolTreasury
-    E->>V: claimSalary()
-    V->>V: hitung accrued (settled + live)
-    V->>V: cek accrued>0 & vaultBalance>=accrued
-    V->>V: Effects: settledBalance=0, vaultBalance-=accrued, _checkLowBalance()
-    V->>F: platformFeeBps()
-    F-->>V: feeBps
-    V->>L: autoRepay(employee, accrued)
-    L-->>V: repaid (maks 20%)
-    V->>V: net = accrued - platformCut - repaid; split 93/5/2
-    V->>T: safeTransfer(platformCut) + PlatformFeePaid
-    V->>L: safeTransfer(repaid)
-    V->>E: safeTransfer(toEmployee)
-    V-->>E: SalaryClaimed
-```
-
-**Algoritma (CEI):**
-
-1. **Check:** stream tidak `Inactive` (`NotWhitelisted`) dan tidak `Paused` (`StreamNotActive`).
-2. **Check:** hitung `accrued = settledBalance + calcAccrued(flowRate, lastWithdrawnTs)` (atau hanya `settledBalance` bila tidak aktif); tolak `accrued == 0` (`NothingToClaim`) dan `vaultBalance < accrued` (`InsufficientVaultBalance`).
-3. **Effect:** `settledBalance = 0`; perbarui `lastWithdrawnTs` jika aktif; `vaultBalance -= accrued`; `_checkLowBalance()`.
-4. **Effect:** hitung `platformCut = bpsOf(accrued, feeBps)` jika `feeBps > 0`.
-5. **Interaction (akuntansi):** `repaid = liquidityContract.autoRepay(msg.sender, accrued)`.
-6. **Effect:** `net = accrued - platformCut - repaid`; bagi `toEmployee/toCompliance/toSeverance` via `bpsOf`; sisa pembulatan (dust) ke karyawan.
-7. **Effect:** tambah `complianceBalance` dan `employeeComplianceAccumulated`; tambah `severanceVaults.amount`; perbarui `tenureMonths = (now - startTs)/SECONDS_PER_MONTH`.
-8. **Interaction:** `safeTransfer(platformCut)` ke treasury (+`PlatformFeePaid`), `safeTransfer(repaid)` ke koperasi, `safeTransfer(toEmployee)` ke karyawan; emit `SalaryClaimed`.
-
-##### resignEmployee(employee)
-
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external override |
-| Modifier | `onlyHR nonReentrant` |
-| FR Terkait | FR-PAYANA-505 |
-
-**Algoritma:**
-
-1. **Check:** stream tidak `Inactive` (`NotWhitelisted`); severance harus `Locked` (`SeveranceAlreadySettled`).
-2. **Effect:** settle stream jika `Active`, kurangi `totalFlowRate`, set `Cancelled`.
-3. **Effect:** pesangon dikembalikan ke `vaultBalance` (bukan ke karyawan); set state `Returned`.
-4. **Interaction:** `_forfeitAllVests(employee)`; `_revokeSBT(employee)`; emit `StreamCancelled` + `SeveranceReturned`.
-
-##### proposeTermination(employee, reasonHash)
-
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external override |
-| Modifier | `onlyHR` |
-| FR Terkait | FR-PAYANA-501 |
-
-**Algoritma:**
-
-1. **Check:** stream tidak `Inactive` (`NotWhitelisted`); tidak ada proposal aktif yang belum kadaluarsa (`TerminationAlreadyProposed`).
-2. **Effect:** buat `TerminationProposal` (`hrApproved=true`, `legalApproved=false`, `expiresAt=now+7 days`, `reasonHash`, `flowRateSnapshot=flowRate`); emit `TerminationProposed`.
-
-##### approveTermination(employee)
-
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external override |
-| Modifier | — (cek peran internal) |
-| FR Terkait | FR-PAYANA-502 |
-
-**Algoritma:**
-
-1. **Check:** proposal ada (`TerminationNotFound`) dan belum kadaluarsa (`ProposalExpired`).
-2. **Effect:** jika pemanggil `HR_ROLE` set `hrApproved` (tolak ganda `AlreadyApproved`); jika `LEGAL_ROLE` set `legalApproved`; selain itu `Unauthorized`; emit `TerminationApproved`.
-
-##### executeTermination(employee)
-
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external override |
-| Modifier | `validTermination(employee) nonReentrant` |
-| FR Terkait | FR-PAYANA-503, FR-PAYANA-504, FR-PAYANA-506 |
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor HR
-    participant V as CompanyVault
-    participant SBT as EmploymentSBT
-    participant E as Karyawan
-    HR->>V: executeTermination(employee)
-    V->>V: validTermination (hr & legal approved, belum kadaluarsa)
-    V->>V: settle stream + totalFlowRate -= flowRate; status Cancelled
-    V->>V: statutory = severanceMultiplier(tenureMonths) * (snapshot * SECONDS_PER_MONTH)
-    alt accumulated < statutory
-        V->>V: topUp dari vaultBalance (atau parsial + SeveranceShortfall)
+    actor U as Pengguna
+    participant FE as Frontend (useAuth)
+    participant PV as Privy Wallet
+    participant BE as Backend /auth/login
+    participant DB as PostgreSQL (sessions)
+    U->>FE: Klik "Masuk"
+    FE->>PV: login() (email/social)
+    PV-->>FE: embedded wallet siap
+    FE->>FE: refreshToken tersimpan? coba /auth/refresh
+    alt tanda tangan baru
+        FE->>FE: bentuk "Sign in to Payana\nTimestamp: <unix>"
+        FE->>PV: switchChain(84532) + personal_sign(message)
+        PV-->>FE: signature
+        FE->>BE: POST {address, message, signature, timestamp}
+        BE->>BE: cek skew <= 5 menit + verifyMessage (viem)
+        BE->>DB: INSERT session (jti, address, expiresAt)
+        BE-->>FE: {token, refreshToken, address}
     end
-    V->>V: amount = accumulated + topUp; state Released
-    V->>V: _forfeitAllVests + delete proposal
-    V->>SBT: revoke(employee) [try/catch]
-    V->>E: safeTransfer(amount)
+    FE->>FE: useRole() resolve peran
+    FE-->>U: redirect ke portal sesuai peran
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Tombol "Masuk" | Tombol | Memicu `login()` Privy (modal email/social). |
+| Indikator status | Teks/spinner | Menampilkan progres "menandatangani" dan "memverifikasi". |
+| Redirect handler | Efek samping | Mengarahkan ke portal berdasarkan hasil `useRole`. |
+
+**Method/Algoritma Utama:**
+
+1. Panggil `login()` Privy; tunggu `authenticated` dan ketersediaan `walletAddress`.
+2. Jika ada `payana_refresh_token` di `localStorage`, coba `POST /auth/refresh` terlebih dahulu untuk menghindari tanda tangan ulang.
+3. Jika refresh gagal, bentuk pesan `Sign in to Payana\nTimestamp: <unix_seconds>`, panggil `switchChain(84532)`, lalu `personal_sign`.
+4. Kirim `{address, message, signature, timestamp}` ke `POST /auth/login`; simpan `token` (akses) dan `refreshToken`.
+5. Jalankan `useRole()` untuk menentukan peran dan mengarahkan ke `/owner`, `/hr/*`, `/hr/phk` (Legal), atau `/employee/*`.
+
+##### 2.4.1.3 Halaman Onboarding HR (`/onboarding`)
+
+**Deskripsi:** Formulir pengajuan permohonan akses platform bagi calon HR Admin, lengkap dengan pemantauan status persetujuan.
+**Aktor:** Calon HR Admin.
+**FR Terkait:** FR-PAYANA-107.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor HR as Calon HR
+    participant FE as Frontend /onboarding
+    participant BE as Backend /registration
+    participant DB as PostgreSQL (pending_registrations)
+    HR->>FE: Isi alamat, email, nama
+    FE->>BE: POST /registration/request {address, email, name}
+    BE->>DB: upsert by address (status=pending)
+    BE-->>FE: {ok: true}
+    HR->>FE: Buka kembali halaman
+    FE->>BE: GET /registration/status/:address
+    BE->>DB: SELECT status
+    BE-->>FE: {status, requestedAt}
+    FE-->>HR: Tampilkan badge pending/approved/rejected
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Input alamat dompet | Field teks | Alamat EVM calon HR. |
+| Input email | Field email | Email PIC HR. |
+| Input nama | Field teks | Nama PIC/perusahaan. |
+| Tombol "Ajukan" | Tombol | Memanggil `registration.submit`. |
+| Badge status | Komponen status | Menampilkan `pending`/`approved`/`rejected`/`none`. |
+
+**Method/Algoritma Utama:**
+
+1. Validasi field tidak kosong; submit ke `POST /registration/request` (upsert by address).
+2. Polling/`GET /registration/status/:address` untuk menampilkan status terkini.
+3. Jika status `approved`, arahkan pengguna untuk login dan melanjutkan deployment vault (dilakukan oleh Owner pada `/owner`).
+
+##### 2.4.1.4 Halaman Verifikasi SBT (`/verify`)
+
+**Deskripsi:** Verifikasi publik keaslian Sertifikat Ketenagakerjaan (Employment SBT) oleh pihak ketiga.
+**Aktor:** Publik (verifikator eksternal, mis. bank, calon pemberi kerja).
+**FR Terkait:** FR-PAYANA-905, FR-PAYANA-904.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor V as Verifikator
+    participant FE as Frontend /verify
+    participant SC as EmploymentSBT
+    V->>FE: Masukkan alamat karyawan
+    FE->>SC: employeeTokenId(address)
+    SC-->>FE: tokenId
+    FE->>SC: employmentRecords(tokenId)
+    SC-->>FE: {hrAuthority, companyName, startTs}
+    FE->>SC: locked(tokenId)
+    SC-->>FE: true (ERC-5192)
+    FE-->>V: Tampilkan detail sertifikat + status terkunci
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Input alamat | Field teks | Alamat dompet karyawan yang diverifikasi. |
+| Kartu sertifikat | Panel hasil | Menampilkan `companyName`, `startTs`, `hrAuthority`. |
+| Badge "Soulbound" | Indikator | Menegaskan token non-transferable (`locked == true`). |
+
+**Method/Algoritma Utama:**
+
+1. Baca `employeeTokenId(address)`; jika 0, tampilkan "sertifikat tidak ditemukan".
+2. Baca `employmentRecords(tokenId)` untuk metadata perusahaan dan tanggal mulai.
+3. Baca `locked(tokenId)` (selalu `true`) untuk mengonfirmasi sifat soulbound.
+
+#### 2.4.2 Portal HR (`/hr/*`)
+
+Seluruh halaman portal HR dibungkus oleh layout `hr/layout.tsx` yang menyediakan navigasi sisi dan role guard berbasis `useRole`. Pengguna yang bukan HR diarahkan keluar dari portal ini.
+
+##### 2.4.2.1 Dashboard HR Onboarding (`/hr/onboarding`)
+
+**Deskripsi:** Wizard tiga langkah untuk men-deploy `CompanyVault`, mengonfigurasi parameter potongan (BPS), dan melakukan deposit awal IDRX.
+**Aktor:** HR Admin.
+**FR Terkait:** FR-PAYANA-201, FR-PAYANA-202, FR-PAYANA-901.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor HR
+    participant FE as Frontend /hr/onboarding
+    participant F as PayrollFactory
+    participant PO as Ponder
+    participant IDRX as IDRX ERC-20
+    participant V as CompanyVault
+    HR->>FE: Langkah 1 isi nama, NPWP, email
+    HR->>FE: Langkah 2 isi BPS BPJS/pesangon
+    HR->>FE: Klik "Deploy Vault"
+    FE->>F: deployVault(hr, name, liquidity, sbt)
+    F-->>FE: tx terkirim
+    loop polling hingga terindeks
+        FE->>PO: getCompany(hr)
+        PO-->>FE: company.id (alamat vault)
+    end
+    HR->>FE: Langkah 3 isi nominal deposit
+    FE->>IDRX: approve(vault, amountWei)
+    FE->>V: fundVault(amountWei)
+    V-->>FE: VaultFunded
+    FE-->>HR: Langkah 4 "Sistem Siap Digunakan"
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Stepper | Indikator langkah | Empat tahap: Registrasi, Konfigurasi, Deposit, Selesai. |
+| Input Nama Perusahaan / NPWP / Email | Field teks | Metadata perusahaan; nama digunakan untuk metadata SBT. |
+| Input BPS BPJS / Pesangon | Field angka | Konfigurasi potongan (informatif untuk `setCompanyConfig`). |
+| Tombol "Deploy Vault" | Tombol tulis | Memanggil `PayrollFactory.deployVault`. |
+| Kartu alamat vault | Panel hasil | Menampilkan alamat vault terindeks + tombol salin. |
+| Input Deposit (IDRX) | Field angka | Nominal deposit awal. |
+| Tombol "Approve & Deposit" | Tombol tulis | Memanggil `approve` lalu `fundVault`. |
+
+**Method/Algoritma Utama:**
+
+1. `handleDeploy`: panggil `deployVault(address, companyName, EMPLOYEE_LIQUIDITY, EMPLOYMENT_SBT)` via `useContractWrite`.
+2. Polling `ponder.getCompany(address)` hingga 20 kali (interval 3 detik) sampai alamat vault terindeks; simpan ke `deployedVault`.
+3. `handleDeposit`: konversi nominal ke wei (`BigInt(amount) * 1e18`), panggil `approve(deployedVault, amountWei)` pada IDRX, lalu `fundVault(amountWei)` pada vault.
+4. Tampilkan langkah selesai dengan tautan ke `/hr/vault`.
+
+##### 2.4.2.2 Manajemen Karyawan (`/hr/employees` dan `/hr/employees/[id]`)
+
+**Deskripsi:** Daftar seluruh karyawan beserta status stream, flow rate, dan saldo terakumulasi; halaman detail menyediakan kontrol penuh atas stream individual.
+**Aktor:** HR Admin.
+**FR Terkait:** FR-PAYANA-301 s.d. FR-PAYANA-306, FR-PAYANA-505.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor HR
+    participant FE as Frontend /hr/employees
+    participant PO as Ponder
+    participant V as CompanyVault
+    HR->>FE: Buka daftar karyawan
+    FE->>PO: getStreams(hrAuthority)
+    PO-->>FE: daftar stream
+    HR->>FE: Pilih karyawan, buka detail [id]
+    FE->>V: getAccrued(employee)
+    V-->>FE: saldo terakumulasi
+    HR->>FE: Klik aksi (pause/resume/updateFlowRate/...)
+    FE->>V: pauseStream / resumeStream / updateFlowRate / updateStreamSplits / cancelStream
+    V-->>FE: event status berubah
+    FE-->>HR: Perbarui tampilan
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Tabel karyawan | Tabel data | Kolom alamat, status, flow rate, saldo terakumulasi. |
+| Badge status stream | Indikator | Active / Paused / Cancelled / Inactive. |
+| Kontrol stream | Grup tombol | `pauseStream`, `resumeStream`, `updateFlowRate`, `updateStreamSplits`, `cancelStream`. |
+| Input flow rate / split | Field angka | Nilai baru untuk pembaruan stream. |
+| Tombol Resign | Tombol tulis | `resignEmployee(employee)` (pesangon kembali ke vault). |
+
+**Method/Algoritma Utama:**
+
+1. Muat daftar via `ponder.getStreams(hrAuthority)`; render tabel.
+2. Pada detail `[id]`, baca `getAccrued(employee)` on-chain untuk saldo real-time.
+3. Aksi kontrol memanggil fungsi kontrak terkait melalui `useContractWrite`; validasi split = 10.000 bps sebelum `updateStreamSplits`.
+
+##### 2.4.2.3 Manajemen Vault (`/hr/vault`)
+
+**Deskripsi:** Manajemen treasury perusahaan: pemantauan saldo, peringatan saldo rendah real-time, deposit, dan penarikan.
+**Aktor:** HR Admin.
+**FR Terkait:** FR-PAYANA-202, FR-PAYANA-203, FR-PAYANA-205, FR-PAYANA-207.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor HR
+    participant FE as Frontend /hr/vault
+    participant V as CompanyVault
+    participant IDRX as IDRX ERC-20
+    participant WS as WebSocket
+    FE->>V: getVaultBalance()
+    V-->>FE: vaultBalance
+    WS-->>FE: LOW_VAULT_BALANCE (jika di bawah threshold)
+    HR->>FE: Deposit nominal
+    FE->>IDRX: approve(vault, amount)
+    FE->>V: fundVault(amount)
+    HR->>FE: Tarik nominal
+    FE->>V: withdrawVault(amount, recipient)
+    V-->>FE: VaultWithdrawn
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Kartu saldo vault | Panel data | Menampilkan `vaultBalance` dan estimasi burn rate bulanan. |
+| Banner peringatan | Alert real-time | Muncul saat pesan WebSocket `LOW_VAULT_BALANCE` diterima. |
+| Form deposit | Field + tombol | `approve` lalu `fundVault(amount)`. |
+| Form penarikan | Field + tombol | `withdrawVault(amount, recipient)`. |
+| Tombol pause/resume vault | Tombol tulis | `pauseVault()` / `resumeVault()`. |
+
+**Method/Algoritma Utama:**
+
+1. Baca `getVaultBalance()` dan `totalFlowRate` untuk estimasi kebutuhan bulanan.
+2. Berlangganan WebSocket; tampilkan banner saat tipe `LOW_VAULT_BALANCE` diterima.
+3. Deposit: `approve(vault, amount)` → `fundVault(amount)`. Penarikan: `withdrawVault(amount, recipient)`.
+
+##### 2.4.2.4 Absensi HR (`/hr/attendance`)
+
+**Deskripsi:** Tampilan dan pengelolaan data kehadiran karyawan untuk rekonsiliasi payroll.
+**Aktor:** HR Admin.
+**FR Terkait:** — (fitur pelengkap antarmuka tingkat aplikasi; tidak memengaruhi logika stream on-chain).
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor HR
+    participant FE as Frontend /hr/attendance
+    HR->>FE: Buka rekap absensi
+    FE-->>HR: Render tabel kehadiran (data aplikasi off-chain)
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Tabel kehadiran | Tabel data | Daftar clock-in/clock-out per karyawan. |
+| Filter periode | Dropdown | Memilih rentang tanggal rekap. |
+
+**Method/Algoritma Utama:**
+
+1. Muat data absensi tingkat aplikasi (off-chain).
+2. Render tabel; sediakan filter periode untuk rekonsiliasi manual.
+
+##### 2.4.2.5 Reimburse HR (`/hr/reimburse`)
+
+**Deskripsi:** Manajemen klaim reimbursement yang diajukan karyawan: daftar, persetujuan, dan pencatatan pembayaran.
+**Aktor:** HR Admin.
+**FR Terkait:** — (fitur pelengkap antarmuka tingkat aplikasi).
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor HR
+    participant FE as Frontend /hr/reimburse
+    HR->>FE: Tinjau klaim masuk
+    HR->>FE: Setujui/tolak klaim
+    FE-->>HR: Perbarui status klaim
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Daftar klaim | Tabel data | Keterangan, jumlah, status, bukti. |
+| Tombol setujui/tolak | Grup tombol | Memutuskan klaim reimbursement. |
+
+**Method/Algoritma Utama:**
+
+1. Muat daftar klaim reimbursement tingkat aplikasi.
+2. Aksi persetujuan/penolakan memperbarui status klaim dan mencatat pembayaran.
+
+##### 2.4.2.6 Bounty HR (`/hr/bounty`)
+
+**Deskripsi:** Manajemen program bounty/insentif kinerja: pembuatan papan bounty, penetapan hadiah IDRX, dan pencatatan klaim disetujui.
+**Aktor:** HR Admin.
+**FR Terkait:** — (fitur pelengkap antarmuka tingkat aplikasi).
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor HR
+    participant FE as Frontend /hr/bounty
+    HR->>FE: Buat bounty + hadiah IDRX
+    HR->>FE: Tinjau klaim penyelesaian
+    FE-->>HR: Tandai bounty terbayar
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Form bounty | Field + tombol | Judul, deskripsi tugas, hadiah IDRX. |
+| Daftar bounty | Tabel data | Status: terbuka/diklaim/selesai. |
+
+**Method/Algoritma Utama:**
+
+1. Buat papan bounty dengan hadiah IDRX.
+2. Tinjau klaim penyelesaian dan catat pembayaran hadiah.
+
+##### 2.4.2.7 Compliance HR (`/hr/compliance`)
+
+**Deskripsi:** Laporan kepatuhan BPJS/PPh21: pratinjau ringkasan bulanan, unduhan CSV, dan penarikan akumulasi dana kepatuhan.
+**Aktor:** HR Admin.
+**FR Terkait:** FR-PAYANA-801, FR-PAYANA-803, FR-PAYANA-804, FR-PAYANA-805.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor HR
+    participant FE as Frontend /hr/compliance
+    participant BE as Backend /compliance
+    participant PO as Ponder (salary_claim)
+    participant V as CompanyVault
+    HR->>FE: Pilih bulan
+    FE->>BE: GET /compliance/summary/:hr?month=YYYY-MM
+    BE->>PO: SUM(accrued/compliance/severance)
+    PO-->>BE: agregat + rincian
+    BE-->>FE: ringkasan JSON
+    HR->>FE: Unduh CSV
+    FE->>BE: GET /compliance/export/:hr?month=YYYY-MM
+    BE-->>FE: file CSV (PII didekripsi)
+    HR->>FE: Tarik dana kepatuhan
+    FE->>V: withdrawCompliance(amount, recipient)
+    V-->>FE: ComplianceWithdrawn
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Pemilih bulan | Input bulan | Format `YYYY-MM`. |
+| Kartu ringkasan | Panel data | Total accrued, compliance (BPJS/PPh21), severance, jumlah karyawan. |
+| Tombol Unduh CSV | Tombol | Memanggil `GET /compliance/export`. |
+| Form tarik kepatuhan | Field + tombol | `withdrawCompliance(amount, recipient)` ke agen pajak. |
+
+**Method/Algoritma Utama:**
+
+1. Ambil ringkasan via `backend.getComplianceSummary(hr, month, token)`.
+2. Tombol unduh memanggil endpoint export; berkas CSV dikembalikan sebagai attachment.
+3. Penarikan memanggil `withdrawCompliance(amount, recipient)` (hanya `complianceBalance`).
+
+##### 2.4.2.8 Koperasi HR (`/hr/koperasi`)
+
+**Deskripsi:** Pemantauan pool likuiditas koperasi perusahaan: total deposit, pinjaman berjalan, utilisasi, dan daftar peminjam aktif.
+**Aktor:** HR Admin.
+**FR Terkait:** FR-PAYANA-706.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor HR
+    participant FE as Frontend /hr/koperasi
+    participant PO as Ponder
+    participant L as EmployeeLiquidityContract
+    FE->>PO: getPool(vaultAddress)
+    PO-->>FE: liquidity_pool (deposit, outstanding, rate)
+    FE->>L: getPoolLiquidity(vaultAddress)
+    L-->>FE: (total, available)
+    FE-->>HR: Tampilkan utilisasi + daftar peminjam (loan_record)
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Kartu likuiditas | Panel data | Total deposit, pinjaman berjalan, likuiditas idle. |
+| Indikator utilisasi | Progress bar | Rasio `totalLoansOutstanding / totalDeposited`. |
+| Tabel peminjam | Tabel data | Daftar `loan_record` aktif beserta status. |
+
+**Method/Algoritma Utama:**
+
+1. Baca `ponder.getPool(vaultAddress)` untuk data terindeks pool.
+2. Baca `getPoolLiquidity(vaultAddress)` on-chain untuk total dan likuiditas idle.
+3. Hitung utilisasi dan render daftar peminjam aktif.
+
+##### 2.4.2.9 Vesting HR (`/hr/vesting`)
+
+**Deskripsi:** Manajemen cliff vest: pembuatan vest baru bertipe Retention/Probation/ESOP dan pembatalan vest yang belum matang.
+**Aktor:** HR Admin.
+**FR Terkait:** FR-PAYANA-601, FR-PAYANA-603, FR-PAYANA-604, FR-PAYANA-605.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor HR
+    participant FE as Frontend /hr/vesting
+    participant PO as Ponder (cliff_vest)
+    participant V as CompanyVault
+    FE->>PO: getVests(employee)
+    PO-->>FE: daftar vest
+    HR->>FE: Buat vest baru
+    FE->>V: createCliffVest(employee, amount, cliffTs, vestType)
+    V-->>FE: CliffVestCreated
+    HR->>FE: Batalkan vest
+    FE->>V: cancelCliffVest(employee, vestId)
+    V-->>FE: CliffVestForfeited
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Form vest baru | Field + dropdown | Alamat karyawan, jumlah, tanggal cliff, tipe vest. |
+| Dropdown tipe vest | Select | Retention / Probation / ESOP. |
+| Daftar vest | Tabel data | Jumlah, cliff, status (Locked/Claimed/Forfeited). |
+| Tombol batalkan | Tombol tulis | `cancelCliffVest(employee, vestId)`. |
+
+**Method/Algoritma Utama:**
+
+1. Validasi `cliffTs` di masa depan dan saldo vault mencukupi.
+2. Panggil `createCliffVest(employee, amount, cliffTs, vestType)`.
+3. Daftar vest dibaca dari `ponder.getVests`; pembatalan memanggil `cancelCliffVest`.
+
+##### 2.4.2.10 PHK (`/hr/phk`)
+
+**Deskripsi:** Antrian dan alur PHK multi-tanda tangan (HR mengajukan, Legal menyetujui, HR mengeksekusi), termasuk pembatalan proposal.
+**Aktor:** HR Admin dan Legal Officer (mode terbatas).
+**FR Terkait:** FR-PAYANA-501, FR-PAYANA-502, FR-PAYANA-503, FR-PAYANA-504.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor HR
+    actor Legal as Legal Officer
+    participant V as CompanyVault
+    HR->>V: proposeTermination(employee, reasonHash)
+    V->>V: hrApproved=true, expiresAt=+7 hari, snapshot flowRate
+    V-->>HR: TerminationProposed
+    Legal->>V: approveTermination(employee)
+    V->>V: legalApproved=true (cek LEGAL_ROLE)
+    V-->>Legal: TerminationApproved
+    HR->>V: executeTermination(employee)
+    V->>V: hitung pesangon (UU Cipta Kerja) + top-up
+    V->>V: revoke SBT + forfeit vest + cancel stream
     V-->>HR: SeveranceReleased + TerminationExecuted
 ```
 
-**Algoritma (CEI):**
+**Deskripsi Antarmuka:**
 
-1. **Check:** modifier `validTermination` memastikan kedua persetujuan dan belum kadaluarsa.
-2. **Effect:** settle stream jika `Active`, kurangi `totalFlowRate`, set `Cancelled`.
-3. **Effect:** hitung `monthlyGross = flowRateSnapshot * SECONDS_PER_MONTH`; `statutory = severanceMultiplier(tenureMonths) * monthlyGross`.
-4. **Effect:** jika `accumulated < statutory`, ambil `topUp` dari `vaultBalance`; jika tidak cukup, `topUp = vaultBalance` (parsial, `hasShortfall=true`); `vaultBalance -= topUp`.
-5. **Effect:** `amount = accumulated + topUp`; set `state = Released`; `_forfeitAllVests(employee)`; `_revokeSBT(employee)`; `delete terminations[employee]`.
-6. **Interaction:** `safeTransfer(employee, amount)`; emit `StreamCancelled`, `SeveranceReleased`, `SeveranceShortfall` (jika ada), `TerminationExecuted`.
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Form proposal | Field + tombol | Alamat karyawan + alasan (di-hash jadi `reasonHash`). |
+| Daftar proposal | Tabel data | Status `hrApproved`/`legalApproved`, kadaluarsa. |
+| Tombol setujui (Legal) | Tombol tulis | `approveTermination(employee)`. |
+| Tombol eksekusi | Tombol tulis | `executeTermination(employee)`. |
+| Tombol batalkan | Tombol tulis | `cancelProposal(employee)` sebelum disetujui Legal. |
 
-##### cancelProposal(employee)
+**Method/Algoritma Utama:**
 
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external override |
-| Modifier | `onlyHR` |
-| FR Terkait | FR-PAYANA-501 |
+1. HR: hash alasan ke `reasonHash` (keccak256), panggil `proposeTermination(employee, reasonHash)`.
+2. Legal: panggil `approveTermination(employee)` (memerlukan `LEGAL_ROLE`).
+3. HR: panggil `executeTermination(employee)` (memerlukan kedua persetujuan dan belum kadaluarsa).
+4. Pembatalan memanggil `cancelProposal(employee)` selama belum disetujui Legal.
 
-**Algoritma:** Check proposal masih aktif (hrApproved && !legalApproved && belum kadaluarsa) (`NoActiveProposal`); `delete terminations[employee]`; emit `TerminationCancelled`.
+##### 2.4.2.11 Audit HR (`/hr/audit`)
 
-##### withdrawCompliance(amount, recipient)
+**Deskripsi:** Riwayat aksi backend yang relevan dengan perusahaan (relay, ekspor kepatuhan, likuidasi, platform fee, peringatan saldo).
+**Aktor:** HR Admin.
+**FR Terkait:** FR-PAYANA-1002.
 
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external override |
-| Modifier | `onlyHR nonReentrant` |
-| FR Terkait | FR-PAYANA-803 |
-
-**Algoritma (CEI):** Check `complianceBalance >= amount` (`InsufficientComplianceBalance`); `complianceBalance -= amount`; `safeTransfer(recipient, amount)`; emit `ComplianceWithdrawn`.
-
-##### createCliffVest(employee, amount, cliffTs, vestType)
-
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external override |
-| Modifier | `onlyHR` |
-| FR Terkait | FR-PAYANA-601, FR-PAYANA-605 |
-
-**Algoritma:**
-
-1. **Check:** `cliffTs > now` (`"CliffInPast"`); `vaultBalance >= amount` (`InsufficientVaultBalance`).
-2. **Effect:** `vestId = vestCounter++`; simpan `CliffVest` (`Locked`); `vaultBalance -= amount`; `_checkLowBalance()`; emit `CliffVestCreated`.
-
-##### claimCliffVest(vestId)
-
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external override |
-| Modifier | `nonReentrant` |
-| FR Terkait | FR-PAYANA-602 |
-
-**Algoritma (CEI):**
-
-1. **Check:** vest ada (`VestNotFound`); status `Locked` (`VestAlreadySettled`); `now >= cliffTs` (`CliffNotReached`).
-2. **Effect:** `amount = vest.amount`; `vest.amount = 0`; `status = Claimed`.
-3. **Interaction:** `safeTransfer(msg.sender, amount)`; emit `CliffVestClaimed`.
-
-##### cancelCliffVest(employee, vestId)
-
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external override |
-| Modifier | `onlyHR` |
-| FR Terkait | FR-PAYANA-603 |
-
-**Algoritma:** Check vest ada dan `Locked`; set `amount=0`, status `Forfeited`; `vaultBalance += amount`; emit `CliffVestForfeited`.
-
-##### Fungsi Internal
-
-- `_forfeitAllVests(employee)`: iterasi `0..vestCounter`; setiap vest `Locked` dengan `amount>0` di-forfeit dan dikembalikan ke `vaultBalance` (O(vestCounter)).
-- `_checkLowBalance()`: no-op jika `totalFlowRate==0`; hitung `monthlyNeed = totalFlowRate * SECONDS_PER_MONTH` dan `threshold = bpsOf(monthlyNeed, lowBalanceThresholdBps)`; emit `LowVaultBalance` jika `vaultBalance < threshold`.
-- `_revokeSBT(employee)`: jika ada `tokenId`, panggil `sbtContract.revoke(employee)` (try/catch); emit `EmploymentRevoked`.
-
-##### Fungsi View
-
-| Fungsi | Return | FR Terkait |
-|--------|--------|-----------|
-| `getAccrued(employee)` | saldo terakumulasi (settled + live) | FR-PAYANA-402 |
-| `getVaultBalance()` | `vaultBalance` | FR-PAYANA-202 |
-| `getSeveranceBalance(employee)` | `severanceVaults[employee].amount` | FR-PAYANA-506 |
-| `getStreamInfo(employee)` | `(address(this), flowRate)` — kunci pool koperasi | FR-PAYANA-703 |
-
-#### 5.1.3 EmployeeLiquidityContract
-
-Pool likuiditas koperasi closed-loop per perusahaan (Koperasi Karyawan). Mewarisi `IEmployeeLiquidity`, `ReentrancyGuard`, `AccessControl`. Satu pool per `CompanyVault`, keyed alamat vault, sebagai pemenuhan model closed-loop (OJK).
+**Alur Interaksi:**
 
 ```mermaid
-classDiagram
-    class EmployeeLiquidityContract {
-        +bytes32 OPS_ROLE
-        +bytes32 PAYROLL_ROLE
-        +uint256 MAX_LOAN_BPS = 8000
-        +uint256 GRACE_PERIOD = 7 days
-        +uint256 LOAN_TERM = 30 days
-        +uint256 REPAY_FRACTION_BPS = 2000
-        +uint256 MINIMUM_DEPOSIT = 100
-        +uint256 PROTOCOL_FEE_BPS = 100
-        +IERC20 IDRX
-        +address protocolTreasury
-        +uint256 totalProtocolFee
-        +mapping registeredVaults
-        +mapping pools
-        +mapping lenderDeposits
-        +mapping loanRecords
-    }
+sequenceDiagram
+    actor HR
+    participant FE as Frontend /hr/audit
+    participant BE as Backend (audit_logs)
+    FE->>BE: Ambil audit log perusahaan
+    BE-->>FE: daftar {action, actor, txHash, meta, createdAt}
+    FE-->>HR: Render riwayat aksi
 ```
 
-**Konstanta:** `MAX_LOAN_BPS=8000` (80%), `GRACE_PERIOD=7 days`, `LOAN_TERM=30 days`, `REPAY_FRACTION_BPS=2000` (20%), `MINIMUM_DEPOSIT=100`, `PROTOCOL_FEE_BPS=100` (1%), `BPS_DENOMINATOR=10.000`, hard cap pinjam `8.000.000 IDRX`.
+**Deskripsi Antarmuka:**
 
-**Custom Errors:** `VaultNotRegistered`, `PoolAlreadyInitialized`, `PoolNotInitialized`, `InsufficientPoolLiquidity`, `LoanLimitExceeded`, `ActiveLoanExists`, `NoActiveLoan`, `GracePeriodNotExpired`, `NothingToWithdraw`, `NotPoolMember`.
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Tabel audit | Tabel data | Aksi (`BUNDLER_RELAY`, `COMPLIANCE_EXPORT`, `LOAN_LIQUIDATED`, `PLATFORM_FEE_PAID`, `LOW_VAULT_BALANCE_ALERT`), waktu, hash. |
+| Tautan transaksi | OnChainLink | Tautan ke Basescan untuk `txHash`. |
 
-**Modifier:** `onlyOps` (`OPS_ROLE`), `onlyPayroll` (`PAYROLL_ROLE`), `poolExists(company)`.
+**Method/Algoritma Utama:**
 
-**Akuntansi Yield:** indeks kumulatif `yieldPerShareX18` (skala 1e18). Pending yield lender = `principal * (yieldPerShareX18 - yieldDebtX18) / 1e18`.
+1. Ambil entri `audit_logs` yang aktor/metanya terkait perusahaan HR.
+2. Render tabel terurut waktu dengan tautan transaksi.
 
-##### registerVault(vault) / unregisterVault(vault)
+##### 2.4.2.12 Pengaturan HR (`/hr/settings`)
 
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external |
-| Modifier | `onlyRole(DEFAULT_ADMIN_ROLE)` |
-| FR Terkait | FR-PAYANA-1001 |
+**Deskripsi:** Konfigurasi parameter vault: BPS BPJS, BPS PPh21, dan threshold peringatan saldo rendah.
+**Aktor:** HR Admin.
+**FR Terkait:** FR-PAYANA-204, FR-PAYANA-802.
 
-**Algoritma:** `registerVault`: tolak alamat nol; `registeredVaults[vault]=true`; `_grantRole(PAYROLL_ROLE, vault)`; emit `VaultRegistered`. `unregisterVault`: set false; `_revokeRole(PAYROLL_ROLE, vault)`; emit `VaultUnregistered`.
+**Alur Interaksi:**
 
-##### claimProtocolFee()
+```mermaid
+sequenceDiagram
+    actor HR
+    participant FE as Frontend /hr/settings
+    participant V as CompanyVault
+    HR->>FE: Atur bpjsBps, pph21Bps, threshold
+    FE->>V: setCompanyConfig(bpjsBps, pph21Bps, lowBalanceThresholdBps)
+    V-->>FE: konfigurasi tersimpan
+    FE-->>HR: Konfirmasi
+```
 
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external |
-| Modifier | `onlyRole(DEFAULT_ADMIN_ROLE)` |
-| FR Terkait | FR-PAYANA-1003 |
+**Deskripsi Antarmuka:**
 
-**Algoritma:** Check `totalProtocolFee > 0`; set `totalProtocolFee=0`; `safeTransfer(protocolTreasury, amount)`.
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Input BPJS Bps | Field angka | Tarif BPJS (informatif). |
+| Input PPh21 Bps | Field angka | Tarif PPh21 (informatif). |
+| Input Threshold Bps | Field angka | Ambang peringatan saldo rendah. |
+| Tombol Simpan | Tombol tulis | `setCompanyConfig(...)`. |
 
-##### initializePool(companyAddress, interestRateBps)
+**Method/Algoritma Utama:**
 
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external override |
-| Modifier | `DEFAULT_ADMIN_ROLE` atau `PAYROLL_ROLE` |
-| FR Terkait | FR-PAYANA-706 |
+1. Baca konfigurasi saat ini dari kontrak untuk prapengisian form.
+2. Panggil `setCompanyConfig(bpjsBps, pph21Bps, lowBalanceThresholdBps)` via `useContractWrite`.
 
-**Algoritma:** Check belum diinisialisasi (`PoolAlreadyInitialized`); buat `Pool` dengan `interestRateBps` (default 150 dari konstruktor vault); emit `PoolInitialized`.
+#### 2.4.3 Portal Karyawan (`/employee/*`)
 
-##### depositToPool(vaultAddress, amount) / depositToPoolFor(companyAddress, amount)
+Seluruh halaman portal karyawan dibungkus oleh layout `employee/layout.tsx` dengan navigasi sisi karyawan dan role guard `useRole`. Karyawan diidentifikasi melalui stream aktif/paused pada Ponder.
 
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external override / external |
-| Modifier | `nonReentrant` (`depositToPoolFor` + `poolExists`) |
-| FR Terkait | FR-PAYANA-701 |
+##### 2.4.3.1 EWA Dashboard (`/employee/ewa`)
 
-**Algoritma:**
-
-1. **Check:** `amount >= MINIMUM_DEPOSIT` (`"BelowMinDeposit"`).
-2. **Check (deposit pertama):** vault terdaftar (`VaultNotRegistered`) dan pemanggil memiliki stream aktif (`getStreamInfo` mengembalikan vault non-nol); pool terinisialisasi (`PoolNotInitialized`).
-3. **Effect/Interaction:** `_doDeposit`: jika pertama set `companyAddress`, `depositedTs`, `yieldDebtX18`; jika ulang `_syncYield` lebih dahulu; `safeTransferFrom(amount)`; `principal += amount`; `pool.totalDeposited += amount`; emit `Deposited`.
-
-##### withdrawDeposit(amount)
-
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external override |
-| Modifier | `nonReentrant` |
-| FR Terkait | FR-PAYANA-702 |
-
-**Algoritma (CEI):**
-
-1. **Check:** ada deposit (`NothingToWithdraw`); `_syncYield` (emit `YieldAccrued` jika ada); cek principal/yield tidak nol; likuiditas idle `totalDeposited - totalLoansOutstanding >= amount` (`InsufficientPoolLiquidity`).
-2. **Effect:** `principal -= amount`; `yieldEarned = 0`; `pool.totalDeposited -= amount`.
-3. **Interaction:** `safeTransfer(msg.sender, amount + yieldToSend)`; emit `Withdrawn`.
-
-##### borrowFromPool(vaultAddress, amount) / borrowFromPoolFor(companyAddress, amount, expectedMonthlySalary)
-
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external override / external |
-| Modifier | `nonReentrant` (`borrowFromPoolFor`: `onlyOps poolExists`) |
-| FR Terkait | FR-PAYANA-703 |
+**Deskripsi:** Halaman utama karyawan yang menampilkan saldo gaji terakumulasi real-time, saldo Smart Account, vesting mendatang, dan riwayat klaim; menyediakan tombol "Tarik Gaji" gasless.
+**Aktor:** Karyawan.
+**FR Terkait:** FR-PAYANA-401, FR-PAYANA-402, FR-PAYANA-403, FR-PAYANA-405.
 
 **Alur Interaksi:**
 
 ```mermaid
 sequenceDiagram
     actor E as Karyawan
-    participant L as EmployeeLiquidityContract
+    participant FE as Frontend /employee/ewa
+    participant PO as Ponder
     participant V as CompanyVault
-    E->>L: borrowFromPool(vaultAddress, amount)
-    L->>L: cek vault terdaftar (VaultNotRegistered)
-    L->>V: getStreamInfo(employee)
-    V-->>L: (vault, flowRate)
-    L->>L: expectedMonthlySalary = flowRate * SECONDS_PER_MONTH
-    L->>L: _doBorrow: cek 1 loan aktif, cap 80%, hard cap 8jt, likuiditas
-    L->>L: interest = amount * interestRateBps / 10000; dueTs = now+30d
-    L->>L: pool.totalLoansOutstanding += amount
-    L->>E: safeTransfer(amount)
-    L-->>E: LoanCreated
-```
-
-**Algoritma `_doBorrow`:**
-
-1. **Check:** tidak ada pinjaman `Active` (`ActiveLoanExists`); `amount <= 80% expectedMonthlySalary` (`LoanLimitExceeded`); `amount <= 8.000.000 IDRX` (`LoanLimitExceeded`); likuiditas idle cukup (`InsufficientPoolLiquidity`).
-2. **Effect:** `interest = amount * interestRateBps / 10000`; buat `LoanRecord` (`Active`, `dueTs = now + 30 days`); `pool.totalLoansOutstanding += amount`.
-3. **Interaction:** `safeTransfer(msg.sender, amount)`; emit `LoanCreated`.
-
-##### repayLoanManual(amount)
-
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external override |
-| Modifier | `nonReentrant` |
-| FR Terkait | FR-PAYANA-705 |
-
-**Algoritma:** Check ada pinjaman `Active` (`NoActiveLoan`) dan `amount > 0`; `safeTransferFrom(msg.sender, this, amount)`; `_applyRepayment(msg.sender, loan, amount)`.
-
-##### autoRepay(employee, accrued)
-
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external override |
-| Modifier | `onlyPayroll nonReentrant` |
-| Return | `uint256 repaid` |
-| FR Terkait | FR-PAYANA-704 |
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    participant V as CompanyVault
-    participant L as EmployeeLiquidityContract
-    V->>L: autoRepay(employee, accrued)
-    alt tidak ada pinjaman aktif
-        L-->>V: return 0
-    else ada pinjaman
-        L->>L: outstanding = principal + interest - repaidAmount
-        L->>L: fraction = accrued * 20% ; repaid = min(fraction, outstanding)
-        L->>L: _applyRepayment(employee, loan, repaid)
-        Note over L: jika lunas penuh: bunga bersih (setelah fee 1%)<br/>didistribusikan ke yieldPerShareX18
-        L-->>V: return repaid + LoanRepaid
+    participant IDRX as IDRX ERC-20
+    FE->>PO: getStream / getClaims / getVests
+    PO-->>FE: data stream, klaim, vest
+    FE->>V: getAccrued(address)
+    V-->>FE: saldo terakumulasi (seed counter)
+    loop tiap 10 detik (NFR-10)
+        FE->>V: getAccrued(address)
+        V-->>FE: nilai terbaru
     end
+    E->>FE: Klik "Tarik Gaji"
+    FE->>V: claimSalary() (jalur gasless ERC-4337)
+    V-->>FE: txHash + SalaryClaimed
+    FE->>IDRX: balanceOf(address) (refresh)
+    FE-->>E: Banner "Dana EWA berhasil ditarik"
 ```
 
-**Algoritma:**
+**Deskripsi Antarmuka:**
 
-1. **Check:** jika tidak ada pinjaman `Active`, kembalikan 0.
-2. **Effect:** `outstanding = principal + interest - repaidAmount`; `fraction = accrued * 20% / 10000`; `repaid = min(fraction, outstanding)`; jika 0 kembalikan 0.
-3. **Effect:** `_applyRepayment(employee, loan, repaid)`; emit `LoanRepaid(employee, repaid, lunas?)`. CompanyVault bertanggung jawab memotong `repaid` dari net gaji.
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Kartu EWA gelap | Panel utama | `StreamCounter` real-time + flow rate per detik + status streaming. |
+| Tombol "Tarik Gaji" | Tombol tulis | Memicu `claimSalary()` (gasless); nonaktif jika `accruedWei == 0`. |
+| Kartu Smart Account | Panel data | Saldo IDRX (`balanceOf`) + alamat ringkas. |
+| Kartu Bonus Vesting | Panel data | Vest `Locked` terdekat + progress bar. |
+| Aktivitas Terakhir | Daftar | Lima klaim terakhir dari `getClaims`. |
+| Banner sukses | Alert + OnChainLink | Konfirmasi klaim + tautan transaksi. |
 
-##### liquidateLoan(borrower)
+**Method/Algoritma Utama:**
 
-| Atribut | Nilai |
-|---------|-------|
-| Visibilitas | external override |
-| Modifier | `onlyOps` |
-| FR Terkait | FR-PAYANA-704 (lanjutan) |
+1. Muat paralel `ponder.getStream`, `ponder.getClaims`, `ponder.getVests`; baca `balanceOf` IDRX.
+2. `fetchAccrued`: baca `getAccrued(address)` on-chain sebagai seed `StreamCounter`; polling tiap 10 detik (NFR-10).
+3. `handleClaim`: panggil `claimSalary()` melalui jalur write (gasless), tampilkan banner sukses, lalu refresh `getAccrued` dan `balanceOf`.
 
-**Algoritma:**
+##### 2.4.3.2 Absensi Karyawan (`/employee/attendance`)
 
-1. **Check:** pinjaman `Active` (`NoActiveLoan`); `now > dueTs + GRACE_PERIOD` (`GracePeriodNotExpired`).
-2. **Effect:** `outstanding = principal + interest - repaidAmount`; `pool.totalLoansOutstanding -= principal`; kurangi `pool.totalDeposited` sebesar outstanding (loss disosialisasikan ke seluruh lender); set status `Defaulted`; emit `LoanDefaulted`.
+**Deskripsi:** Riwayat clock-in/clock-out dan status kehadiran harian karyawan.
+**Aktor:** Karyawan.
+**FR Terkait:** — (fitur pelengkap antarmuka tingkat aplikasi).
 
-##### Fungsi Internal
-
-- `_applyRepayment(borrower, loan, amount)`: `actualRepaid = min(amount, outstanding)`; `loan.repaidAmount += actualRepaid`; pada pelunasan penuh kurangi `totalLoansOutstanding`, hitung `fee = interest * 1% `, `totalProtocolFee += fee`, distribusikan `netInterest` ke `yieldPerShareX18` (jika `totalDeposited > 0`), set status `Repaid`.
-- `_syncYield(dep, pool)`: `accrued = principal * (yieldPerShareX18 - yieldDebtX18)/1e18`; `yieldEarned += accrued`; perbarui `yieldDebtX18`.
-
-##### Fungsi View
-
-| Fungsi | Return | FR Terkait |
-|--------|--------|-----------|
-| `getLoanBalance(borrower)` | `(principal, interest, repaid)` | FR-PAYANA-705 |
-| `getPoolLiquidity(company)` | `(total, available)` | FR-PAYANA-706 |
-| `getDepositBalance(lender)` | `(principal, yieldEarned+pending)` | FR-PAYANA-701/702 |
-
-#### 5.1.4 EmploymentSBT
-
-Sertifikat ketenagakerjaan Soulbound (ERC-5192). Mewarisi `ERC721`, `IERC5192`, `AccessControl`. Nama token: "Finley Employment Certificate" (FEMP).
-
-```mermaid
-classDiagram
-    class EmploymentSBT {
-        +bytes32 MINTER_ROLE
-        +mapping employmentRecords
-        +mapping employeeTokenId
-        +mint(employee, companyName, hrAuthority) uint256
-        +revoke(employee)
-        +locked(tokenId) bool
-        +setBaseURI(newBaseURI)
-        +supportsInterface(interfaceId) bool
-        -_update(to, tokenId, auth) address
-    }
-```
-
-**Custom Errors:** `AlreadyHasToken(employee)`, `NoTokenFound(employee)`, `SoulboundTransferNotAllowed`.
-
-| Fungsi | Visibilitas/Modifier | FR | Algoritma |
-|--------|----------------------|-----|-----------|
-| `mint(employee, companyName, hrAuthority)` | external `onlyRole(MINTER_ROLE)` | FR-901, 902 | Tolak jika sudah punya token (`AlreadyHasToken`); tokenId monoton mulai 1; simpan `EmploymentRecord{hrAuthority, companyName, startTs}`; emit `Locked(tokenId)`; kembalikan tokenId. |
-| `revoke(employee)` | external `onlyRole(MINTER_ROLE)` | FR-903 | Hapus `employeeTokenId` dan `employmentRecords`; burn token. |
-| `locked(tokenId)` | external view | FR-905 | Selalu `true` (ERC-5192). |
-| `setBaseURI(newBaseURI)` | external `onlyRole(DEFAULT_ADMIN_ROLE)` | — | Perbarui base URI metadata. |
-| `supportsInterface(id)` | public view | FR-905 | Deklarasi dukungan `IERC5192`. |
-| `_update(to, tokenId, auth)` | internal override | FR-905 | Blokir transfer P2P (`SoulboundTransferNotAllowed`); hanya mint (from=0) dan burn (to=0) diizinkan. |
-
-#### 5.1.5 IDRXPriceOracle
-
-Oracle harga berbasis Chainlink untuk tampilan treasury berdenominasi USD (opsional). Mewarisi `Ownable`.
-
-```mermaid
-classDiagram
-    class IDRXPriceOracle {
-        +AggregatorV3Interface priceFeed
-        +setPriceFeed(priceFeed)
-        +getLatestRate() uint256
-        +getIDRXPriceInUSD() uint256
-        +convertUSDtoIDRX(usdAmount) uint256
-        +convertIDRXtoUSD(idrxAmount) uint256
-    }
-```
-
-| Fungsi | Visibilitas/Modifier | Algoritma |
-|--------|----------------------|-----------|
-| `getLatestRate()` | external view | Baca `latestRoundData()`; validasi `answer > 0` (`OracleNegativeRate`), `answeredInRound >= roundId` (`OracleStaleData`), `updatedAt > 0` (`OracleRoundIncomplete`); kembalikan rate 8 desimal. |
-| `getIDRXPriceInUSD()` | external view | `10^26 / rate` (18 desimal). |
-| `convertUSDtoIDRX(usdAmount)` | external view | `usdAmount * rate / 10^8`. |
-| `convertIDRXtoUSD(idrxAmount)` | external view | `idrxAmount * 10^8 / rate`. |
-| `setPriceFeed(priceFeed)` | external `onlyOwner` | Perbarui `priceFeed`; emit `PriceFeedUpdated`. |
-
-#### 5.1.6 ConfidentialCompanyVault (Ekstensi FHE)
-
-Ekstensi opsional `CompanyVault` yang menyimpan gaji sebagai ciphertext `euint256` Inco Lightning. Lapisan streaming tetap plaintext; hanya nominal gaji yang dienkripsi.
-
-```mermaid
-classDiagram
-    class ConfidentialCompanyVault {
-        +mapping encryptedSalaries "euint256"
-        +mapping hasEncryptedSalary
-        +mapping auditorExpiry
-        +setEncryptedSalary(employee, encryptedSalary) payable
-        +getEncryptedSalary(employee) euint256
-        +aggregateTotalPayroll() euint256
-        +grantViewingKey(auditor, expiresAt)
-        +isAuditorActive(auditor) bool
-        +revokeAuditorAccess(auditor)
-    }
-```
-
-| Fungsi | Visibilitas/Modifier | FR | Algoritma |
-|--------|----------------------|-----|-----------|
-| `setEncryptedSalary(employee, enc)` | external payable `onlyHR` | FR-1102 | Bayar `inco.getFee()`; verifikasi input proof via `newEuint256(msg.sender)`; beri ACL ke contract/HR/karyawan; emit `EncryptedSalarySet` tanpa plaintext. |
-| `getEncryptedSalary(employee)` | external view | FR-1103 | Hanya karyawan sendiri atau HR; kembalikan handle ciphertext untuk dekripsi client-side. |
-| `aggregateTotalPayroll()` | external | FR-1104 | Penjumlahan homomorfik O(n) via `.add()`; ACL hasil ke HR. |
-| `grantViewingKey(auditor, expiresAt)` | external `onlyHR` | FR-1105 | Beri ACL Inco ke auditor dengan batas waktu Solidity-level (`auditorExpiry`). |
-| `isAuditorActive(auditor)` | external view | FR-1105 | `now < auditorExpiry[auditor]`. |
-| `revokeAuditorAccess(auditor)` | external `onlyHR` | FR-1105 | Set `auditorExpiry[auditor]=0`. |
-
----
-
-### 5.2 Perancangan Backend API
-
-Backend Express 5 mengekspos REST API. Middleware global: `helmet`, `cors` (origin dibatasi `FRONTEND_URL`), `express.json` (kecuali `/webhook` yang menggunakan `express.raw` untuk verifikasi HMAC). Endpoint terproteksi memakai middleware `requireAuth` (Bearer JWT) dan, untuk endpoint Owner, `requireOwner`.
-
-| Grup | Mount | Proteksi |
-|------|-------|----------|
-| `/auth` | publik | login/refresh publik; profile/logout butuh JWT |
-| `/bundler` | `requireAuth` | JWT wajib |
-| `/compliance` | `requireAuth` | JWT wajib + kepemilikan data |
-| `/registration` | campuran | `/request` & `/status` publik; lainnya JWT + Owner |
-| `/webhook` | HMAC Alchemy | tanpa JWT |
-
-#### 5.2.1 Grup Autentikasi (`/auth`)
-
-##### POST /auth/login
-
-| Atribut | Nilai |
-|---------|-------|
-| Method | POST |
-| Auth | publik |
-| FR Terkait | FR-PAYANA-101 |
-| Middleware | — (verifikasi EIP-191 internal) |
-
-**Request Body:**
-
-```json
-{
-  "address": "0xabc...123",
-  "message": "Sign in to Payana\nTimestamp: 1733500000",
-  "signature": "0x9f8c...",
-  "timestamp": "1733500000"
-}
-```
-
-**Response 200:**
-
-```json
-{
-  "accessToken": "eyJhbGciOi...",
-  "refreshToken": "eyJhbGciOi...",
-  "address": "0xabc...123"
-}
-```
-
-**Tabel Error:**
-
-| Kode | Error | Penyebab |
-|------|-------|----------|
-| 400 | BAD_REQUEST | `address`/`message`/`signature` kosong, atau pesan tanpa `Timestamp:`, atau tanda tangan malformed |
-| 401 | UNAUTHORIZED | Skew waktu > ±5 menit, atau verifikasi tanda tangan gagal |
-| 500 | INTERNAL_ERROR | Gagal menyimpan sesi |
-
-**Algoritma:**
-
-1. Validasi field; ekstrak `Timestamp:` dari pesan dengan regex.
-2. Tolak jika `|now - msgTs| > 300` detik (replay protection).
-3. `verifyMessage` (viem) terhadap `{address, message, signature}`; tolak jika tidak valid.
-4. Buat `jti = randomUUID()`, `expiresAt = now + 7 hari`; `INSERT` sesi ke tabel `sessions`.
-5. Terbitkan `accessToken` (15 menit) dan `refreshToken` (7 hari) via `jwt.sign({address, jti})`.
-
-##### POST /auth/refresh
-
-| Atribut | Nilai |
-|---------|-------|
-| Method | POST |
-| Auth | publik (validasi refresh token internal) |
-| FR Terkait | FR-PAYANA-102 |
-
-**Request Body:** `{ "refreshToken": "eyJhbGciOi..." }`
-
-**Response 200:** `{ "accessToken": "eyJhbGciOi..." }`
-
-**Tabel Error:**
-
-| Kode | Error | Penyebab |
-|------|-------|----------|
-| 400 | BAD_REQUEST | `refreshToken` kosong |
-| 401 | UNAUTHORIZED | Sesi (jti) telah dicabut/kadaluarsa, atau token invalid |
-| 500 | INTERNAL_ERROR | JWT secret tidak terkonfigurasi |
-
-**Algoritma:**
-
-1. `jwt.verify(refreshToken, refreshSecret)` → `{address, jti}`.
-2. Validasi sesi `jti` masih ada dan belum kadaluarsa di tabel `sessions`.
-3. Terbitkan `accessToken` baru (15 menit) dengan `{address, jti}` yang sama.
-
-##### POST /auth/logout
-
-| Atribut | Nilai |
-|---------|-------|
-| Method | POST |
-| Auth | JWT (`requireAuth`) |
-| FR Terkait | FR-PAYANA-103 |
-
-**Response 200:** `{ "message": "Successfully logged out and session revoked" }`
-
-**Algoritma:** Hapus sesi berdasarkan `jti` dari token (`DELETE FROM sessions WHERE jti = ?`). Revocation bersifat deterministik.
-
-##### POST /auth/profile
-
-| Atribut | Nilai |
-|---------|-------|
-| Method | POST |
-| Auth | JWT (`requireAuth`) |
-| FR Terkait | FR-PAYANA-104 |
-
-**Request Body:** `{ "name": "Budi Santoso", "nik": "3201234567890123", "phone": "08123456789" }`
-
-**Response 200:** `{ "success": true, "message": "Employee profile encrypted and saved successfully" }`
-
-**Tabel Error:**
-
-| Kode | Error | Penyebab |
-|------|-------|----------|
-| 400 | BAD_REQUEST | Field kosong atau NIK bukan 16 digit numerik |
-| 500 | INTERNAL_ERROR | Gagal menyimpan |
-
-**Algoritma:**
-
-1. Validasi `name`, `nik`, `phone` tidak kosong; `nik` harus cocok `^\d{16}$`.
-2. Enkripsi ketiganya dengan `encrypt()` (AES-256-GCM).
-3. Upsert (`onConflictDoUpdate` by `address`) ke tabel `employees` dengan `updatedAt = now`.
-
-##### GET /auth/profile
-
-| Atribut | Nilai |
-|---------|-------|
-| Method | GET |
-| Auth | JWT (`requireAuth`) |
-| FR Terkait | FR-PAYANA-105 |
-
-**Response 200:**
-
-```json
-{
-  "address": "0xabc...123",
-  "name": "Budi Santoso",
-  "nik": "3201234567890123",
-  "phone": "08123456789",
-  "createdAt": "2026-01-01T00:00:00.000Z",
-  "updatedAt": "2026-06-01T00:00:00.000Z"
-}
-```
-
-**Tabel Error:** 404 NOT_FOUND (profil tidak ada); 500 INTERNAL_ERROR (gagal dekripsi/baca).
-
-**Algoritma:** Ambil baris `employees` milik caller; dekripsi `name/nik/phone` via `decrypt()`; kembalikan plaintext.
-
-#### 5.2.2 Grup Bundler Relay (`/bundler`)
-
-##### POST /bundler/relay
-
-| Atribut | Nilai |
-|---------|-------|
-| Method | POST |
-| Auth | JWT (`requireAuth`) |
-| FR Terkait | FR-PAYANA-403, FR-PAYANA-404 |
-| Middleware | rate limiter (`checkAndIncrement`) |
-
-**Request Body:**
-
-```json
-{
-  "userOp": {
-    "sender": "0xabc...123",
-    "nonce": "0x1",
-    "callData": "0x5b7e8209",
-    "preVerificationGas": "0x...",
-    "maxFeePerGas": "0x...",
-    "maxPriorityFeePerGas": "0x...",
-    "signature": "0x..."
-  },
-  "entryPoint": "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
-}
-```
-
-**Response 200:** `{ "userOpHash": "0x7d2a..." }`
-
-**Tabel Error:**
-
-| Kode | Error | Penyebab |
-|------|-------|----------|
-| 400 | BAD_REQUEST | `userOp.sender` hilang |
-| 403 | FORBIDDEN | Alamat JWT ≠ `userOp.sender`, atau selektor calldata bukan `0x5b7e8209` |
-| 429 | TOO_MANY_REQUESTS | Melebihi 10 klaim/jam |
-| 502 | BAD_GATEWAY | Bundler menolak atau tidak dapat dihubungi |
-| 500 | INTERNAL_ERROR | `BUNDLER_RPC_URL` tidak terkonfigurasi |
-
-**Algoritma:**
-
-1. Validasi `userOp.sender` ada; ambil `employee = sender.toLowerCase()`.
-2. **Gerbang kepemilikan:** alamat JWT harus sama dengan `employee` (`403`).
-3. **Whitelist selektor:** `callData[0..10] == 0x5b7e8209` (`claimSalary()`); selain itu `403`.
-4. **Rate limit:** `checkAndIncrement(employee)`; jika false `429`.
-5. Teruskan `eth_sendUserOperation` ke Pimlico (`BUNDLER_RPC_URL`); jika error `502`.
-6. Catat `BUNDLER_RELAY` di `audit_logs`; kembalikan `userOpHash`. Mendukung EntryPoint v0.6 dan v0.7.
-
-##### GET /bundler/status/:userOpHash
-
-| Atribut | Nilai |
-|---------|-------|
-| Method | GET |
-| Auth | JWT (`requireAuth`) |
-| FR Terkait | FR-PAYANA-405 |
-
-**Response 200:** `{ "receipt": { ... } }` (atau `null` jika belum tersedia).
-
-**Algoritma:** Panggil `eth_getUserOperationReceipt` ke bundler; kembalikan `receipt`. Polling oleh frontend.
-
-#### 5.2.3 Grup Compliance (`/compliance`)
-
-##### GET /compliance/export/:hr?month=YYYY-MM
-
-| Atribut | Nilai |
-|---------|-------|
-| Method | GET |
-| Auth | JWT + kepemilikan (`callerAddress == :hr`) |
-| FR Terkait | FR-PAYANA-804 |
-
-**Response 200:** Berkas CSV (`Content-Type: text/csv`, attachment). Header kolom:
-
-```
-employee_address,employee_name,employee_nik,employee_phone,claim_count,total_accrued_idrx,compliance_bpjs_idrx,severance_idrx
-```
-
-**Tabel Error:**
-
-| Kode | Error | Penyebab |
-|------|-------|----------|
-| 403 | FORBIDDEN | Alamat JWT ≠ `:hr` |
-| 400 | BAD_REQUEST | `month` tidak ber-format `YYYY-MM` |
-| 404 | NOT_FOUND | Tidak ada klaim pada periode |
-| 500 | INTERNAL_ERROR | Kegagalan kueri |
-
-**Algoritma:**
-
-1. Verifikasi `callerAddress == :hr` (`403`); validasi `month`.
-2. Hitung rentang `[from, to)` Unix dari bulan.
-3. Kueri SQL `salary_claim` (`GROUP BY employee`: `COUNT(*)`, `SUM(accrued)`, `SUM(to_compliance)`, `SUM(to_severance)`).
-4. Ambil profil dari `employees`; dekripsi `name/nik/phone`; bangun baris CSV (escape nama mengandung koma).
-5. Catat `COMPLIANCE_EXPORT` di `audit_logs`; kirim CSV.
-
-##### GET /compliance/summary/:hr?month=YYYY-MM
-
-| Atribut | Nilai |
-|---------|-------|
-| Method | GET |
-| Auth | JWT + kepemilikan (`callerAddress == :hr`) |
-| FR Terkait | FR-PAYANA-805 |
-
-**Response 200:**
-
-```json
-{
-  "month": "2026-05",
-  "hrAddress": "0xhr...",
-  "employeeCount": "12",
-  "totalAccrued": "150000000000000000000000",
-  "totalCompliance": "7500000000000000000000",
-  "totalSeverance": "3000000000000000000000",
-  "rows": [
-    { "employee": "0xemp...", "claim_count": "20", "total_accrued": "...", "total_compliance": "...", "total_severance": "..." }
-  ]
-}
-```
-
-**Tabel Error:** 403 FORBIDDEN; 400 BAD_REQUEST; 500 INTERNAL_ERROR.
-
-**Algoritma:** Verifikasi kepemilikan; jalankan agregat total (`COUNT(DISTINCT employee)`, `SUM(...)`) dan rincian per karyawan dari `salary_claim`; kembalikan JSON.
-
-#### 5.2.4 Grup Registrasi (`/registration`)
-
-##### POST /registration/request
-
-| Atribut | Nilai |
-|---------|-------|
-| Method | POST |
-| Auth | publik |
-| FR Terkait | FR-PAYANA-107 |
-
-**Request Body:** `{ "address": "0xhr...", "email": "hr@co.com", "name": "PT Karya" }`
-
-**Response 200:** `{ "ok": true }`
-
-**Tabel Error:** 400 (`address` hilang); 500 (db error).
-
-**Algoritma:** Upsert (`onConflictDoUpdate` by `address`) ke `pending_registrations` dengan status default `pending`.
-
-##### GET /registration/status/:address
-
-| Atribut | Nilai |
-|---------|-------|
-| Method | GET |
-| Auth | publik |
-| FR Terkait | FR-PAYANA-107 |
-
-**Response 200:** `{ "status": "pending", "requestedAt": "..." }` atau `{ "status": "none" }`.
-
-**Algoritma:** Ambil baris by `address`; kembalikan status (`none` jika tidak ada).
-
-##### GET /registration/pending
-
-| Atribut | Nilai |
-|---------|-------|
-| Method | GET |
-| Auth | JWT + `requireOwner` |
-| FR Terkait | FR-PAYANA-108 |
-
-**Response 200:** Array baris `pending_registrations` terurut `requestedAt`.
-
-**Algoritma:** `requireOwner` memverifikasi alamat JWT terhadap `OWNER_ADDRESS`; kembalikan seluruh antrian.
-
-##### PATCH /registration/:address/approve
-
-| Atribut | Nilai |
-|---------|-------|
-| Method | PATCH |
-| Auth | JWT + `requireOwner` |
-| FR Terkait | FR-PAYANA-109 |
-
-**Response 200:** `{ "ok": true }`
-
-**Algoritma:** Set `status = "approved"`, `updatedAt = now` untuk `address`.
-
-##### DELETE /registration/:address
-
-| Atribut | Nilai |
-|---------|-------|
-| Method | DELETE |
-| Auth | JWT + `requireOwner` |
-| FR Terkait | FR-PAYANA-109 |
-
-**Response 200:** `{ "ok": true }`
-
-**Algoritma:** Set `status = "rejected"` (soft reject, tidak menghapus baris).
-
-#### 5.2.5 Grup Webhook (`/webhook`)
-
-##### POST /webhook/alchemy
-
-| Atribut | Nilai |
-|---------|-------|
-| Method | POST |
-| Auth | HMAC Alchemy (`x-alchemy-signature`) |
-| FR Terkait | FR-PAYANA-207, FR-PAYANA-405, FR-PAYANA-1008, FR-PAYANA-1102 |
-
-**Request Body (ringkas):**
-
-```json
-{
-  "webhookId": "wh_abc123",
-  "type": "GRAPHQL",
-  "event": { "data": { "block": { "logs": [ { "topics": ["0x..."], "data": "0x...", "address": "0x...", "transactionHash": "0x..." } ] } } }
-}
-```
-
-**Response 200:** `{ "status": "ok", "logsProcessed": 1 }` atau `{ "status": "already_processed" }`.
-
-**Tabel Error:** 401 UNAUTHORIZED (tanda tangan HMAC tidak valid).
-
-**Algoritma:**
-
-1. Verifikasi `x-alchemy-signature` dengan HMAC-SHA256 + `timingSafeEqual`.
-2. Deduplikasi via `webhook_events` (lewati jika sudah `processed`); upsert id.
-3. Untuk setiap log, cocokkan `topics[0]` dengan topic hash kanonik dan tangani:
-   - `LowVaultBalance` → audit `LOW_VAULT_BALANCE_ALERT` + broadcast `LOW_VAULT_BALANCE`.
-   - `SalaryClaimed` → broadcast `SALARY_CLAIMED`.
-   - `PlatformFeePaid` → audit `PLATFORM_FEE_PAID` + broadcast `PLATFORM_FEE_PAID`.
-   - `EncryptedSalarySet` → audit `ENCRYPTED_SALARY_SET` + broadcast `ENCRYPTED_SALARY_SET` (tanpa plaintext).
-4. Tandai event `processed = true`.
-
-#### 5.2.6 Layanan Background
-
-##### Liquidation Cron (`liquidation.ts`)
-
-| Atribut | Nilai |
-|---------|-------|
-| Jadwal | `node-cron` `0 */6 * * *` (setiap 6 jam) |
-| FR Terkait | FR-PAYANA-704 |
-
-**Algoritma:**
-
-1. Hitung `cutoff = now - 7 hari`; kueri `loan_record` berstatus `Active` dengan `due_ts < cutoff`.
-2. Untuk setiap borrower, gunakan wallet `OPS_PRIVATE_KEY` (OPS_ROLE) memanggil `liquidateLoan(borrower)`.
-3. Tunggu receipt; catat `LOAN_LIQUIDATED` di `audit_logs`.
-
-##### Paymaster Monitor (`paymasterMonitor.ts`)
-
-| Atribut | Nilai |
-|---------|-------|
-| Jadwal | `*/15 * * * *` (15 menit) + sekali saat boot |
-| FR Terkait | NFR (anggaran Paymaster) |
-
-**Algoritma:**
-
-1. Baca saldo ETH `PAYMASTER_ADDRESS` (`getBalance`).
-2. Jika `>= ALERT_THRESHOLD` (default 0,05 ETH), berhenti.
-3. Jika di bawah ambang, catat `PAYMASTER_LOW_BALANCE` dan kirim alert ke `OPS_ALERT_WEBHOOK_URL`.
-
-#### 5.2.7 Layanan WebSocket (`wsServer.ts`)
-
-`WebSocketServer` dilampirkan ke server HTTP yang sama (`ws://host:PORT`). Fungsi `broadcast(type, payload)` mengirim pesan JSON ke seluruh klien `OPEN`.
-
-| Tipe | Pemicu | Tujuan Dashboard |
-|------|--------|------------------|
-| `LOW_VAULT_BALANCE` | event `LowVaultBalance` | HR (`/hr/vault`) |
-| `SALARY_CLAIMED` | event `SalaryClaimed` | Karyawan (`/employee/ewa`) |
-| `PLATFORM_FEE_PAID` | event `PlatformFeePaid` | Owner (`/owner`) |
-| `ENCRYPTED_SALARY_SET` | event `EncryptedSalarySet` | HR (FHE) |
-
-**Algoritma `broadcast`:** Jika server belum dibuat, no-op + peringatan. Jika ada, serialisasi `{type, payload}` dan kirim ke setiap klien dengan `readyState == OPEN`.
-
-#### 5.2.8 Layanan Pendukung
-
-- **`encryption.ts`:** `encrypt(text)` menghasilkan `iv_hex:authTag_hex:ciphertext_hex` (AES-256-GCM, IV 12-byte acak, kunci SHA-256 dari `ENCRYPTION_KEY`); `decrypt(cipherText)` membalik proses dengan verifikasi auth tag.
-- **`rateLimiter.ts`:** `checkAndIncrement(addr)` mengelola jendela 1 jam per karyawan di tabel `rate_limits`; reset jendela jika kedaluwarsa; tolak jika `claimCount >= MAX_CLAIMS` (default 10).
-
----
-
-### 5.3 Perancangan Frontend
-
-Frontend dibangun dengan Next.js 16 (App Router), React 19, Tailwind CSS 4, Shadcn/UI, wagmi 2.15, viem 2.47, dan Privy `@privy-io/react-auth` 2.10. Pembacaan on-chain memakai `publicClient` (viem) terhadap kontrak di `CONTRACTS`; pembacaan agregat memakai Ponder via `lib/api.ts`.
-
-#### 5.3.1 Klien Data (`lib/api.ts`)
-
-`lib/api.ts` mengekspos tiga klien:
-
-| Klien | Method Utama | Sumber | Dipakai di |
-|-------|--------------|--------|-----------|
-| `ponder` | `getCompany`, `getCompanies`, `getStream`, `getStreams`, `getClaims`, `getVests`, `getPool`, `getDeposit`, `getLoan`, `getPlatformFees`, `getEncryptedSalaries`, `getAuditorGrants` | Ponder GraphQL/REST | seluruh portal |
-| `backend` | `getComplianceSummary`, `getProfile`, `updateProfile` | Backend REST + JWT | `/hr/compliance`, `/employee/settings` |
-| `registration` | `submit`, `getStatus`, `getPending`, `approve`, `reject` | Backend `/registration` | `/onboarding`, `/owner` |
-
-#### 5.3.2 Custom Hook Web3
-
-##### useAuth (`hooks/useAuth.ts`)
-
-| Atribut | Nilai |
-|---------|-------|
-| Parameters | — |
-| Return | `{ address, token, isReady, login, logout }` |
-| Contract/API queried | `POST /auth/login`, `POST /auth/refresh`; Privy `personal_sign` |
-| Used in | Seluruh halaman terproteksi |
-
-**Algoritma:**
-
-1. Pilih wallet Privy (`walletClientType === "privy"`) atau fallback wallet pertama; set `address`.
-2. Pada autentikasi tanpa token, coba `payana_refresh_token` di `localStorage` via `POST /auth/refresh`.
-3. Jika refresh gagal, bentuk pesan ber-timestamp, `switchChain(84532)`, `personal_sign`, lalu `POST /auth/login`; simpan `token` + `refreshToken`.
-4. `logout`: bersihkan token/address, hapus refresh token, panggil `privyLogout()`.
-5. Guard `isSigningIn` (useRef) mencegah loop tanda tangan ganda.
-
-##### useRole (`hooks/useRole.ts`)
-
-| Atribut | Nilai |
-|---------|-------|
-| Parameters | — (membaca `address` dari `useAuth`) |
-| Return | `{ role, vaultAddress, isLoading }` |
-| Contract/API queried | `PayrollFactory.companyVaults`, `CompanyVault.hasRole`, `ponder.getCompanies/getStream` |
-| Used in | Role guard layout, `/employee/ewa`, `/employee/koperasi`, `/owner` |
-
-**Algoritma (FR-PAYANA-106, prioritas Owner → HR → Legal → Karyawan):**
-
-1. Cache `Map` per alamat; kembalikan jika ada.
-2. **Owner:** jika `address == NEXT_PUBLIC_OWNER_ADDRESS` → `owner`.
-3. **HR:** `companyVaults(address) != 0` → `hr` dengan `vaultAddress`.
-4. **Legal:** iterasi `getCompanies()`, resolusi vault tiap company, cek `hasRole(LEGAL_ROLE, address)` → `legal`.
-5. **Karyawan:** `ponder.getStream(address)` dengan status `Active`/`Paused` → `employee` (resolusi `vaultAddress` dari `hrAuthority`).
-6. Jika tidak ada → `role = null` (diarahkan ke onboarding).
-
-##### useContractWrite (`hooks/useContractWrite.ts`)
-
-| Atribut | Nilai |
-|---------|-------|
-| Parameters | `write({ address, abi, functionName, args })` |
-| Return | `{ write, isPending, error }` |
-| Contract/API queried | `walletClient.writeContract` (viem) via embedded wallet Privy |
-| Used in | Seluruh aksi tulis HR/Owner/Legal (mis. `startStream`, `fundVault`, `claimSalary`) |
-
-**Algoritma:**
-
-1. Pilih wallet Privy; jika tidak ada lempar `"No wallet connected"`.
-2. `switchChain(BASE_SEPOLIA.id)`; buat `walletClient` dengan transport `custom(provider)`.
-3. Tampilkan toast "Waiting for signature…" → "Broadcasting transaction…".
-4. `writeContract({account, address, abi, functionName, args})`; kembalikan `hash`.
-5. Pada error, set `error` dan toast pesan terpotong; lempar ulang.
-
-##### useTxToast (`hooks/useTxToast.ts`)
-
-| Atribut | Nilai |
-|---------|-------|
-| Parameters | — |
-| Return | `{ toasts, toast, addToast, removeToast, updateToast }` |
-| Contract/API queried | — (state UI lokal/context) |
-| Used in | `useContractWrite`, halaman onboarding/EWA |
-
-**Algoritma:** Jika dalam `TxToastContext`, gunakan provider; jika tidak, kelola state lokal. `addToast` menghasilkan id acak; toast `success`/`error` otomatis hilang setelah 5 detik; `updateToast` memperbarui pesan/tipe berdasarkan id.
-
-#### 5.3.3 Komponen Bersama (`components/shared`)
-
-| Komponen | Props Utama | Return/Render | Dipakai di |
-|----------|-------------|---------------|-----------|
-| `StreamCounter` | `flowRateWei`, `seedWei` | Penghitung saldo real-time per detik | `/employee/ewa` |
-| `IDRXAmount` | `wei` | Format nominal IDRX (1 IDRX = 1 IDR) | seluruh portal |
-| `OnChainLink` | `hash`, `type` | Tautan ke Basescan | EWA, audit |
-| `Modal` | `isOpen`, `onClose` | Dialog overlay | `/owner` (deploy/approve) |
-| Vault Balance Card | `vaultBalance`, threshold | Kartu saldo + indikator rendah | `/hr/vault` |
-
-**Algoritma `StreamCounter`:** Mulai dari `seedWei` (hasil `getAccrued`); tambahkan `flowRateWei` per detik melalui interval; resinkronisasi dengan seed terbaru saat parent melakukan polling 10 detik (NFR-10).
-
-#### 5.3.4 Integrasi Privy dan ERC-4337
-
-Diagram urutan EWA gasless end-to-end menggabungkan Privy (tanda tangan silent), backend relay, Pimlico Bundler, dan webhook konfirmasi real-time.
+**Alur Interaksi:**
 
 ```mermaid
 sequenceDiagram
     actor E as Karyawan
-    participant FE as Frontend EWA
-    participant PV as Privy Embedded Wallet
-    participant BE as Backend /bundler/relay
-    participant PM as Pimlico Bundler + Paymaster
-    participant EP as EntryPoint (Base)
-    participant V as CompanyVault
-    participant AL as Alchemy Webhook
-    participant WS as WebSocket
-
-    E->>FE: Klik "Tarik Gaji"
-    FE->>FE: bangun UserOperation (callData=claimSalary 0x5b7e8209)
-    FE->>PV: sign UserOperation (silent)
-    PV-->>FE: signature
-    FE->>BE: POST /bundler/relay {userOp, entryPoint} (Bearer JWT)
-    BE->>BE: cek JWT.address == userOp.sender
-    BE->>BE: cek selektor == claimSalary()
-    BE->>BE: checkAndIncrement (<=10/jam)
-    BE->>PM: eth_sendUserOperation
-    PM->>EP: handleOps (Paymaster sponsor gas)
-    EP->>V: claimSalary()
-    V->>V: split 93/5/2 + autoRepay + platformFee
-    V-->>EP: emit SalaryClaimed + PlatformFeePaid
-    BE-->>FE: {userOpHash}
-    AL->>BE: POST /webhook/alchemy (event SalaryClaimed)
-    BE->>BE: verifikasi HMAC + audit log
-    BE->>WS: broadcast SALARY_CLAIMED
-    WS-->>FE: pesan real-time
-    FE-->>E: tampilkan konfirmasi klaim
+    participant FE as Frontend /employee/attendance
+    E->>FE: Buka riwayat kehadiran
+    FE-->>E: Render tabel clock-in/out
 ```
 
-Catatan: untuk aksi HR/Owner/Legal (mis. `startStream`, `proposeTermination`, `fundVault`), frontend memakai jalur `useContractWrite` standar (transaksi ditandatangani dan dibayar gas oleh wallet pengguna), bukan jalur relay gasless yang dikhususkan untuk `claimSalary()` karyawan.
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Tabel kehadiran | Tabel data | Tanggal, jam masuk, jam keluar, status. |
+| Tombol clock-in/out | Tombol | Mencatat kehadiran tingkat aplikasi. |
+
+**Method/Algoritma Utama:**
+
+1. Muat riwayat kehadiran tingkat aplikasi.
+2. Aksi clock-in/out memperbarui status harian.
+
+##### 2.4.3.3 Reimburse Karyawan (`/employee/reimburse`)
+
+**Deskripsi:** Formulir pengajuan reimbursement dan pemantauan status persetujuan HR.
+**Aktor:** Karyawan.
+**FR Terkait:** — (fitur pelengkap antarmuka tingkat aplikasi).
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor E as Karyawan
+    participant FE as Frontend /employee/reimburse
+    E->>FE: Isi keterangan, jumlah, unggah bukti
+    FE-->>E: Ajukan klaim
+    E->>FE: Pantau status persetujuan
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Form klaim | Field + unggah | Keterangan biaya, jumlah IDRX, bukti. |
+| Daftar status | Tabel data | Status persetujuan HR. |
+
+**Method/Algoritma Utama:**
+
+1. Submit klaim reimbursement tingkat aplikasi.
+2. Pantau status persetujuan dari HR.
+
+##### 2.4.3.4 Bounty Karyawan (`/employee/bounty`)
+
+**Deskripsi:** Daftar program bounty yang tersedia beserta tombol klaim hadiah IDRX setelah tugas selesai.
+**Aktor:** Karyawan.
+**FR Terkait:** — (fitur pelengkap antarmuka tingkat aplikasi).
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor E as Karyawan
+    participant FE as Frontend /employee/bounty
+    E->>FE: Lihat daftar bounty
+    E->>FE: Klaim hadiah setelah tugas selesai
+    FE-->>E: Status klaim diperbarui
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Daftar bounty | Grid kartu | Judul, deskripsi, hadiah IDRX. |
+| Tombol klaim | Tombol | Mengajukan klaim penyelesaian. |
+
+**Method/Algoritma Utama:**
+
+1. Muat daftar bounty terbuka.
+2. Ajukan klaim hadiah; tunggu verifikasi HR.
+
+##### 2.4.3.5 Koperasi Karyawan (`/employee/koperasi`)
+
+**Deskripsi:** Modul simpan-pinjam koperasi: deposit, penarikan, pinjam (maks 80% gaji bulanan), dan pelunasan manual.
+**Aktor:** Karyawan.
+**FR Terkait:** FR-PAYANA-701 s.d. FR-PAYANA-705.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor E as Karyawan
+    participant FE as Frontend /employee/koperasi
+    participant PO as Ponder
+    participant IDRX as IDRX ERC-20
+    participant L as EmployeeLiquidityContract
+    FE->>PO: getPool / getDeposit / getLoan / getStream
+    PO-->>FE: data pool, deposit, pinjaman, stream
+    alt Simpan
+        E->>FE: Deposit nominal
+        FE->>IDRX: approve(liquidity, amount)
+        FE->>L: depositToPool(vaultAddress, amount)
+    else Pinjam
+        E->>FE: Pinjam (<= 80% gaji bulanan)
+        FE->>L: borrowFromPool(vaultAddress, amount)
+    else Lunasi
+        E->>FE: Bayar manual
+        FE->>IDRX: approve(liquidity, amount)
+        FE->>L: repayLoanManual(amount)
+    end
+    L-->>FE: event terkait
+    FE-->>E: Refresh saldo & pinjaman
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Tab Pinjam/Simpan | Tab navigasi | Beralih antara mode meminjam dan menyimpan. |
+| Kartu pool | Panel data | Total deposit, pinjaman berjalan, suku bunga. |
+| Slider/Input nominal | Field | Nominal pinjam/deposit; pinjam dibatasi `maxBorrow` (80% gaji bulanan). |
+| Indikator pelunasan | Progress bar | `repaidAmount / (principal + interest)`. |
+| Tombol aksi | Tombol tulis | `depositToPool`, `withdrawDeposit`, `borrowFromPool`, `repayLoanManual`. |
+
+**Method/Algoritma Utama:**
+
+1. Muat paralel `getPool(vaultAddress)`, `getDeposit(address)`, `getLoan(address)`, `getStream(address)`.
+2. Hitung `maxBorrow = floor(monthlySalary * 0.8)` dengan `monthlySalary = (flowRate/1e18) * 2.592.000`.
+3. Hitung `totalRepay = amount * (1 + interestRateBps/10000)` dan outstanding pinjaman.
+4. Aksi memanggil fungsi kontrak terkait (didahului `approve` untuk deposit/pelunasan), lalu `refreshData`.
+
+##### 2.4.3.6 Vesting Karyawan (`/employee/vesting`)
+
+**Deskripsi:** Daftar cliff vest milik karyawan beserta tombol klaim setelah cliff tercapai.
+**Aktor:** Karyawan.
+**FR Terkait:** FR-PAYANA-602, FR-PAYANA-604.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor E as Karyawan
+    participant FE as Frontend /employee/vesting
+    participant PO as Ponder (cliff_vest)
+    participant V as CompanyVault
+    FE->>PO: getVests(address)
+    PO-->>FE: daftar vest + status
+    E->>FE: Klik klaim (cliff tercapai)
+    FE->>V: claimCliffVest(vestId)
+    V-->>FE: CliffVestClaimed + transfer IDRX
+    FE-->>E: Perbarui status menjadi Claimed
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Daftar vest | Tabel/grid | Jumlah terkunci, tanggal cliff, tipe, status. |
+| Badge status | Indikator | Locked / Claimed / Forfeited. |
+| Tombol klaim | Tombol tulis | `claimCliffVest(vestId)`; aktif hanya setelah cliff. |
+
+**Method/Algoritma Utama:**
+
+1. Muat `ponder.getVests(address)`; tampilkan status dan tanggal cliff.
+2. Tombol klaim aktif jika `block.timestamp >= cliffTs` dan status `Locked`.
+3. Panggil `claimCliffVest(vestId)`; perbarui status.
+
+##### 2.4.3.7 Transfer (`/employee/transfer`)
+
+**Deskripsi:** Transfer IDRX dari Smart Account karyawan ke alamat EVM eksternal menggunakan fungsi standar ERC-20.
+**Aktor:** Karyawan.
+**FR Terkait:** FR-PAYANA-401 (pendukung pencairan).
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor E as Karyawan
+    participant FE as Frontend /employee/transfer
+    participant IDRX as IDRX ERC-20
+    E->>FE: Isi alamat tujuan + nominal
+    FE->>IDRX: balanceOf(address) (validasi saldo)
+    E->>FE: Konfirmasi transfer
+    FE->>IDRX: transfer(recipient, amountWei)
+    IDRX-->>FE: Transfer event
+    FE-->>E: Konfirmasi pengiriman
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Input alamat tujuan | Field teks | Alamat EVM eksternal (mis. MetaMask/bursa). |
+| Input nominal | Field angka | Jumlah IDRX yang dikirim. |
+| Kartu saldo | Panel data | Saldo IDRX terkini. |
+| Tombol kirim | Tombol tulis | `transfer(recipient, amountWei)`. |
+
+**Method/Algoritma Utama:**
+
+1. Baca `balanceOf(address)` untuk validasi kecukupan saldo.
+2. Konversi nominal ke wei; panggil `transfer(recipient, amountWei)` pada IDRX.
+
+##### 2.4.3.8 Pesangon (`/employee/severance`)
+
+**Deskripsi:** Tampilan saldo pesangon yang terakumulasi on-chain (2% dari setiap klaim) beserta status dan estimasi besaran berdasarkan masa kerja.
+**Aktor:** Karyawan.
+**FR Terkait:** FR-PAYANA-505, FR-PAYANA-506.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor E as Karyawan
+    participant FE as Frontend /employee/severance
+    participant V as CompanyVault
+    participant PO as Ponder (severance_vault)
+    FE->>V: getSeveranceBalance(address)
+    V-->>FE: amount terakumulasi
+    FE->>PO: severance_vault (state, tenureMonths)
+    PO-->>FE: status + masa kerja
+    FE-->>E: Tampilkan saldo + estimasi pesangon
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Kartu saldo pesangon | Panel data | `getSeveranceBalance(address)`. |
+| Badge status | Indikator | Locked / Released / Returned. |
+| Estimasi pesangon | Panel info | Estimasi berdasarkan masa kerja (UU Cipta Kerja). |
+
+**Method/Algoritma Utama:**
+
+1. Baca `getSeveranceBalance(address)` on-chain dan `severance_vault` terindeks.
+2. Tampilkan status (Locked/Released/Returned) dan estimasi statutori berdasarkan `tenureMonths`.
+
+##### 2.4.3.9 Audit Karyawan (`/employee/audit`)
+
+**Deskripsi:** Riwayat klaim gaji dan transaksi koperasi milik karyawan yang login.
+**Aktor:** Karyawan.
+**FR Terkait:** FR-PAYANA-1002 (transparansi pribadi).
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor E as Karyawan
+    participant FE as Frontend /employee/audit
+    participant PO as Ponder
+    FE->>PO: getClaims(address)
+    PO-->>FE: riwayat klaim
+    FE-->>E: Render daftar transaksi
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Tabel riwayat | Tabel data | Klaim gaji + transaksi koperasi, waktu, jumlah IDRX. |
+| Tautan transaksi | OnChainLink | Tautan Basescan per transaksi. |
+
+**Method/Algoritma Utama:**
+
+1. Ambil `ponder.getClaims(address)`; render terurut waktu.
+2. Sertakan tautan transaksi ke Basescan.
+
+##### 2.4.3.10 Pengaturan Karyawan (`/employee/settings`)
+
+**Deskripsi:** Pembaruan profil PII karyawan (nama, NIK 16 digit, telepon) yang disimpan terenkripsi.
+**Aktor:** Karyawan.
+**FR Terkait:** FR-PAYANA-104, FR-PAYANA-105.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor E as Karyawan
+    participant FE as Frontend /employee/settings
+    participant BE as Backend /auth/profile
+    participant DB as PostgreSQL (employees, AES-GCM)
+    FE->>BE: GET /auth/profile (Bearer JWT)
+    BE->>DB: SELECT + decrypt
+    BE-->>FE: {name, nik, phone}
+    E->>FE: Perbarui field
+    FE->>BE: POST /auth/profile {name, nik, phone}
+    BE->>DB: encrypt (AES-256-GCM) + upsert
+    BE-->>FE: {success: true}
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Input nama | Field teks | Nama lengkap. |
+| Input NIK | Field teks | Harus tepat 16 digit numerik. |
+| Input telepon | Field teks | Nomor telepon. |
+| Tombol simpan | Tombol | `POST /auth/profile`. |
+
+**Method/Algoritma Utama:**
+
+1. Ambil profil terkini via `backend.getProfile(token)`; prapengisian form.
+2. Validasi NIK 16 digit; submit `POST /auth/profile` (server mengenkripsi AES-256-GCM).
+
+#### 2.4.4 Portal Owner SaaS (`/owner`)
+
+**Deskripsi:** Dashboard agregat operator platform: TVL, jumlah tenant aktif, estimasi pendapatan platform fee, antrian registrasi HR, serta konfigurasi platform fee dan fungsi darurat.
+**Aktor:** Owner SaaS.
+**FR Terkait:** FR-PAYANA-1002, FR-PAYANA-1004, FR-PAYANA-1006, FR-PAYANA-1008, FR-PAYANA-108, FR-PAYANA-109.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor O as Owner
+    participant FE as Frontend /owner
+    participant BE as Backend /registration
+    participant PO as Ponder
+    participant F as PayrollFactory
+    FE->>FE: Owner guard (address == OWNER_ADDRESS)
+    FE->>BE: GET /registration/pending (Bearer JWT)
+    BE-->>FE: antrian registrasi
+    FE->>PO: getCompanies / getPlatformFees
+    PO-->>FE: tenant + estimasi pendapatan
+    O->>FE: Setujui registrasi
+    FE->>BE: PATCH /registration/:address/approve
+    O->>FE: Tolak registrasi
+    FE->>BE: DELETE /registration/:address
+    O->>FE: Set platform fee / freeze
+    FE->>F: setPlatformFee(bps) / emergencyFreezeAll()
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Kartu metrik | Panel data | TVL, jumlah tenant (`getCompanies`/`getTotalVaults`), estimasi fee. |
+| Grafik pendapatan | AreaChart | Tren pendapatan platform. |
+| Tab registrasi | Tab + tabel | Pending / Approved / Rejected. |
+| Tombol setujui/tolak | Grup tombol | `approve` / `reject` registrasi. |
+| Form platform fee | Field + tombol | `setPlatformFee(bps)` (maks 100 bps). |
+| Tombol freeze darurat | Tombol tulis | `emergencyFreezeAll()`. |
+
+**Method/Algoritma Utama:**
+
+1. Owner guard: bandingkan `address` dengan `NEXT_PUBLIC_OWNER_ADDRESS`; jika tidak cocok, redirect ke `/login`.
+2. Muat `registration.getPending(token)` dan `ponder.getCompanies()`/`ponder.getPlatformFees()`.
+3. `handleApprove`/`handleReject` memanggil endpoint registrasi lalu refresh.
+4. Konfigurasi fee via `setPlatformFee(bps)`; pembekuan via `emergencyFreezeAll()`.
+
+#### 2.4.5 Portal Legal Officer
+
+**Deskripsi:** Legal Officer tidak memiliki prefiks rute tersendiri; perannya difokuskan pada persetujuan PHK melalui antarmuka `/hr/phk` dalam mode terbatas.
+**Aktor:** Legal Officer.
+**FR Terkait:** FR-PAYANA-502.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor Legal as Legal Officer
+    participant FE as Frontend /hr/phk (mode Legal)
+    participant V as CompanyVault
+    FE->>FE: useRole deteksi LEGAL_ROLE pada vault
+    FE-->>Legal: Tampilkan hanya proposal menunggu persetujuan
+    Legal->>V: approveTermination(employee)
+    V-->>Legal: TerminationApproved
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Daftar proposal menunggu | Tabel data | Hanya proposal yang `legalApproved == false`. |
+| Tombol setujui | Tombol tulis | `approveTermination(employee)`. |
+
+**Method/Algoritma Utama:**
+
+1. `useRole` mengiterasi `getCompanies()` dan memeriksa `hasRole(LEGAL_ROLE, address)` per vault.
+2. Pada mode Legal, antarmuka hanya menampilkan proposal menunggu dan tombol `approveTermination`.
+3. Legal Officer tidak dapat mengajukan proposal, mengelola stream, atau mengakses treasury.
 
 ---
 
-## 6. Perancangan Keamanan
-
-### 6.1 Keamanan Smart Contract
-
-1. **Pola CEI (Checks-Effects-Interactions):** `claimSalary()`, `withdrawDeposit()`, `executeTermination()`, dan `withdrawVault()` melakukan seluruh perubahan state sebelum transfer eksternal untuk mencegah reentrancy.
-2. **ReentrancyGuard:** modifier `nonReentrant` pada fungsi yang melakukan transfer IDRX (`claimSalary`, `withdrawVault`, `executeTermination`, `resignEmployee`, `withdrawCompliance`, `claimCliffVest`, serta fungsi koperasi `depositToPool`, `withdrawDeposit`, `borrowFromPool`, `repayLoanManual`, `autoRepay`).
-3. **AccessControl Berbasis Peran:** `SUPERADMIN_ROLE` (Factory), `HR_ROLE` & `LEGAL_ROLE` (Vault), `MINTER_ROLE` (SBT), `OPS_ROLE` & `PAYROLL_ROLE` (Liquidity). Setiap fungsi sensitif dilindungi modifier peran.
-4. **Multi-Sig PHK:** PHK memerlukan dua tanda tangan berurutan (HR via `proposeTermination`, Legal via `approveTermination`) dengan kadaluarsa 7 hari, mencegah PHK sewenang-wenang.
-5. **SafeERC20:** seluruh transfer IDRX memakai `safeTransfer`/`safeTransferFrom`.
-6. **Pausable/Freeze:** `pauseVault`/`resumeVault` untuk jeda operasional; `freezeVault`/`emergencyFreezeAll` untuk pembekuan permanen (irreversible) sebagai respons eksploitasi.
-7. **Validasi Input:** `validateSplits` memastikan total split = 10.000 bps; cap pinjaman 80% gaji dan 8.000.000 IDRX; cap platform fee 100 bps; cliff harus di masa depan.
-8. **try/catch Defensif:** mint/revoke SBT dan inisialisasi pool dibungkus try/catch agar kegagalan dependensi tidak membatalkan operasi inti.
-9. **Privasi via FHE:** `ConfidentialCompanyVault` menyimpan gaji sebagai `euint256` dengan ACL Inco; tidak ada plaintext di calldata, storage, atau event.
-
-### 6.2 Keamanan Backend
-
-1. **JWT + JTI:** access token 15 menit, refresh token 7 hari; setiap sesi memiliki `jti` tersimpan di tabel `sessions` sehingga logout/revocation bersifat deterministik (bukan sekadar bergantung kadaluarsa).
-2. **AES-256-GCM untuk PII:** nama, NIK, dan telepon dienkripsi dengan IV acak 12-byte dan auth tag (format `iv:tag:ciphertext`); kunci diturunkan via SHA-256 dari `ENCRYPTION_KEY` (UU PDP).
-3. **Verifikasi EIP-191:** `verifyMessage` (viem) + replay protection ±5 menit berdasarkan `Timestamp` dalam pesan.
-4. **HMAC Webhook:** verifikasi `x-alchemy-signature` dengan `timingSafeEqual` untuk mencegah brute-force timing.
-5. **Gerbang Relay Bundler:** validasi kepemilikan Smart Account (JWT == sender), whitelist selektor `claimSalary()`, dan rate-limit 10/jam untuk melindungi anggaran Paymaster.
-6. **Otorisasi Granular:** endpoint compliance dan registration memverifikasi kepemilikan data (HR hanya data sendiri) dan peran Owner (`requireOwner`).
-7. **Helmet & CORS:** header keamanan HTTP dan pembatasan origin ke `FRONTEND_URL`.
-
-### 6.3 Keamanan Frontend
-
-1. **Privy WaaS:** kunci privat dikelola Privy (embedded wallet); pengguna tidak menyimpan seed phrase. Penandatanganan dilakukan secara silent untuk klaim gaji.
-2. **Role Guard:** `useRole` menentukan peran dari kondisi on-chain; akses portal dibatasi sesuai peran, dengan prioritas Owner → HR → Legal → Karyawan.
-3. **Token Refresh:** `useAuth` menyimpan refresh token di `localStorage` dan mencoba `/auth/refresh` sebelum meminta tanda tangan ulang, mengurangi friksi sekaligus menjaga umur access token pendek.
-4. **Pemisahan Chain:** seluruh interaksi dipaksa ke Base Sepolia (`switchChain(84532)`) sebelum penandatanganan untuk mencegah salah jaringan.
 
 ---
 
@@ -4158,4 +3668,575 @@ Bagian ini merinci variabel state React, komputasi turunan, aturan validasi, dan
 
 ---
 
-*Dokumen DPPL Payana — Revisi C, Juni 2026 (akhir dokumen, termasuk pelengkap A.4–A.8).*
+*Dokumen DPPL Payana — Revisi E, Juni 2026 (akhir dokumen, termasuk pelengkap A.4–A.8).*
+
+---
+
+## B. Lampiran B — Perancangan Backend API
+
+
+Backend Express 5 mengekspos REST API. Middleware global: `helmet`, `cors` (origin dibatasi `FRONTEND_URL`), `express.json` (kecuali `/webhook` yang menggunakan `express.raw` untuk verifikasi HMAC). Endpoint terproteksi memakai middleware `requireAuth` (Bearer JWT) dan, untuk endpoint Owner, `requireOwner`.
+
+| Grup | Mount | Proteksi |
+|------|-------|----------|
+| `/auth` | publik | login/refresh publik; profile/logout butuh JWT |
+| `/bundler` | `requireAuth` | JWT wajib |
+| `/compliance` | `requireAuth` | JWT wajib + kepemilikan data |
+| `/registration` | campuran | `/request` & `/status` publik; lainnya JWT + Owner |
+| `/webhook` | HMAC Alchemy | tanpa JWT |
+
+#### 5.2.1 Grup Autentikasi (`/auth`)
+
+**[POST /auth/login]**
+| | |
+|---|---|
+| Input | - |
+| Output | - |
+| Deskripsi | ; sesuai FR-PAYANA-101 |
+
+**Request Body:**
+
+```json
+{
+  "address": "0xabc...123",
+  "message": "Sign in to Payana\nTimestamp: 1733500000",
+  "signature": "0x9f8c...",
+  "timestamp": "1733500000"
+}
+```
+
+**Response 200:**
+
+```json
+{
+  "accessToken": "eyJhbGciOi...",
+  "refreshToken": "eyJhbGciOi...",
+  "address": "0xabc...123"
+}
+```
+
+**Tabel Error:**
+
+| Kode | Error | Penyebab |
+|------|-------|----------|
+| 400 | BAD_REQUEST | `address`/`message`/`signature` kosong, atau pesan tanpa `Timestamp:`, atau tanda tangan malformed |
+| 401 | UNAUTHORIZED | Skew waktu > ±5 menit, atau verifikasi tanda tangan gagal |
+| 500 | INTERNAL_ERROR | Gagal menyimpan sesi |
+
+**Algoritma:**
+
+1. Validasi field; ekstrak `Timestamp:` dari pesan dengan regex.
+2. Tolak jika `|now - msgTs| > 300` detik (replay protection).
+3. `verifyMessage` (viem) terhadap `{address, message, signature}`; tolak jika tidak valid.
+4. Buat `jti = randomUUID()`, `expiresAt = now + 7 hari`; `INSERT` sesi ke tabel `sessions`.
+5. Terbitkan `accessToken` (15 menit) dan `refreshToken` (7 hari) via `jwt.sign({address, jti})`.
+
+**[POST /auth/refresh]**
+| | |
+|---|---|
+| Input | - |
+| Output | - |
+| Deskripsi | ; sesuai FR-PAYANA-102 |
+
+**Request Body:** `{ "refreshToken": "eyJhbGciOi..." }`
+
+**Response 200:** `{ "accessToken": "eyJhbGciOi..." }`
+
+**Tabel Error:**
+
+| Kode | Error | Penyebab |
+|------|-------|----------|
+| 400 | BAD_REQUEST | `refreshToken` kosong |
+| 401 | UNAUTHORIZED | Sesi (jti) telah dicabut/kadaluarsa, atau token invalid |
+| 500 | INTERNAL_ERROR | JWT secret tidak terkonfigurasi |
+
+**Algoritma:**
+
+1. `jwt.verify(refreshToken, refreshSecret)` → `{address, jti}`.
+2. Validasi sesi `jti` masih ada dan belum kadaluarsa di tabel `sessions`.
+3. Terbitkan `accessToken` baru (15 menit) dengan `{address, jti}` yang sama.
+
+**[POST /auth/logout]**
+| | |
+|---|---|
+| Input | - |
+| Output | - |
+| Deskripsi | ; sesuai FR-PAYANA-103 |
+
+**Response 200:** `{ "message": "Successfully logged out and session revoked" }`
+
+**Algoritma:** Hapus sesi berdasarkan `jti` dari token (`DELETE FROM sessions WHERE jti = ?`). Revocation bersifat deterministik.
+
+**[POST /auth/profile]**
+| | |
+|---|---|
+| Input | - |
+| Output | - |
+| Deskripsi | ; sesuai FR-PAYANA-104 |
+
+**Request Body:** `{ "name": "Budi Santoso", "nik": "3201234567890123", "phone": "08123456789" }`
+
+**Response 200:** `{ "success": true, "message": "Employee profile encrypted and saved successfully" }`
+
+**Tabel Error:**
+
+| Kode | Error | Penyebab |
+|------|-------|----------|
+| 400 | BAD_REQUEST | Field kosong atau NIK bukan 16 digit numerik |
+| 500 | INTERNAL_ERROR | Gagal menyimpan |
+
+**Algoritma:**
+
+1. Validasi `name`, `nik`, `phone` tidak kosong; `nik` harus cocok `^\d{16}$`.
+2. Enkripsi ketiganya dengan `encrypt()` (AES-256-GCM).
+3. Upsert (`onConflictDoUpdate` by `address`) ke tabel `employees` dengan `updatedAt = now`.
+
+**[GET /auth/profile]**
+| | |
+|---|---|
+| Input | - |
+| Output | - |
+| Deskripsi | ; sesuai FR-PAYANA-105 |
+
+**Response 200:**
+
+```json
+{
+  "address": "0xabc...123",
+  "name": "Budi Santoso",
+  "nik": "3201234567890123",
+  "phone": "08123456789",
+  "createdAt": "2026-01-01T00:00:00.000Z",
+  "updatedAt": "2026-06-01T00:00:00.000Z"
+}
+```
+
+**Tabel Error:** 404 NOT_FOUND (profil tidak ada); 500 INTERNAL_ERROR (gagal dekripsi/baca).
+
+**Algoritma:** Ambil baris `employees` milik caller; dekripsi `name/nik/phone` via `decrypt()`; kembalikan plaintext.
+
+#### 5.2.2 Grup Bundler Relay (`/bundler`)
+
+**[POST /bundler/relay]**
+| | |
+|---|---|
+| Input | - |
+| Output | - |
+| Deskripsi | ; sesuai FR-PAYANA-403, FR-PAYANA-404 |
+
+**Request Body:**
+
+```json
+{
+  "userOp": {
+    "sender": "0xabc...123",
+    "nonce": "0x1",
+    "callData": "0x5b7e8209",
+    "preVerificationGas": "0x...",
+    "maxFeePerGas": "0x...",
+    "maxPriorityFeePerGas": "0x...",
+    "signature": "0x..."
+  },
+  "entryPoint": "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
+}
+```
+
+**Response 200:** `{ "userOpHash": "0x7d2a..." }`
+
+**Tabel Error:**
+
+| Kode | Error | Penyebab |
+|------|-------|----------|
+| 400 | BAD_REQUEST | `userOp.sender` hilang |
+| 403 | FORBIDDEN | Alamat JWT ≠ `userOp.sender`, atau selektor calldata bukan `0x5b7e8209` |
+| 429 | TOO_MANY_REQUESTS | Melebihi 10 klaim/jam |
+| 502 | BAD_GATEWAY | Bundler menolak atau tidak dapat dihubungi |
+| 500 | INTERNAL_ERROR | `BUNDLER_RPC_URL` tidak terkonfigurasi |
+
+**Algoritma:**
+
+1. Validasi `userOp.sender` ada; ambil `employee = sender.toLowerCase()`.
+2. **Gerbang kepemilikan:** alamat JWT harus sama dengan `employee` (`403`).
+3. **Whitelist selektor:** `callData[0..10] == 0x5b7e8209` (`claimSalary()`); selain itu `403`.
+4. **Rate limit:** `checkAndIncrement(employee)`; jika false `429`.
+5. Teruskan `eth_sendUserOperation` ke Pimlico (`BUNDLER_RPC_URL`); jika error `502`.
+6. Catat `BUNDLER_RELAY` di `audit_logs`; kembalikan `userOpHash`. Mendukung EntryPoint v0.6 dan v0.7.
+
+**[GET /bundler/status/:userOpHash]**
+| | |
+|---|---|
+| Input | - |
+| Output | - |
+| Deskripsi | ; sesuai FR-PAYANA-405 |
+
+**Response 200:** `{ "receipt": { ... } }` (atau `null` jika belum tersedia).
+
+**Algoritma:** Panggil `eth_getUserOperationReceipt` ke bundler; kembalikan `receipt`. Polling oleh frontend.
+
+#### 5.2.3 Grup Compliance (`/compliance`)
+
+**[GET /compliance/export/:hr?month=YYYY-MM]**
+| | |
+|---|---|
+| Input | - |
+| Output | - |
+| Deskripsi | ; sesuai FR-PAYANA-804 |
+
+**Response 200:** Berkas CSV (`Content-Type: text/csv`, attachment). Header kolom:
+
+```
+employee_address,employee_name,employee_nik,employee_phone,claim_count,total_accrued_idrx,compliance_bpjs_idrx,severance_idrx
+```
+
+**Tabel Error:**
+
+| Kode | Error | Penyebab |
+|------|-------|----------|
+| 403 | FORBIDDEN | Alamat JWT ≠ `:hr` |
+| 400 | BAD_REQUEST | `month` tidak ber-format `YYYY-MM` |
+| 404 | NOT_FOUND | Tidak ada klaim pada periode |
+| 500 | INTERNAL_ERROR | Kegagalan kueri |
+
+**Algoritma:**
+
+1. Verifikasi `callerAddress == :hr` (`403`); validasi `month`.
+2. Hitung rentang `[from, to)` Unix dari bulan.
+3. Kueri SQL `salary_claim` (`GROUP BY employee`: `COUNT(*)`, `SUM(accrued)`, `SUM(to_compliance)`, `SUM(to_severance)`).
+4. Ambil profil dari `employees`; dekripsi `name/nik/phone`; bangun baris CSV (escape nama mengandung koma).
+5. Catat `COMPLIANCE_EXPORT` di `audit_logs`; kirim CSV.
+
+**[GET /compliance/summary/:hr?month=YYYY-MM]**
+| | |
+|---|---|
+| Input | - |
+| Output | - |
+| Deskripsi | ; sesuai FR-PAYANA-805 |
+
+**Response 200:**
+
+```json
+{
+  "month": "2026-05",
+  "hrAddress": "0xhr...",
+  "employeeCount": "12",
+  "totalAccrued": "150000000000000000000000",
+  "totalCompliance": "7500000000000000000000",
+  "totalSeverance": "3000000000000000000000",
+  "rows": [
+    { "employee": "0xemp...", "claim_count": "20", "total_accrued": "...", "total_compliance": "...", "total_severance": "..." }
+  ]
+}
+```
+
+**Tabel Error:** 403 FORBIDDEN; 400 BAD_REQUEST; 500 INTERNAL_ERROR.
+
+**Algoritma:** Verifikasi kepemilikan; jalankan agregat total (`COUNT(DISTINCT employee)`, `SUM(...)`) dan rincian per karyawan dari `salary_claim`; kembalikan JSON.
+
+#### 5.2.4 Grup Registrasi (`/registration`)
+
+**[POST /registration/request]**
+| | |
+|---|---|
+| Input | - |
+| Output | - |
+| Deskripsi | ; sesuai FR-PAYANA-107 |
+
+**Request Body:** `{ "address": "0xhr...", "email": "hr@co.com", "name": "PT Karya" }`
+
+**Response 200:** `{ "ok": true }`
+
+**Tabel Error:** 400 (`address` hilang); 500 (db error).
+
+**Algoritma:** Upsert (`onConflictDoUpdate` by `address`) ke `pending_registrations` dengan status default `pending`.
+
+**[GET /registration/status/:address]**
+| | |
+|---|---|
+| Input | - |
+| Output | - |
+| Deskripsi | ; sesuai FR-PAYANA-107 |
+
+**Response 200:** `{ "status": "pending", "requestedAt": "..." }` atau `{ "status": "none" }`.
+
+**Algoritma:** Ambil baris by `address`; kembalikan status (`none` jika tidak ada).
+
+**[GET /registration/pending]**
+| | |
+|---|---|
+| Input | - |
+| Output | - |
+| Deskripsi | ; sesuai FR-PAYANA-108 |
+
+**Response 200:** Array baris `pending_registrations` terurut `requestedAt`.
+
+**Algoritma:** `requireOwner` memverifikasi alamat JWT terhadap `OWNER_ADDRESS`; kembalikan seluruh antrian.
+
+**[PATCH /registration/:address/approve]**
+| | |
+|---|---|
+| Input | - |
+| Output | - |
+| Deskripsi | ; sesuai FR-PAYANA-109 |
+
+**Response 200:** `{ "ok": true }`
+
+**Algoritma:** Set `status = "approved"`, `updatedAt = now` untuk `address`.
+
+**[DELETE /registration/:address]**
+| | |
+|---|---|
+| Input | - |
+| Output | - |
+| Deskripsi | ; sesuai FR-PAYANA-109 |
+
+**Response 200:** `{ "ok": true }`
+
+**Algoritma:** Set `status = "rejected"` (soft reject, tidak menghapus baris).
+
+#### 5.2.5 Grup Webhook (`/webhook`)
+
+**[POST /webhook/alchemy]**
+| | |
+|---|---|
+| Input | - |
+| Output | - |
+| Deskripsi | ; sesuai FR-PAYANA-207, FR-PAYANA-405, FR-PAYANA-1008, FR-PAYANA-1102 |
+
+**Request Body (ringkas):**
+
+```json
+{
+  "webhookId": "wh_abc123",
+  "type": "GRAPHQL",
+  "event": { "data": { "block": { "logs": [ { "topics": ["0x..."], "data": "0x...", "address": "0x...", "transactionHash": "0x..." } ] } } }
+}
+```
+
+**Response 200:** `{ "status": "ok", "logsProcessed": 1 }` atau `{ "status": "already_processed" }`.
+
+**Tabel Error:** 401 UNAUTHORIZED (tanda tangan HMAC tidak valid).
+
+**Algoritma:**
+
+1. Verifikasi `x-alchemy-signature` dengan HMAC-SHA256 + `timingSafeEqual`.
+2. Deduplikasi via `webhook_events` (lewati jika sudah `processed`); upsert id.
+3. Untuk setiap log, cocokkan `topics[0]` dengan topic hash kanonik dan tangani:
+   - `LowVaultBalance` → audit `LOW_VAULT_BALANCE_ALERT` + broadcast `LOW_VAULT_BALANCE`.
+   - `SalaryClaimed` → broadcast `SALARY_CLAIMED`.
+   - `PlatformFeePaid` → audit `PLATFORM_FEE_PAID` + broadcast `PLATFORM_FEE_PAID`.
+   - `EncryptedSalarySet` → audit `ENCRYPTED_SALARY_SET` + broadcast `ENCRYPTED_SALARY_SET` (tanpa plaintext).
+4. Tandai event `processed = true`.
+
+#### 5.2.6 Layanan Background
+
+**[Liquidation Cron (`liquidation.ts`)]**
+| | |
+|---|---|
+| Input | - |
+| Output | - |
+| Deskripsi | ; sesuai FR-PAYANA-704 |
+
+**Algoritma:**
+
+1. Hitung `cutoff = now - 7 hari`; kueri `loan_record` berstatus `Active` dengan `due_ts < cutoff`.
+2. Untuk setiap borrower, gunakan wallet `OPS_PRIVATE_KEY` (OPS_ROLE) memanggil `liquidateLoan(borrower)`.
+3. Tunggu receipt; catat `LOAN_LIQUIDATED` di `audit_logs`.
+
+**[Paymaster Monitor (`paymasterMonitor.ts`)]**
+| | |
+|---|---|
+| Input | - |
+| Output | - |
+| Deskripsi | ; sesuai NFR (anggaran Paymaster) |
+
+**Algoritma:**
+
+1. Baca saldo ETH `PAYMASTER_ADDRESS` (`getBalance`).
+2. Jika `>= ALERT_THRESHOLD` (default 0,05 ETH), berhenti.
+3. Jika di bawah ambang, catat `PAYMASTER_LOW_BALANCE` dan kirim alert ke `OPS_ALERT_WEBHOOK_URL`.
+
+#### 5.2.7 Layanan WebSocket (`wsServer.ts`)
+
+`WebSocketServer` dilampirkan ke server HTTP yang sama (`ws://host:PORT`). Fungsi `broadcast(type, payload)` mengirim pesan JSON ke seluruh klien `OPEN`.
+
+| Tipe | Pemicu | Tujuan Dashboard |
+|------|--------|------------------|
+| `LOW_VAULT_BALANCE` | event `LowVaultBalance` | HR (`/hr/vault`) |
+| `SALARY_CLAIMED` | event `SalaryClaimed` | Karyawan (`/employee/ewa`) |
+| `PLATFORM_FEE_PAID` | event `PlatformFeePaid` | Owner (`/owner`) |
+| `ENCRYPTED_SALARY_SET` | event `EncryptedSalarySet` | HR (FHE) |
+
+**Algoritma `broadcast`:** Jika server belum dibuat, no-op + peringatan. Jika ada, serialisasi `{type, payload}` dan kirim ke setiap klien dengan `readyState == OPEN`.
+
+#### 5.2.8 Layanan Pendukung
+
+- **`encryption.ts`:** `encrypt(text)` menghasilkan `iv_hex:authTag_hex:ciphertext_hex` (AES-256-GCM, IV 12-byte acak, kunci SHA-256 dari `ENCRYPTION_KEY`); `decrypt(cipherText)` membalik proses dengan verifikasi auth tag.
+- **`rateLimiter.ts`:** `checkAndIncrement(addr)` mengelola jendela 1 jam per karyawan di tabel `rate_limits`; reset jendela jika kedaluwarsa; tolak jika `claimCount >= MAX_CLAIMS` (default 10).
+
+---
+
+
+---
+
+## C. Lampiran C — Perancangan Frontend
+
+
+Frontend dibangun dengan Next.js 16 (App Router), React 19, Tailwind CSS 4, Shadcn/UI, wagmi 2.15, viem 2.47, dan Privy `@privy-io/react-auth` 2.10. Pembacaan on-chain memakai `publicClient` (viem) terhadap kontrak di `CONTRACTS`; pembacaan agregat memakai Ponder via `lib/api.ts`.
+
+#### 5.3.1 Klien Data (`lib/api.ts`)
+
+`lib/api.ts` mengekspos tiga klien:
+
+| Klien | Method Utama | Sumber | Dipakai di |
+|-------|--------------|--------|-----------|
+| `ponder` | `getCompany`, `getCompanies`, `getStream`, `getStreams`, `getClaims`, `getVests`, `getPool`, `getDeposit`, `getLoan`, `getPlatformFees`, `getEncryptedSalaries`, `getAuditorGrants` | Ponder GraphQL/REST | seluruh portal |
+| `backend` | `getComplianceSummary`, `getProfile`, `updateProfile` | Backend REST + JWT | `/hr/compliance`, `/employee/settings` |
+| `registration` | `submit`, `getStatus`, `getPending`, `approve`, `reject` | Backend `/registration` | `/onboarding`, `/owner` |
+
+#### 5.3.2 Custom Hook Web3
+
+**[useAuth (`hooks/useAuth.ts`)]**
+| | |
+|---|---|
+| Input | - |
+| Output | `{ address, token, isReady, login, logout }` |
+| Deskripsi |  |
+
+**Algoritma:**
+
+1. Pilih wallet Privy (`walletClientType === "privy"`) atau fallback wallet pertama; set `address`.
+2. Pada autentikasi tanpa token, coba `payana_refresh_token` di `localStorage` via `POST /auth/refresh`.
+3. Jika refresh gagal, bentuk pesan ber-timestamp, `switchChain(84532)`, `personal_sign`, lalu `POST /auth/login`; simpan `token` + `refreshToken`.
+4. `logout`: bersihkan token/address, hapus refresh token, panggil `privyLogout()`.
+5. Guard `isSigningIn` (useRef) mencegah loop tanda tangan ganda.
+
+**[useRole (`hooks/useRole.ts`)]**
+| | |
+|---|---|
+| Input | - |
+| Output | `{ role, vaultAddress, isLoading }` |
+| Deskripsi |  |
+
+**Algoritma (FR-PAYANA-106, prioritas Owner → HR → Legal → Karyawan):**
+
+1. Cache `Map` per alamat; kembalikan jika ada.
+2. **Owner:** jika `address == NEXT_PUBLIC_OWNER_ADDRESS` → `owner`.
+3. **HR:** `companyVaults(address) != 0` → `hr` dengan `vaultAddress`.
+4. **Legal:** iterasi `getCompanies()`, resolusi vault tiap company, cek `hasRole(LEGAL_ROLE, address)` → `legal`.
+5. **Karyawan:** `ponder.getStream(address)` dengan status `Active`/`Paused` → `employee` (resolusi `vaultAddress` dari `hrAuthority`).
+6. Jika tidak ada → `role = null` (diarahkan ke onboarding).
+
+**[useContractWrite (`hooks/useContractWrite.ts`)]**
+| | |
+|---|---|
+| Input | - |
+| Output | `{ write, isPending, error }` |
+| Deskripsi |  |
+
+**Algoritma:**
+
+1. Pilih wallet Privy; jika tidak ada lempar `"No wallet connected"`.
+2. `switchChain(BASE_SEPOLIA.id)`; buat `walletClient` dengan transport `custom(provider)`.
+3. Tampilkan toast "Waiting for signature…" → "Broadcasting transaction…".
+4. `writeContract({account, address, abi, functionName, args})`; kembalikan `hash`.
+5. Pada error, set `error` dan toast pesan terpotong; lempar ulang.
+
+**[useTxToast (`hooks/useTxToast.ts`)]**
+| | |
+|---|---|
+| Input | - |
+| Output | `{ toasts, toast, addToast, removeToast, updateToast }` |
+| Deskripsi |  |
+
+**Algoritma:** Jika dalam `TxToastContext`, gunakan provider; jika tidak, kelola state lokal. `addToast` menghasilkan id acak; toast `success`/`error` otomatis hilang setelah 5 detik; `updateToast` memperbarui pesan/tipe berdasarkan id.
+
+#### 5.3.3 Komponen Bersama (`components/shared`)
+
+| Komponen | Props Utama | Return/Render | Dipakai di |
+|----------|-------------|---------------|-----------|
+| `StreamCounter` | `flowRateWei`, `seedWei` | Penghitung saldo real-time per detik | `/employee/ewa` |
+| `IDRXAmount` | `wei` | Format nominal IDRX (1 IDRX = 1 IDR) | seluruh portal |
+| `OnChainLink` | `hash`, `type` | Tautan ke Basescan | EWA, audit |
+| `Modal` | `isOpen`, `onClose` | Dialog overlay | `/owner` (deploy/approve) |
+| Vault Balance Card | `vaultBalance`, threshold | Kartu saldo + indikator rendah | `/hr/vault` |
+
+**Algoritma `StreamCounter`:** Mulai dari `seedWei` (hasil `getAccrued`); tambahkan `flowRateWei` per detik melalui interval; resinkronisasi dengan seed terbaru saat parent melakukan polling 10 detik (NFR-10).
+
+#### 5.3.4 Integrasi Privy dan ERC-4337
+
+Diagram urutan EWA gasless end-to-end menggabungkan Privy (tanda tangan silent), backend relay, Pimlico Bundler, dan webhook konfirmasi real-time.
+
+```mermaid
+sequenceDiagram
+    actor E as Karyawan
+    participant FE as Frontend EWA
+    participant PV as Privy Embedded Wallet
+    participant BE as Backend /bundler/relay
+    participant PM as Pimlico Bundler + Paymaster
+    participant EP as EntryPoint (Base)
+    participant V as CompanyVault
+    participant AL as Alchemy Webhook
+    participant WS as WebSocket
+
+    E->>FE: Klik "Tarik Gaji"
+    FE->>FE: bangun UserOperation (callData=claimSalary 0x5b7e8209)
+    FE->>PV: sign UserOperation (silent)
+    PV-->>FE: signature
+    FE->>BE: POST /bundler/relay {userOp, entryPoint} (Bearer JWT)
+    BE->>BE: cek JWT.address == userOp.sender
+    BE->>BE: cek selektor == claimSalary()
+    BE->>BE: checkAndIncrement (<=10/jam)
+    BE->>PM: eth_sendUserOperation
+    PM->>EP: handleOps (Paymaster sponsor gas)
+    EP->>V: claimSalary()
+    V->>V: split 93/5/2 + autoRepay + platformFee
+    V-->>EP: emit SalaryClaimed + PlatformFeePaid
+    BE-->>FE: {userOpHash}
+    AL->>BE: POST /webhook/alchemy (event SalaryClaimed)
+    BE->>BE: verifikasi HMAC + audit log
+    BE->>WS: broadcast SALARY_CLAIMED
+    WS-->>FE: pesan real-time
+    FE-->>E: tampilkan konfirmasi klaim
+```
+
+Catatan: untuk aksi HR/Owner/Legal (mis. `startStream`, `proposeTermination`, `fundVault`), frontend memakai jalur `useContractWrite` standar (transaksi ditandatangani dan dibayar gas oleh wallet pengguna), bukan jalur relay gasless yang dikhususkan untuk `claimSalary()` karyawan.
+
+---
+
+
+---
+
+## D. Lampiran D — Perancangan Keamanan
+
+
+### 6.1 Keamanan Smart Contract
+
+1. **Pola CEI (Checks-Effects-Interactions):** `claimSalary()`, `withdrawDeposit()`, `executeTermination()`, dan `withdrawVault()` melakukan seluruh perubahan state sebelum transfer eksternal untuk mencegah reentrancy.
+2. **ReentrancyGuard:** modifier `nonReentrant` pada fungsi yang melakukan transfer IDRX (`claimSalary`, `withdrawVault`, `executeTermination`, `resignEmployee`, `withdrawCompliance`, `claimCliffVest`, serta fungsi koperasi `depositToPool`, `withdrawDeposit`, `borrowFromPool`, `repayLoanManual`, `autoRepay`).
+3. **AccessControl Berbasis Peran:** `SUPERADMIN_ROLE` (Factory), `HR_ROLE` & `LEGAL_ROLE` (Vault), `MINTER_ROLE` (SBT), `OPS_ROLE` & `PAYROLL_ROLE` (Liquidity). Setiap fungsi sensitif dilindungi modifier peran.
+4. **Multi-Sig PHK:** PHK memerlukan dua tanda tangan berurutan (HR via `proposeTermination`, Legal via `approveTermination`) dengan kadaluarsa 7 hari, mencegah PHK sewenang-wenang.
+5. **SafeERC20:** seluruh transfer IDRX memakai `safeTransfer`/`safeTransferFrom`.
+6. **Pausable/Freeze:** `pauseVault`/`resumeVault` untuk jeda operasional; `freezeVault`/`emergencyFreezeAll` untuk pembekuan permanen (irreversible) sebagai respons eksploitasi.
+7. **Validasi Input:** `validateSplits` memastikan total split = 10.000 bps; cap pinjaman 80% gaji dan 8.000.000 IDRX; cap platform fee 100 bps; cliff harus di masa depan.
+8. **try/catch Defensif:** mint/revoke SBT dan inisialisasi pool dibungkus try/catch agar kegagalan dependensi tidak membatalkan operasi inti.
+9. **Privasi via FHE:** `ConfidentialCompanyVault` menyimpan gaji sebagai `euint256` dengan ACL Inco; tidak ada plaintext di calldata, storage, atau event.
+
+### 6.2 Keamanan Backend
+
+1. **JWT + JTI:** access token 15 menit, refresh token 7 hari; setiap sesi memiliki `jti` tersimpan di tabel `sessions` sehingga logout/revocation bersifat deterministik (bukan sekadar bergantung kadaluarsa).
+2. **AES-256-GCM untuk PII:** nama, NIK, dan telepon dienkripsi dengan IV acak 12-byte dan auth tag (format `iv:tag:ciphertext`); kunci diturunkan via SHA-256 dari `ENCRYPTION_KEY` (UU PDP).
+3. **Verifikasi EIP-191:** `verifyMessage` (viem) + replay protection ±5 menit berdasarkan `Timestamp` dalam pesan.
+4. **HMAC Webhook:** verifikasi `x-alchemy-signature` dengan `timingSafeEqual` untuk mencegah brute-force timing.
+5. **Gerbang Relay Bundler:** validasi kepemilikan Smart Account (JWT == sender), whitelist selektor `claimSalary()`, dan rate-limit 10/jam untuk melindungi anggaran Paymaster.
+6. **Otorisasi Granular:** endpoint compliance dan registration memverifikasi kepemilikan data (HR hanya data sendiri) dan peran Owner (`requireOwner`).
+7. **Helmet & CORS:** header keamanan HTTP dan pembatasan origin ke `FRONTEND_URL`.
+
+### 6.3 Keamanan Frontend
+
+1. **Privy WaaS:** kunci privat dikelola Privy (embedded wallet); pengguna tidak menyimpan seed phrase. Penandatanganan dilakukan secara silent untuk klaim gaji.
+2. **Role Guard:** `useRole` menentukan peran dari kondisi on-chain; akses portal dibatasi sesuai peran, dengan prioritas Owner → HR → Legal → Karyawan.
+3. **Token Refresh:** `useAuth` menyimpan refresh token di `localStorage` dan mencoba `/auth/refresh` sebelum meminta tanda tangan ulang, mengurangi friksi sekaligus menjaga umur access token pendek.
+4. **Pemisahan Chain:** seluruh interaksi dipaksa ke Base Sepolia (`switchChain(84532)`) sebelum penandatanganan untuk mencegah salah jaringan.
+
+---
+
