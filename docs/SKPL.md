@@ -16,6 +16,10 @@ Universitas Atma Jaya Yogyakarta
 | Revisi | Deskripsi | Ditulis oleh | Diperiksa oleh | Disetujui oleh |
 |--------|-----------|--------------|----------------|----------------|
 | A      | Dokumen awal | Bonaventura Octavito | - | - |
+| B      | Sinkronisasi dengan DPPL Revisi E: penambahan FR-PAYANA-1201–1203 (Kelompok L, kontrak `IDRXPriceOracle`), fungsi produk ke-13, UC-21, entri Chainlink pada tabel antarmuka perangkat lunak; perbaikan referensi mati ke `skpl_part2.md` | Bonaventura Octavito | - | - |
+| C      | Penghapusan Kelompok L (FR-PAYANA-1201–1203, UC-21, fungsi produk ke-13, kontrak `IDRXPriceOracle`/Chainlink) — IDRX dirancang 1:1 terhadap Rupiah sehingga price oracle tidak punya kasus penggunaan nyata; kontrak dihapus total dari kodebase. Konsolidasi Diagram Use Case menjadi satu diagram utuh (sebelumnya dipecah per aktor: HR Admin / Karyawan / Legal+Owner+Pihak Ketiga). | Bonaventura Octavito | - | - |
+| D      | Revisi NFR-PAYANA-01 berdasarkan stress test aktual (k6 + InfluxDB + Grafana, 50→100 concurrent users) — target awal "≤500ms P99 @ 1.000 concurrent users via Datadog APM" tidak pernah divalidasi (Datadog tidak pernah diintegrasikan); diganti dengan hasil ukur nyata dan catatan bahwa endpoint terautentikasi (`/auth/login`, `/compliance/*`) belum mencapai threshold pada skala 100 concurrent di deployment single-instance saat ini | Bonaventura Octavito | - | - |
+| E      | NFR-PAYANA-07 (retry otomatis + fallback RPC) sebelumnya hanya didokumentasikan tanpa implementasi nyata — `isHr()`/`canViewEmployeeData()` di `authz.ts` menelan semua error RPC (termasuk 429 transien) langsung jadi "tidak diizinkan" tanpa retry. Diimplementasikan `backend/src/services/rpcRetry.ts` (3x retry exponential backoff + fallback RPC publik) sesuai deskripsi requirement; ditambahkan hasil probe ceiling RPC Alchemy free-tier (~15-20 `eth_call` bersamaan) serta hasil soak test (40 concurrent/14 menit, 0 error 5xx) dan spike test (lonjakan instan 0→100 VU, 0 error 5xx, pulih bersih) sebagai bukti validasi — lihat `stress-test/README.md` Run 3 & Run 4 | Bonaventura Octavito | - | - |
 
 ---
 
@@ -46,7 +50,7 @@ Payana adalah platform perangkat lunak berbasis web yang menyediakan layanan pen
 
 Ruang lingkup sistem Payana mencakup dua belas fungsi utama yang dikelompokkan ke dalam delapan modul:
 
-1. **Modul Core Payroll (A):** Pengelolaan vault dana perusahaan, pendaftaran karyawan ke dalam sistem stream, distribusi gaji real-time detik per detik, dan penarikan mandiri gaji yang sudah diperoleh (Earned Wage Access / EWA) dengan mekanisme auto-split 93% (gaji bersih) / 5% (kepatuhan BPJS dan PPh21) / 2% (pesangon).
+1. **Modul Core Payroll (A):** Pengelolaan vault dana perusahaan, pendaftaran karyawan ke dalam sistem stream, distribusi gaji real-time detik per detik, penarikan mandiri gaji yang sudah diperoleh (Earned Wage Access / EWA) dengan mekanisme auto-split 93% (gaji bersih) / 5% (kepatuhan BPJS dan PPh21) / 2% (pesangon).
 
 2. **Modul Work ID (B):** Autentikasi berbasis tanda tangan kriptografi EIP-191 melalui embedded wallet Privy, pemrosesan transaksi tanpa biaya gas bagi karyawan (gasless) menggunakan ERC-4337 Paymaster, dan penerbitan Sertifikat Ketenagakerjaan berbasis Soulbound Token (SBT) ERC-5192.
 
@@ -54,7 +58,7 @@ Ruang lingkup sistem Payana mencakup dua belas fungsi utama yang dikelompokkan k
 
 4. **Modul Cliff Vesting (D):** Pengaturan bonus retensi dengan periode cliff, penanganan masa percobaan karyawan, dan skema ESOP.
 
-5. **Modul Koperasi Karyawan (E):** Pool likuiditas internal karyawan untuk pinjaman darurat tanpa bunga tinggi, mekanisme kolateral berbasis stream gaji, dan pelunasan otomatis saat klaim gaji.
+5. **Modul Mesin Pajak & Kasbon (G):** Pemotongan PPh21 TER dan BPJS otomatis on-chain saat klaim gaji berdasarkan konfigurasi HR, serta fasilitas kasbon (uang muka gaji) hingga 80% gaji bulanan dengan pelunasan otomatis saat klaim gaji berikutnya.
 
 6. **Modul Dashboard (F):** Antarmuka HR untuk manajemen vault, stream, dan laporan kepatuhan; antarmuka karyawan untuk pemantauan EWA secara langsung; antarmuka Legal Officer untuk persetujuan PHK.
 
@@ -147,8 +151,8 @@ Sistem yang berada **di luar ruang lingkup** MVP ini antara lain: integrasi HRIS
 | 11 | Inco Lightning — *Confidential EVM Documentation* | Dokumentasi teknis FHE co-processor untuk Base Sepolia yang digunakan pada fitur Salary Privacy. |
 | 12 | Base Network — *Developer Documentation* | Dokumentasi jaringan Base L2 (Ethereum rollup), termasuk spesifikasi finality, gas pricing, dan RPC endpoint. |
 | 13 | Privy — *Embedded Wallets Documentation* | Referensi integrasi Privy WaaS (Wallet-as-a-Service) untuk autentikasi email-to-wallet karyawan. |
-| 14 | Undang-Undang Perkoperasian No. 25 Tahun 1992 | Landasan hukum operasional koperasi karyawan (EmployeeLiquidityPool) sebagai entitas closed-loop. |
-| 15 | OJK POJK No. 77/POJK.01/2016 tentang Layanan Pinjam Meminjam Uang Berbasis Teknologi Informasi | Regulasi yang harus dihindari: koperasi Payana beroperasi sebagai closed-loop agar tidak terklasifikasikan sebagai fintech pinjol. |
+| 14 | Peraturan Menteri Keuangan (PMK) No. 168/2023 tentang Pemotongan PPh Pasal 21 | Landasan hukum skema Tarif Efektif Rata-rata (TER) yang diimplementasikan pada perhitungan PPh21 otomatis on-chain (`PayrollMath.calcPPh21TerBps()`). |
+| 15 | OJK POJK No. 77/POJK.01/2016 tentang Layanan Pinjam Meminjam Uang Berbasis Teknologi Informasi | Regulasi yang dihindari oleh fitur kasbon: dana kasbon bersumber langsung dari `vaultBalance` perusahaan pemberi kerja (bukan pool lender/investor pihak ketiga), sehingga tidak termasuk cakupan pengawasan sebagai layanan pinjam-meminjam berbasis teknologi informasi. |
 | 16 | S. Nakamoto, *Bitcoin: A Peer-to-Peer Electronic Cash System*, 2008. [Online]. Tersedia: https://bitcoin.org/bitcoin.pdf | Whitepaper fondasi teknologi blockchain yang menjadi landasan konseptual sistem desentralisasi Payana. |
 | 17 | V. Buterin, *Ethereum: A Next-Generation Smart Contract and Decentralized Application Platform*, Ethereum Foundation, 2014. [Online]. Tersedia: https://ethereum.org/whitepaper | Whitepaper Ethereum yang mendasari penggunaan smart contract Solidity dan jaringan Base L2. |
 | 18 | G. Wood, *Ethereum: A Secure Decentralised Generalised Transaction Ledger (Yellow Paper)*, Ethereum Foundation, 2014. [Online]. Tersedia: https://ethereum.github.io/yellowpaper/paper.pdf | Spesifikasi teknis EVM yang menjadi acuan perilaku eksekusi smart contract dan mekanisme gas. |
@@ -166,7 +170,7 @@ Dokumen SKPL Payana disusun dalam empat bab utama dan satu lampiran, dengan urai
 
 **Bab 2 — Deskripsi Umum Kebutuhan** memberikan gambaran makro tentang sistem Payana tanpa masuk ke spesifikasi detail. Bab ini menjelaskan posisi Payana dalam ekosistem teknologi yang lebih luas dan hubungan antar komponen arsitekturalnya (Bagian 2.1), merangkum dua belas fungsi produk beserta rasional keberadaannya (Bagian 2.2), mendeskripsikan karakteristik empat kelompok pengguna utama beserta hak aksesnya (Bagian 2.3), mengidentifikasi kekangan teknis, regulasi, dan bisnis yang membatasi ruang solusi (Bagian 2.4), serta mendaftarkan asumsi dan kebergantungan eksternal yang harus terpenuhi agar sistem berfungsi (Bagian 2.5).
 
-**Bab 3 — Kebutuhan Rinci** (dibahas pada dokumen `skpl_part2.md`) merinci seluruh kebutuhan fungsional dalam format Use Case dan daftar FR berpenomoran, disertai kebutuhan non-fungsional (performa, keamanan, kepatuhan, kebergunaan, skalabilitas, privasi, dan observabilitas) dengan kriteria penerimaan yang terukur.
+**Bab 3 — Kebutuhan Rinci** merinci seluruh kebutuhan fungsional dalam format Use Case dan daftar FR berpenomoran, disertai kebutuhan non-fungsional (performa, keamanan, kepatuhan, kebergunaan, skalabilitas, privasi, dan observabilitas) dengan kriteria penerimaan yang terukur.
 
 **Lampiran** menyediakan materi pendukung seperti diagram alur data, diagram urutan interaksi, dan pemetaan antara kebutuhan fungsional dengan komponen implementasi.
 
@@ -178,7 +182,7 @@ Dokumen SKPL Payana disusun dalam empat bab utama dan satu lampiran, dengan urai
 
 Payana adalah produk perangkat lunak mandiri (bukan modul dari sistem yang lebih besar) yang dirancang untuk menggantikan alur kerja penggajian konvensional berbasis transfer bank batch bulanan. Dalam ekosistem teknologi Indonesia, Payana berdiri di persimpangan antara platform SaaS Sumber Daya Manusia (HRIS) dan infrastruktur keuangan terdesentralisasi (DeFi), namun dengan antarmuka yang dibuat sepenuhnya ramah bagi pengguna non-teknis sehingga tidak memerlukan pengetahuan blockchain apa pun dari sisi karyawan.
 
-Sistem Payana dibangun di atas empat lapisan arsitektur yang terstruktur dan saling bergantung. Lapisan pertama dan paling fundamental adalah **lapisan Smart Contract** yang berjalan di atas jaringan Base (Ethereum Layer-2). Pada lapisan ini, terdapat empat kontrak Solidity utama: `PayrollFactory` sebagai penyelia multi-tenant yang men-deploy dan melacak `CompanyVault` per perusahaan, `CompanyVault` sebagai kontrak terisolasi per tenant yang menyimpan seluruh logika penggajian (streaming, klaim, pesangon, vesting, PHK), `EmployeeLiquidityContract` sebagai kontrak koperasi karyawan, dan `EmploymentSBT` sebagai penerbit sertifikat ketenagakerjaan soulbound. Keempat kontrak ini di-deploy permanen di Base Sepolia (testnet, Chain ID 84532) dengan PayrollFactory beralamat di `0x1B5A705Cb11BAF5798DC78fE27b8686C8c986BdF`. Seluruh nilai moneter dalam sistem dinyatakan dalam token **IDRX** (ERC-20 berpegged Rupiah), sehingga karyawan berinteraksi dengan unit yang familiar secara nominal tanpa perlu memahami konversi mata uang kripto.
+Sistem Payana dibangun di atas empat lapisan arsitektur yang terstruktur dan saling bergantung. Lapisan pertama dan paling fundamental adalah **lapisan Smart Contract** yang berjalan di atas jaringan Base (Ethereum Layer-2). Pada lapisan ini, terdapat tiga kontrak Solidity utama yang sudah di-deploy permanen di Base Sepolia (testnet, Chain ID 84532): `PayrollFactory` sebagai penyelia multi-tenant yang men-deploy dan melacak `CompanyVault` per perusahaan (beralamat `0xF62dF08b38c6Fbde33E24208BA044907475ca815`), `CompanyVault` sebagai kontrak terisolasi per tenant yang menyimpan seluruh logika penggajian (streaming, klaim, pesangon, vesting, PHK, mesin pajak, dan kasbon), dan `EmploymentSBT` sebagai penerbit sertifikat ketenagakerjaan soulbound. Seluruh nilai moneter dalam sistem dinyatakan dalam token **IDRX** (ERC-20 berpegged Rupiah), sehingga karyawan berinteraksi dengan unit yang familiar secara nominal tanpa perlu memahami konversi mata uang kripto.
 
 Lapisan kedua adalah **lapisan Ponder Indexer** yang bertugas mengindeks seluruh event blockchain secara real-time ke dalam basis data relasional yang dapat dikueri. Ponder (versi 0.16.6) berlangganan event dari kontrak Payana melalui RPC Alchemy dan menyimpan data terstruktur seperti informasi stream, riwayat klaim, dan status pesangon ke dalam tabel PostgreSQL. Lapisan ini menyediakan REST API berbasis Hono (versi 4.5.0) yang dikonsumsi oleh lapisan backend untuk mempercepat pembacaan data on-chain tanpa harus melakukan RPC call langsung pada setiap permintaan dashboard.
 
@@ -202,7 +206,7 @@ Rasional   : Model streaming menggantikan siklus batch bulanan dengan distribusi
 
 **3. Penarikan Gaji Mandiri (EWA)**
 
-Deskripsi  : Sistem menyediakan fungsi bagi karyawan untuk mengklaim gaji yang telah terakumulasi kapan saja melalui fungsi `claimSalary()`. Setiap klaim memicu distribusi atomic dalam satu transaksi: 93% ke alamat Work ID karyawan, 5% ke ComplianceVault, dan 2% ke SeveranceVault. Karyawan tidak perlu memiliki ETH karena biaya gas ditanggung oleh sistem Paymaster (ERC-4337). Laju klaim dibatasi maksimum 10 kali per jam per karyawan untuk mencegah penyalahgunaan. Jika karyawan memiliki pinjaman koperasi yang belum lunas, mekanisme auto-repay dipicu secara otomatis saat klaim.
+Deskripsi  : Sistem menyediakan fungsi bagi karyawan untuk mengklaim gaji yang telah terakumulasi kapan saja melalui fungsi `claimSalary()`. Setiap klaim memicu distribusi atomic dalam satu transaksi: platform fee, cicilan kasbon (jika ada), PPh21+BPJS ke ComplianceVault, porsi severance ke SeveranceVault, dan sisanya ke alamat Work ID karyawan. Karyawan tidak perlu memiliki ETH karena biaya gas ditanggung oleh sistem Paymaster (ERC-4337). Laju klaim dibatasi maksimum 10 kali per jam per karyawan untuk mencegah penyalahgunaan. Jika karyawan memiliki kasbon yang belum lunas, mekanisme auto-repay dipicu secara otomatis saat klaim.
 
 Rasional   : EWA mengatasi kebutuhan mendesak karyawan akan akses dana sebelum jadwal gajian, sekaligus mengeliminasi ketergantungan pada pinjaman online berbunga tinggi. Mekanisme gasless memastikan bahwa hambatan teknis (memiliki ETH) tidak menghalangi karyawan yang membutuhkan.
 
@@ -218,11 +222,11 @@ Deskripsi  : Sistem menyediakan fungsi bagi HR Admin untuk mengkonfigurasi bonus
 
 Rasional   : Mekanisme cliff vesting on-chain memberikan kepastian hukum kepada karyawan bahwa bonus retensi yang dijanjikan tidak dapat ditarik kembali secara unilateral oleh perusahaan, sekaligus memberikan insentif yang terverifikasi bagi karyawan untuk bertahan hingga masa cliff selesai.
 
-**6. Koperasi Karyawan**
+**6. Mesin Pajak & Kasbon**
 
-Deskripsi  : Sistem menyediakan modul koperasi karyawan yang berfungsi sebagai pool likuiditas internal tertutup (closed-loop). Karyawan dapat menyetorkan IDRX ke pool koperasi perusahaannya (`depositToPool()`), karyawan lain dapat meminjam dari pool dengan kolateral berbasis stream gaji aktif mereka (`borrowFromPool()`), dan melunasi pinjaman secara manual (`repayLoanManual()`) atau otomatis saat klaim gaji (`autoRepay()`). Platform mengambil biaya protokol 1% dari yield pool. Pinjaman yang melewati jatuh tempo dapat dilikuidasi secara otomatis oleh sistem.
+Deskripsi  : Sistem menghitung dan memotong PPh21 (Tarif Efektif Rata-rata/TER sesuai PMK 168/2023, dengan opsi override tarif tetap oleh HR) dan BPJS secara otomatis on-chain pada setiap klaim gaji. Sistem juga menyediakan fasilitas kasbon (uang muka gaji): karyawan dapat mengajukan kasbon hingga 80% gaji bulanan (`requestAdvance()`), HR menyetujui atau menolak pengajuan (`approveAdvance()`/`rejectAdvance()`), dan pelunasan terjadi otomatis melalui pemotongan sebagian dari setiap klaim gaji berikutnya.
 
-Rasional   : Koperasi tertutup menyediakan alternatif pinjaman darurat yang terjangkau bagi karyawan tanpa melibatkan pinjaman online berbunga tinggi. Model closed-loop (hanya karyawan satu perusahaan) memastikan bahwa sistem ini tidak terklasifikasikan sebagai layanan keuangan pinjol yang diawasi OJK (POJK No. 77/2016), sehingga meminimalkan risiko regulasi.
+Rasional   : Perhitungan pajak on-chain menjamin konsistensi dan auditability penuh, menggantikan perhitungan off-chain yang rawan drift dari nilai riil. Kasbon menggantikan skema koperasi peer-to-peer sebelumnya dengan model yang lebih sederhana: dana talangan berasal langsung dari `vaultBalance` perusahaan (bukan pool lender pihak ketiga), sehingga menghindari kompleksitas regulasi peer-to-peer lending (POJK No. 77/2016) yang sebelumnya menjadi rasional utama desain koperasi closed-loop.
 
 **7. Sertifikasi Ketenagakerjaan Berbasis SBT**
 
@@ -244,9 +248,9 @@ Rasional   : Blockchain Base bersifat publik dan dapat dikueri oleh siapapun. Ta
 
 **10. Administrasi Platform SaaS**
 
-Deskripsi  : Sistem menyediakan antarmuka administrasi bagi Owner SaaS (SaaS Admin) untuk mengelola registrasi perusahaan baru. HR yang ingin bergabung mengajukan permohonan melalui antarmuka onboarding (`POST /registration/request`). Owner meninjau daftar permohonan yang masuk (`GET /registration/pending`) dan dapat menyetujui (`PATCH /registration/:address/approve`) atau menolak (`DELETE /registration/:address`) setiap permohonan. Owner juga memiliki akses fungsi darurat `emergencyFreezeAll()` untuk membekukan seluruh vault dalam kondisi insiden keamanan. Platform menghasilkan pendapatan melalui dua mekanisme on-chain: (1) platform fee berbasis persentase (`platformFeeBps`) yang dipotong dari setiap klaim gaji karyawan secara otomatis dan dikirim ke `protocolTreasury`, dan (2) protocol fee 1% dari seluruh bunga pinjaman koperasi yang diakumulasikan dalam `EmployeeLiquidityContract`. Owner dapat mengonfigurasi `platformFeeBps` kapan saja melalui `PayrollFactory` dan menarik akumulasi fee ke treasury via `claimProtocolFee()`.
+Deskripsi  : Sistem menyediakan antarmuka administrasi bagi Owner SaaS (SaaS Admin) untuk mengelola registrasi perusahaan baru. HR yang ingin bergabung mengajukan permohonan melalui antarmuka onboarding (`POST /registration/request`). Owner meninjau daftar permohonan yang masuk (`GET /registration/pending`) dan dapat menyetujui (`PATCH /registration/:address/approve`) atau menolak (`DELETE /registration/:address`) setiap permohonan. Owner juga memiliki akses fungsi darurat `emergencyFreezeAll()` untuk membekukan seluruh vault dalam kondisi insiden keamanan. Platform menghasilkan pendapatan melalui platform fee berbasis persentase (`platformFeeBps`) yang dipotong dari setiap klaim gaji karyawan secara otomatis dan langsung ditransfer ke `protocolTreasury` pada saat itu juga (bukan diakumulasi lalu diklaim terpisah). Owner dapat mengonfigurasi `platformFeeBps` dan `protocolTreasury` kapan saja melalui `PayrollFactory`.
 
-Rasional   : Gerbang persetujuan SaaS Admin mencegah penggunaan platform oleh entitas yang tidak terverifikasi. Fungsi darurat diperlukan sebagai mekanisme mitigasi risiko terhadap potensi eksploitasi kontrak atau keadaan darurat lainnya. Dua sumber pendapatan on-chain memberikan model bisnis yang transparan dan dapat diaudit: platform fee dari payroll volume memberikan pendapatan yang berkorelasi langsung dengan skala penggunaan, sementara koperasi fee memberikan insentif bagi Owner untuk mendorong aktivitas koperasi di dalam platform.
+Rasional   : Gerbang persetujuan SaaS Admin mencegah penggunaan platform oleh entitas yang tidak terverifikasi. Fungsi darurat diperlukan sebagai mekanisme mitigasi risiko terhadap potensi eksploitasi kontrak atau keadaan darurat lainnya. Platform fee dari payroll volume memberikan model bisnis yang transparan, dapat diaudit, dan pendapatannya berkorelasi langsung dengan skala penggunaan.
 
 **11. Autentikasi Berbasis Wallet**
 
@@ -268,7 +272,7 @@ HR Admin adalah pengguna utama platform Payana dari sisi perusahaan. Persona ini
 
 **Karyawan (Employee)**
 
-Karyawan adalah pengguna utama platform dari sisi individu. Persona ini adalah pekerja tetap atau kontrak pada perusahaan yang menggunakan Payana. Karyawan sama sekali tidak diasumsikan memiliki pengetahuan tentang blockchain, wallet, atau DeFi — antarmuka yang mereka hadapi menggunakan terminologi sehari-hari ("Tarik Gaji", "Akun Gaji", "Saldo Tersedia"). Karyawan menggunakan platform secara insidental — kapan saja mereka ingin mengakses gaji yang sudah diperoleh, memantau saldo pesangon, mengajukan pinjaman koperasi, atau melihat status bonus mereka. Hak akses karyawan mencakup: klaim EWA dari stream mereka sendiri, pembacaan saldo stream dan pesangon milik sendiri, simpan-pinjam di koperasi perusahaan, pembacaan informasi cliff vesting milik sendiri, dan dekripsi gaji sendiri (jika fitur FHE aktif). Karyawan tidak dapat membaca atau mengakses data stream, gaji, atau pesangon karyawan lain.
+Karyawan adalah pengguna utama platform dari sisi individu. Persona ini adalah pekerja tetap atau kontrak pada perusahaan yang menggunakan Payana. Karyawan sama sekali tidak diasumsikan memiliki pengetahuan tentang blockchain, wallet, atau DeFi — antarmuka yang mereka hadapi menggunakan terminologi sehari-hari ("Tarik Gaji", "Akun Gaji", "Saldo Tersedia"). Karyawan menggunakan platform secara insidental — kapan saja mereka ingin mengakses gaji yang sudah diperoleh, memantau saldo pesangon, mengajukan kasbon, atau melihat status bonus mereka. Hak akses karyawan mencakup: klaim EWA dari stream mereka sendiri, pembacaan saldo stream dan pesangon milik sendiri, pengajuan kasbon (uang muka gaji), pembacaan informasi cliff vesting milik sendiri, dan dekripsi gaji sendiri (jika fitur FHE aktif). Karyawan tidak dapat membaca atau mengakses data stream, gaji, atau pesangon karyawan lain.
 
 **Legal Officer**
 
@@ -304,7 +308,7 @@ Owner adalah pengguna tertinggi dalam hierarki platform Payana, diidentifikasi s
 
 10. **Kepatuhan Regulasi BPJS dan Perpajakan PPh21:** Persentase potongan BPJS dan PPh21 tidak boleh di-hardcode dalam kontrak karena tarif resmi dapat berubah melalui regulasi pemerintah. Sistem harus menyediakan mekanisme konfigurasi ulang oleh HR tanpa redeployment kontrak.
 
-11. **Koperasi Harus Beroperasi sebagai Closed-Loop:** Sesuai UU Perkoperasian No. 25/1992 dan untuk menghindari klasifikasi sebagai fintech pinjol berdasarkan POJK No. 77/2016, koperasi karyawan (`EmployeeLiquidityContract`) hanya boleh menerima deposit dan menyalurkan pinjaman kepada karyawan dari perusahaan yang sama. Pembukaan pool ke pihak luar merupakan pelanggaran regulasi.
+11. **Kasbon Bukan Produk Pinjaman Pihak Ketiga:** Dana kasbon bersumber langsung dari `vaultBalance` milik perusahaan pemberi kerja (bukan pool lender/investor eksternal), sehingga tidak termasuk cakupan pengawasan POJK No. 77/2016 tentang layanan pinjam-meminjam berbasis teknologi informasi.
 
 **(c) Kekangan Bisnis**
 
@@ -362,23 +366,21 @@ Payana memiliki antarmuka pengguna berikut:
 | 7 | Onboarding Karyawan HR | Formulir penambahan karyawan baru ke dalam sistem: input Work ID (alamat dompet karyawan), pengaturan flow rate IDRX per detik, dan konfigurasi persentase split (karyawan, kepatuhan, severance). |
 | 8 | Manajemen PHK HR | Antrian proposal Pemutusan Hubungan Kerja: daftar proposal aktif beserta status persetujuan HR dan Legal Officer, formulir pengajuan proposal PHK baru, dan tombol eksekusi setelah kedua pihak menyetujui. |
 | 9 | Manajemen Vesting HR | Daftar cliff vest aktif per karyawan: tombol pembuatan vest baru (dengan pilihan tipe Retention, Probation, atau ESOP, jumlah IDRX, dan tanggal cliff), serta tombol pembatalan vest yang belum matang. |
-| 10 | Koperasi HR | Manajemen pool likuiditas koperasi perusahaan: tampilan total deposit, total pinjaman yang sedang berjalan, daftar peminjam aktif, dan kontrol parameter pool. |
+| 10 | Kasbon HR | Daftar pengajuan kasbon karyawan (Pending/Active/Rejected/Repaid), tombol setujui/tolak, dan riwayat pemotongan pajak (PPh21 + BPJS) per klaim gaji. |
 | 11 | Laporan Kepatuhan HR | Pratinjau ringkasan kepatuhan bulanan (jumlah karyawan, total gaji diklaim, total compliance, total severance) dan tombol unduh laporan CSV BPJS/PPh21 per periode bulan. |
 | 12 | Audit Log HR | Riwayat seluruh aksi yang direkam dalam audit log off-chain untuk perusahaan yang bersangkutan, mencakup relay transaksi, ekspor laporan, dan likuidasi pinjaman, dilengkapi timestamp dan hash transaksi. |
 | 13 | Pengaturan HR | Konfigurasi parameter vault perusahaan: tarif BPJS (bpjsBps), tarif PPh21 (pph21Bps), dan threshold persentase peringatan saldo rendah (lowBalanceThresholdBps). |
 | 14 | Halaman Reimburse HR | Manajemen klaim reimbursement (penggantian biaya operasional) yang diajukan oleh karyawan: daftar klaim masuk, tombol persetujuan, dan pencatatan pembayaran. |
 | 15 | Halaman Bounty HR | Manajemen program bounty atau insentif kinerja berbasis penyelesaian tugas: pembuatan papan bounty, penetapan hadiah IDRX, dan pencatatan klaim yang disetujui. |
-| 16 | Halaman Absensi HR | Tampilan dan pengelolaan data kehadiran karyawan yang terintegrasi dengan sistem payroll untuk keperluan rekonsiliasi. |
-| 17 | Dashboard EWA Karyawan | Tampilan utama karyawan: saldo gaji yang telah terakumulasi secara real-time berdasarkan flow rate aktif, tombol "Tarik Gaji" untuk melakukan klaim melalui transaksi gasless, dan riwayat penarikan sebelumnya. |
-| 18 | Pesangon Karyawan | Tampilan saldo dana pesangon karyawan yang terakumulasi on-chain (2% dari setiap klaim gaji), beserta status dana (Terkunci atau Cair) dan estimasi besaran berdasarkan masa kerja. |
-| 19 | Vesting Karyawan | Daftar cliff vest yang dimiliki karyawan: jumlah IDRX yang terkunci, tanggal cliff yang harus dicapai sebelum pencairan, tipe vest, dan status (Terkunci atau Telah Diklaim). |
-| 20 | Koperasi Karyawan | Tampilan pinjaman aktif beserta sisa yang harus dilunasi, tombol pengajuan pinjaman baru dari pool koperasi perusahaan, dan tombol deposit IDRX ke pool untuk mendapatkan bunga. |
-| 21 | Transfer Karyawan | Fasilitas transfer IDRX dari dompet karyawan ke alamat EVM lain di luar sistem, misalnya ke rekening MetaMask atau bursa kripto. |
-| 22 | Audit Log Karyawan | Riwayat klaim gaji dan transaksi koperasi milik karyawan yang sedang login, dengan tampilan timestamp dan jumlah IDRX setiap transaksi. |
-| 23 | Pengaturan Karyawan | Pembaruan profil pribadi karyawan: nama lengkap, NIK 16 digit, dan nomor telepon. Data disimpan dalam bentuk terenkripsi AES-256-GCM di server off-chain. |
-| 24 | Reimburse Karyawan | Formulir pengajuan klaim reimbursement oleh karyawan: input keterangan biaya, jumlah IDRX yang diminta, dan unggah bukti pendukung, disertai status persetujuan dari HR. |
-| 25 | Bounty Karyawan | Tampilan daftar program bounty atau tugas berbasis insentif yang tersedia untuk karyawan, beserta tombol klaim hadiah IDRX setelah menyelesaikan tugas yang ditetapkan. |
-| 26 | Absensi Karyawan | Tampilan data kehadiran karyawan yang bersangkutan, mencakup riwayat clock-in dan clock-out serta status kehadiran harian. |
+| 16 | Dashboard EWA Karyawan | Tampilan utama karyawan: saldo gaji yang telah terakumulasi secara real-time berdasarkan flow rate aktif, tombol "Tarik Gaji" untuk melakukan klaim melalui transaksi gasless, dan riwayat penarikan sebelumnya. |
+| 17 | Pesangon Karyawan | Tampilan saldo dana pesangon karyawan yang terakumulasi on-chain (2% dari setiap klaim gaji), beserta status dana (Terkunci atau Cair) dan estimasi besaran berdasarkan masa kerja. |
+| 18 | Vesting Karyawan | Daftar cliff vest yang dimiliki karyawan: jumlah IDRX yang terkunci, tanggal cliff yang harus dicapai sebelum pencairan, tipe vest, dan status (Terkunci atau Telah Diklaim). |
+| 19 | Kasbon Karyawan | Status kasbon aktif beserta sisa yang harus dilunasi, tombol pengajuan kasbon baru, dan rincian potongan PPh21/BPJS pada setiap klaim gaji. |
+| 20 | Transfer Karyawan | Fasilitas transfer IDRX dari dompet karyawan ke alamat EVM lain di luar sistem, misalnya ke rekening MetaMask atau bursa kripto. |
+| 21 | Audit Log Karyawan | Riwayat klaim gaji dan transaksi kasbon milik karyawan yang sedang login, dengan tampilan timestamp dan jumlah IDRX setiap transaksi. |
+| 22 | Pengaturan Karyawan | Pembaruan profil pribadi karyawan: nama lengkap, NIK 16 digit, dan nomor telepon. Data disimpan dalam bentuk terenkripsi AES-256-GCM di server off-chain. |
+| 23 | Reimburse Karyawan | Formulir pengajuan klaim reimbursement oleh karyawan: input keterangan biaya, jumlah IDRX yang diminta, dan unggah bukti pendukung, disertai status persetujuan dari HR. |
+| 24 | Bounty Karyawan | Tampilan daftar program bounty atau tugas berbasis insentif yang tersedia untuk karyawan, beserta tombol klaim hadiah IDRX setelah menyelesaikan tugas yang ditetapkan. |
 
 Selain halaman di atas, Payana juga menyediakan laporan berikut:
 
@@ -455,7 +457,7 @@ Perangkat lunak sisi klien:
 
 Payana akan berhubungan dengan sistem-sistem berikut:
 
-1. Base Blockchain (Ethereum L2) adalah jaringan eksekusi utama di mana seluruh smart contract Payana (PayrollFactory, CompanyVault, EmployeeLiquidityContract, EmploymentSBT) di-deploy dan berjalan. Sistem menggunakan Chain ID 84532 untuk Base Sepolia (testnet) dan Chain ID 8453 untuk Base Mainnet (produksi). Finality optimistik Base adalah sekitar 2 detik dan digunakan sebagai dasar konfirmasi transaksi untuk keperluan UX aplikasi.
+1. Base Blockchain (Ethereum L2) adalah jaringan eksekusi utama di mana seluruh smart contract Payana (PayrollFactory, CompanyVault, EmploymentSBT) di-deploy dan berjalan. Sistem menggunakan Chain ID 84532 untuk Base Sepolia (testnet) dan Chain ID 8453 untuk Base Mainnet (produksi). Finality optimistik Base adalah sekitar 2 detik dan digunakan sebagai dasar konfirmasi transaksi untuk keperluan UX aplikasi.
 
 2. IDRX Token Contract adalah kontrak ERC-20 stablecoin berbasis Rupiah Indonesia dengan rasio 1 IDRX = 1 IDR dan presisi 18 desimal, yang di-deploy di jaringan Base. Seluruh operasi keuangan dalam sistem Payana menggunakan IDRX sebagai satu-satunya token pembayaran.
 
@@ -519,7 +521,7 @@ Deskripsi      : Sistem harus memampukan Owner SaaS untuk menyetujui atau menola
 
 #### 3.2.10. Deployment Vault Perusahaan
 ID Requirement : FR-PAYANA-201
-Deskripsi      : Sistem harus memampukan Owner SaaS untuk mendeploy vault CompanyVault baru melalui kontrak PayrollFactory bagi HR Admin yang telah mendapatkan persetujuan. Setiap vault yang dideploy sepenuhnya terisolasi dari vault perusahaan lain — tidak ada dana atau state yang dibagikan antar-tenant. Satu alamat HR hanya dapat memiliki satu vault, dan upaya deployment kedua untuk alamat yang sama ditolak oleh kontrak PayrollFactory. Bersamaan dengan deployment vault, pool likuiditas koperasi untuk perusahaan tersebut diinisialisasi secara otomatis dengan tingkat bunga default 1,5% per 30 hari.
+Deskripsi      : Sistem harus memampukan Owner SaaS untuk mendeploy vault CompanyVault baru melalui kontrak PayrollFactory bagi HR Admin yang telah mendapatkan persetujuan. Setiap vault yang dideploy sepenuhnya terisolasi dari vault perusahaan lain — tidak ada dana atau state yang dibagikan antar-tenant. Satu alamat HR hanya dapat memiliki satu vault, dan upaya deployment kedua untuk alamat yang sama ditolak oleh kontrak PayrollFactory.
 
 #### 3.2.11. Pendanaan Vault (Deposit IDRX)
 ID Requirement : FR-PAYANA-202
@@ -531,7 +533,7 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menarik IDRX dari saldo 
 
 #### 3.2.13. Konfigurasi Parameter Vault
 ID Requirement : FR-PAYANA-204
-Deskripsi      : Sistem harus memampukan HR Admin untuk mengonfigurasi parameter operasional vault perusahaannya melalui fungsi setCompanyConfig() pada kontrak CompanyVault, yaitu tarif BPJS (bpjsBps), tarif PPh21 (pph21Bps), dan threshold persentase peringatan saldo rendah (lowBalanceThresholdBps). Parameter-parameter ini disimpan on-chain dan digunakan sebagai referensi dalam laporan kepatuhan serta mekanisme pemantauan saldo otomatis.
+Deskripsi      : Sistem harus memampukan HR Admin untuk mengonfigurasi parameter operasional vault perusahaannya melalui fungsi setCompanyConfig() pada kontrak CompanyVault, yaitu tarif BPJS (bpjsBps), tarif PPh21 (pph21Bps), dan threshold persentase peringatan saldo rendah (lowBalanceThresholdBps). Tarif BPJS selalu dipakai langsung sebagai tarif tetap. Untuk PPh21, nilai pph21Bps bersifat opsional: jika HR mengisinya (> 0), sistem memakainya sebagai tarif tetap; jika dibiarkan pada nilai default (0), sistem menghitung tarif secara dinamis berdasarkan Tarif Efektif Rata-rata (TER) sesuai PMK 168/2023 melalui PayrollMath.calcPPh21TerBps(), berbasis estimasi gaji tahunan karyawan.
 
 #### 3.2.14. Jeda dan Lanjutkan Operasi Vault
 ID Requirement : FR-PAYANA-205
@@ -583,7 +585,7 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk membatalkan stream gaji 
 
 #### 3.2.24. Klaim Gaji (Earned Wage Access)
 ID Requirement : FR-PAYANA-401
-Deskripsi      : Sistem harus memampukan karyawan untuk menarik seluruh saldo gaji yang telah terakumulasi kapan saja melalui fungsi claimSalary() pada kontrak CompanyVault, tanpa menunggu tanggal gajian bulanan. Sistem melakukan distribusi atomik dalam satu transaksi: porsi karyawan (default 93%) ditransfer langsung ke alamat Work ID karyawan, porsi kepatuhan (default 5%) ditambahkan ke sub-pool complianceBalance, dan porsi severance (default 2%) ditambahkan ke vault pesangon karyawan. Apabila karyawan memiliki pinjaman koperasi aktif, sistem mengalokasikan hingga 20% dari total klaim untuk melunasi pinjaman secara otomatis melalui panggilan ke EmployeeLiquidityContract.autoRepay() sebelum distribusi split dilakukan.
+Deskripsi      : Sistem harus memampukan karyawan untuk menarik seluruh saldo gaji yang telah terakumulasi kapan saja melalui fungsi claimSalary() pada kontrak CompanyVault, tanpa menunggu tanggal gajian bulanan. Sistem melakukan distribusi atomik dalam satu transaksi: platform fee dipotong terlebih dahulu, kemudian apabila karyawan memiliki kasbon aktif, hingga 20% dari total klaim dialokasikan untuk melunasi kasbon secara otomatis (lihat FR-PAYANA-706). Sisanya dipotong PPh21 dan BPJS (dihitung dinamis atau tarif tetap, lihat FR-PAYANA-701/702) ke sub-pool complianceBalance, porsi severance (default 2%) ditambahkan ke vault pesangon karyawan, dan sisa bersih ditransfer langsung ke alamat Work ID karyawan.
 
 #### 3.2.25. Kalkulasi Saldo Gaji Terakumulasi
 ID Requirement : FR-PAYANA-402
@@ -632,7 +634,7 @@ Deskripsi      : Sistem harus memastikan bahwa seluruh dana pesangon yang menjad
 
 ---
 
-## 3.2 Kebutuhan Fungsional — Kelompok F hingga K
+## 3.2 Kebutuhan Fungsional — Kelompok F hingga L
 
 ---
 
@@ -682,57 +684,57 @@ Deskripsi      : Sistem harus mendukung pembuatan lebih dari satu cliff vest akt
 
 ---
 
-### Kelompok G: Koperasi Karyawan
+### Kelompok G: Mesin Pajak & Kasbon
 
-Kelompok ini mendefinisikan kebutuhan fungsional untuk sistem likuiditas koperasi karyawan berbasis closed-loop, yang memungkinkan karyawan mendepositkan IDRX idle untuk mendapatkan imbal hasil, meminjam dana sebagai talangan gaji, dan melunasi pinjaman secara otomatis melalui mekanisme pemotongan saat klaim gaji.
+Kelompok ini mendefinisikan kebutuhan fungsional untuk pemotongan otomatis PPh21 (skema Tarif Efektif Rata-rata/TER sesuai PMK 168/2023) dan BPJS pada setiap klaim gaji, serta fasilitas kasbon (uang muka gaji) yang memampukan karyawan menarik sebagian gaji yang belum accrued sebagai talangan, dengan pelunasan otomatis saat klaim gaji berikutnya.
 
 ---
 
-#### 3.2.6. Deposit Simpanan Karyawan ke Pool Koperasi
+#### 3.2.6. Kalkulasi PPh21 TER Otomatis Saat Klaim Gaji
 
 ID Requirement : FR-PAYANA-701
 
-Deskripsi      : Sistem harus memampukan karyawan yang memiliki stream gaji aktif untuk mendepositkan IDRX miliknya ke pool koperasi perusahaannya dengan memanggil fungsi `depositToPool()` pada kontrak `EmployeeLiquidityContract`. Sistem harus secara otomatis mendeteksi pool koperasi yang sesuai berdasarkan alamat CompanyVault yang terhubung dengan stream karyawan tersebut, sehingga karyawan tidak perlu menentukan alamat pool secara manual. Deposito minimum ditetapkan sebesar 100 unit IDRX untuk mencegah deposito bernilai debu (dust deposit) yang tidak efisien. Setiap deposito dicatat dalam mapping `lenderDeposits` dengan menyimpan jumlah pokok, timestamp deposito, dan indeks yield pada saat deposito dilakukan (`yieldDebtX18`) sebagai basis perhitungan imbal hasil berbasis indeks kumulatif. Event `Deposited` diterbitkan setelah setiap deposito berhasil.
+Deskripsi      : Sistem harus menghitung tarif PPh21 Tarif Efektif Rata-rata (TER) secara otomatis pada setiap pemanggilan `claimSalary()`, berdasarkan estimasi gaji tahunan (flowRate dikali estimasi detik per tahun), kecuali HR telah mengonfigurasi tarif tetap (`pph21Bps` > 0, lihat FR-PAYANA-204) yang akan digunakan sebagai override. Sistem harus menerapkan skema bracket sesuai PMK 168/2023: 0% untuk estimasi gaji tahunan hingga Rp60.000.000, 5% hingga Rp250.000.000, 15% hingga Rp500.000.000, 25% hingga Rp5.000.000.000, dan 30% di atas Rp5.000.000.000. Perhitungan dinamis dilakukan oleh fungsi murni `PayrollMath.calcPPh21TerBps()` yang mengembalikan tarif dalam basis poin.
 
 ---
 
-#### 3.2.7. Penarikan Simpanan dan Imbal Hasil dari Pool Koperasi
+#### 3.2.7. Pemotongan BPJS Sesuai Konfigurasi HR
 
 ID Requirement : FR-PAYANA-702
 
-Deskripsi      : Sistem harus memampukan karyawan yang sebelumnya telah mendepositkan IDRX ke pool koperasi untuk menarik kembali pokoknya beserta imbal hasil yang telah terakumulasi dengan memanggil fungsi `withdrawDeposit()`. Sebelum transfer dilakukan, sistem harus mensinkronisasi imbal hasil yang belum direalisasi (pending yield) berdasarkan selisih antara indeks yield kumulatif pool saat ini dan indeks yield pada saat deposito terakhir, menggunakan formula `principal * (yieldPerShareX18 - yieldDebtX18) / 1e18`. Sistem harus memvalidasi bahwa likuiditas idle pool (totalDeposited dikurangi totalLoansOutstanding) mencukupi untuk memenuhi permintaan penarikan; jika tidak, transaksi harus ditolak dengan error `InsufficientPoolLiquidity`. Pokok dan imbal hasil ditransfer kepada karyawan dalam satu transaksi, dan event `Withdrawn` diterbitkan setelah penarikan berhasil.
+Deskripsi      : Sistem harus memampukan HR Admin mengonfigurasi tarif BPJS (`bpjsBps`) melalui `setCompanyConfig()`. Pada setiap `claimSalary()`, sistem harus memotong jumlah sebesar `accrued × bpjsBps / 10000` sebagai iuran BPJS, dikombinasikan dengan hasil perhitungan PPh21 (FR-PAYANA-701), dan menggabungkan keduanya ke dalam `complianceBalance` vault perusahaan untuk ditarik HR ke instansi terkait (DJP/BPJS). Perubahan tarif hanya berlaku untuk klaim gaji setelah perubahan dilakukan, tidak berlaku surut.
 
 ---
 
-#### 3.2.8. Pengajuan Pinjaman oleh Karyawan
+#### 3.2.8. Riwayat Pemotongan Pajak dan BPJS per Klaim Gaji
 
 ID Requirement : FR-PAYANA-703
 
-Deskripsi      : Sistem harus memampukan karyawan yang memiliki stream gaji aktif untuk mengajukan pinjaman IDRX dari pool koperasi perusahaannya sebagai talangan gaji dengan memanggil fungsi `borrowFromPool()`. Sistem harus memvalidasi bahwa jumlah pinjaman yang diajukan tidak melebihi 80% dari estimasi gaji bulanan karyawan (dihitung dari flowRate dikali jumlah detik per bulan) dan tidak melebihi batas keras sistemik sebesar 8.000.000 IDRX per pinjaman. Sistem juga harus memvalidasi bahwa karyawan tidak memiliki pinjaman aktif lain sebelumnya (one-loan-at-a-time policy) dan bahwa likuiditas pool mencukupi. Bunga dihitung di muka pada saat pinjaman dibuat (principal dikali interestRateBps dibagi 10.000), jatuh tempo ditetapkan 30 hari sejak tanggal pinjaman, dan catatan pinjaman disimpan dalam mapping `loanRecords`. Event `LoanCreated` diterbitkan setelah pinjaman berhasil diproses.
+Deskripsi      : Sistem harus menerbitkan event `TaxWithheld(employee, pph21Amount, bpjsAmount, timestamp)` pada setiap klaim gaji yang memuat pemotongan pajak, dan mengindeksnya melalui Ponder. HR dan karyawan yang bersangkutan harus dapat melihat riwayat pemotongan ini pada halaman Compliance/Kasbon masing-masing, termasuk breakdown antara komponen PPh21 dan BPJS per transaksi klaim.
 
 ---
 
-#### 3.2.9. Cicilan Pinjaman Otomatis Saat Klaim Gaji
+#### 3.2.9. Pengajuan Kasbon oleh Karyawan
 
 ID Requirement : FR-PAYANA-704
 
-Deskripsi      : Sistem harus memampukan pencicilan pinjaman koperasi secara otomatis tanpa interaksi eksplisit dari karyawan, dengan cara CompanyVault memanggil fungsi `autoRepay()` pada kontrak `EmployeeLiquidityContract` setiap kali karyawan melakukan klaim gaji melalui `claimSalary()`. Fungsi `autoRepay()` harus menyapu hingga 20% (REPAY_FRACTION_BPS = 2000) dari jumlah gaji yang diklaim sebagai cicilan, dibatasi oleh sisa pokok ditambah bunga yang belum terbayar. Jika cicilan yang disapu mencukupi untuk melunasi seluruh pinjaman, sistem harus menutup catatan pinjaman, mendistribusikan bunga bersih (setelah dikurangi protocol fee 1%) sebagai imbal hasil kepada lender melalui pembaruan indeks `yieldPerShareX18`, dan mengubah status pinjaman menjadi Repaid. Fungsi `autoRepay()` hanya dapat dipanggil oleh kontrak CompanyVault yang telah mendapatkan `PAYROLL_ROLE`, untuk mencegah penyalahgunaan dari pihak luar.
+Deskripsi      : Sistem harus memampukan karyawan dengan stream gaji aktif untuk mengajukan kasbon (uang muka gaji) dengan memanggil `requestAdvance()` secara gasless melalui Paymaster. Sistem harus memvalidasi bahwa jumlah kasbon tidak melebihi 80% dari estimasi gaji bulanan karyawan (`MAX_ADVANCE_BPS = 8000`) dan bahwa karyawan tidak memiliki kasbon aktif atau pending lainnya (satu kasbon aktif dalam satu waktu). Status kasbon berubah menjadi `Pending` dan event `AdvanceRequested` diterbitkan.
 
 ---
 
-#### 3.2.10. Cicilan Pinjaman Manual oleh Karyawan
+#### 3.2.10. Persetujuan dan Penolakan Kasbon oleh HR
 
 ID Requirement : FR-PAYANA-705
 
-Deskripsi      : Sistem harus memampukan karyawan yang memiliki pinjaman aktif untuk melunasi sebagian atau seluruh pinjamannya lebih cepat dari jadwal dengan memanggil fungsi `repayLoanManual()` dan menyetorkan IDRX secara langsung ke kontrak. Sistem harus memvalidasi bahwa karyawan memiliki pinjaman aktif dan bahwa jumlah yang direpayment lebih dari nol; jika tidak terdapat pinjaman aktif, transaksi ditolak dengan error `NoActiveLoan`. Pembayaran yang melebihi sisa pokok ditambah bunga akan dibatasi secara internal pada nilai yang tepat sehingga tidak ada kelebihan yang terbuang. Pada saat pinjaman lunas, sistem harus mendistribusikan bunga bersih ke pool lender melalui pembaruan indeks yield, dan event `LoanRepaid` diterbitkan dengan keterangan apakah pinjaman telah sepenuhnya dilunasi.
+Deskripsi      : Sistem harus memampukan HR Admin menyetujui pengajuan kasbon karyawan melalui `approveAdvance(employee)`, dengan validasi bahwa `vaultBalance` perusahaan mencukupi jumlah yang diajukan; dana kasbon langsung ditransfer ke karyawan dan status berubah menjadi `Active`, event `AdvanceApproved` diterbitkan. Sistem juga harus memampukan HR menolak pengajuan melalui `rejectAdvance(employee)`, mengubah status menjadi `Rejected` (event `AdvanceRejected`) dan memampukan karyawan mengajukan kembali.
 
 ---
 
-#### 3.2.11. Pengelolaan Portfolio Koperasi oleh HR
+#### 3.2.11. Pelunasan Kasbon Otomatis Saat Klaim Gaji
 
 ID Requirement : FR-PAYANA-706
 
-Deskripsi      : Sistem harus memampukan HR Admin untuk melihat kondisi pool koperasi perusahaannya secara keseluruhan melalui fungsi view `getPoolLiquidity()`, yang mengembalikan total IDRX yang telah didepositkan oleh seluruh lender serta jumlah yang sedang dipinjam (outstanding loans). Data ini harus dapat ditampilkan di dashboard HR dalam bentuk ringkasan kesehatan pool, mencakup utilisasi pool (persentase dana yang sedang dipinjam), total bunga yang telah terdistribusikan kepada lender, dan daftar pinjaman aktif beserta status pembayarannya. [Perlu dikonfirmasi] Fungsi administratif untuk membekukan pool koperasi dalam kondisi darurat belum terdefinisi pada kode yang ada saat ini dan memerlukan spesifikasi lebih lanjut sebelum implementasi.
+Deskripsi      : Sistem harus memotong `min(20% dari accrued, sisa kasbon)` dari setiap klaim gaji karyawan yang memiliki kasbon berstatus `Active`, sebagai cicilan otomatis, sebelum pemotongan PPh21/BPJS dan pesangon. Ketika sisa kasbon mencapai nol, status berubah menjadi `Repaid`. Event `AdvanceRepaid(employee, repaidAmount, remainingDebt)` diterbitkan pada setiap cicilan. Pada `resignEmployee()` atau `executeTermination()`, sisa kasbon yang belum lunas dihapus (bad debt — trade-off yang disengaja untuk MVP; pesangon yang telah terakumulasi tetap dapat diklaim penuh oleh karyawan).
 
 ---
 
@@ -754,7 +756,9 @@ Deskripsi      : Sistem harus secara otomatis mengakumulasikan porsi kepatuhan (
 
 ID Requirement : FR-PAYANA-802
 
-Deskripsi      : Sistem harus memampukan HR Admin untuk mengonfigurasi tarif BPJS (bpjsBps) dan PPh21 (pph21Bps) dalam satuan basis points melalui fungsi `setCompanyConfig()`, sehingga platform dapat mengakomodasi perbedaan bracket pajak antar karyawan dan perubahan regulasi tanpa memerlukan update smart contract. Konfigurasi ini bersifat informatif pada level on-chain dan digunakan oleh sistem backend untuk mengalokasikan rincian internal dari porsi compliance yang terkumpul, yakni berapa bagian untuk BPJS Kesehatan, BPJS Ketenagakerjaan, dan PPh21. Sistem harus memastikan bahwa perubahan tarif hanya dapat dilakukan oleh pengguna dengan `HR_ROLE` pada vault perusahaan yang bersangkutan, dan setiap perubahan konfigurasi harus berlaku untuk klaim gaji yang terjadi setelah perubahan tersebut, tidak berlaku surut. Tarif PPh21 tidak di-hardcode karena dapat berubah mengikuti kebijakan Direktorat Jenderal Pajak.
+Deskripsi      : Sistem harus memampukan HR Admin untuk mengonfigurasi tarif BPJS (bpjsBps) dan, secara opsional, tarif tetap PPh21 (pph21Bps) dalam satuan basis points melalui fungsi `setCompanyConfig()`. Tarif BPJS selalu dipakai langsung sebagai potongan tetap saat `claimSalary()`. Untuk PPh21, jika HR mengisi `pph21Bps` (> 0), nilai tersebut dipakai sebagai override tarif tetap; jika dibiarkan pada nilai default (0), sistem menghitung tarif secara dinamis mengikuti skema Tarif Efektif Rata-rata (TER) sesuai PMK 168/2023 melalui `PayrollMath.calcPPh21TerBps()` (lihat FR-PAYANA-701), sehingga platform tidak perlu update smart contract setiap kali bracket tarif berubah. Sistem harus memastikan bahwa perubahan tarif hanya dapat dilakukan oleh pengguna dengan `HR_ROLE` pada vault perusahaan yang bersangkutan, dan setiap perubahan konfigurasi harus berlaku untuk klaim gaji yang terjadi setelah perubahan tersebut, tidak berlaku surut.
+
+> Catatan: FR-PAYANA-802 ini menjelaskan mekanisme konfigurasi yang sama dengan FR-PAYANA-204 (§3.2.13 pada seksi Kelompok D). Duplikasi ini adalah isu penomoran subbab lama yang sudah diketahui (dua section "3.2 Kebutuhan Fungsional" terpisah dalam dokumen ini) dan perlu dirapikan pada revisi renumbering berikutnya, di luar cakupan perubahan Gen8.
 
 ---
 
@@ -838,7 +842,7 @@ Kelompok ini mendefinisikan kebutuhan fungsional untuk operator platform Payana 
 
 ID Requirement : FR-PAYANA-1001
 
-Deskripsi      : Sistem harus memampukan operator platform Payana yang memiliki `SUPERADMIN_ROLE` pada kontrak `PayrollFactory` untuk mendeploy instance CompanyVault baru yang terisolasi bagi setiap perusahaan klien yang bergabung, dengan memanggil fungsi `deployVault()`. Fungsi ini menerima parameter alamat HR yang akan menjadi administrator vault (hrAuthority), nama perusahaan (companyName), serta alamat kontrak koperasi dan SBT yang bersifat bersama (shared) antar seluruh tenant. Sistem harus menjamin bahwa satu alamat HR hanya dapat memiliki satu CompanyVault; upaya mendeploy vault kedua untuk alamat HR yang sama harus ditolak dengan error `HRAlreadyHasVault`. Alamat vault yang baru dibuat dicatat dalam mapping `companyVaults` dan ditambahkan ke array `allVaults` untuk keperluan operasi darurat. Event `VaultDeployed` diterbitkan dan dapat diindeks oleh layanan Ponder untuk pemantauan platform secara agregat.
+Deskripsi      : Sistem harus memampukan operator platform Payana yang memiliki `SUPERADMIN_ROLE` pada kontrak `PayrollFactory` untuk mendeploy instance CompanyVault baru yang terisolasi bagi setiap perusahaan klien yang bergabung, dengan memanggil fungsi `deployVault()`. Fungsi ini menerima parameter alamat HR yang akan menjadi administrator vault (hrAuthority), nama perusahaan (companyName), serta alamat kontrak SBT yang bersifat bersama (shared) antar seluruh tenant. Sistem harus menjamin bahwa satu alamat HR hanya dapat memiliki satu CompanyVault; upaya mendeploy vault kedua untuk alamat HR yang sama harus ditolak dengan error `HRAlreadyHasVault`. Alamat vault yang baru dibuat dicatat dalam mapping `companyVaults` dan ditambahkan ke array `allVaults` untuk keperluan operasi darurat. Event `VaultDeployed` diterbitkan dan dapat diindeks oleh layanan Ponder untuk pemantauan platform secara agregat.
 
 ---
 
@@ -850,11 +854,13 @@ Deskripsi      : Sistem harus memampukan Owner SaaS untuk memantau kondisi kesel
 
 ---
 
-#### 3.2.24. Penarikan Protocol Fee oleh Owner SaaS
+#### 3.2.24. Konfigurasi Platform Fee dan Treasury oleh Owner SaaS
 
 ID Requirement : FR-PAYANA-1003
 
-Deskripsi      : Sistem harus memampukan Owner SaaS untuk menarik protocol fee yang telah terakumulasi dari aktivitas koperasi karyawan ke alamat treasury platform dengan memanggil fungsi `claimProtocolFee()` pada kontrak `EmployeeLiquidityContract`. Protocol fee ditetapkan sebesar 1% (PROTOCOL_FEE_BPS = 100) dari seluruh bunga yang dikumpulkan dari setiap pinjaman yang lunas, dan diakumulasikan secara atomik dalam variabel `totalProtocolFee` setiap kali pinjaman dilunasi. Fungsi `claimProtocolFee()` hanya dapat dipanggil oleh pengguna dengan `DEFAULT_ADMIN_ROLE` pada kontrak koperasi, dan seluruh saldo fee yang terakumulasi ditransfer sekaligus ke alamat `protocolTreasury` yang dikonfigurasi saat deployment. Sistem harus menolak penarikan jika saldo fee yang terakumulasi adalah nol dengan pesan error yang informatif.
+Deskripsi      : Sistem harus memampukan Owner SaaS mengonfigurasi `platformFeeBps` (maksimum 1%) dan alamat `protocolTreasury` pada kontrak `PayrollFactory`. Platform fee dipotong otomatis dan langsung ditransfer ke `protocolTreasury` pada setiap klaim gaji karyawan (lihat FR-PAYANA-401) — tidak ada mekanisme akumulasi-lalu-klaim terpisah.
+
+> **[Diubah pasca Gen8]** FR ini sebelumnya mendeskripsikan `claimProtocolFee()` pada `EmployeeLiquidityContract` (penarikan 1% bunga pinjaman koperasi yang terakumulasi). Fungsi dan kontrak tersebut sudah tidak ada sejak Gen8 (koperasi digantikan Mesin Pajak & Kasbon, lihat Kelompok G). FR-PAYANA-1003 direvisi untuk menjelaskan mekanisme platform fee yang tersisa, yang sumbernya kini murni dari `platformFeeBps` pada `PayrollFactory`.
 
 ---
 
@@ -945,6 +951,8 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menerbitkan viewing key 
 
 ---
 
+> **Catatan:** Kelompok L (Konversi Nilai Treasury ke USD via `IDRXPriceOracle`/Chainlink, sebelumnya FR-PAYANA-1201–1203) telah dihapus dari dokumen ini pada Revisi C. Kontrak `IDRXPriceOracle.sol` dihapus total dari kodebase — IDRX dirancang sebagai stablecoin 1:1 terhadap Rupiah, sehingga fungsi konversi harga tidak punya kasus penggunaan nyata: bukan kebutuhan yang "belum sempat diimplementasikan", tapi kebutuhan yang gugur begitu asumsi 1 IDRX = 1 IDR ditetapkan sebagai desain final produk.
+
 ### 3.3 Diagram Use Case
 
 > **Catatan untuk Pembaca:** Sistem Payana adalah sistem hybrid tiga lapisan (smart contract on-chain, REST API backend, antarmuka web frontend). Use case di bawah ini menggambarkan interaksi pengguna dengan sistem secara end-to-end tanpa memisahkan lapisan teknis.
@@ -953,20 +961,20 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menerbitkan viewing key 
 
 | ID | Nama Use Case | Aktor | FR Terkait |
 |----|---------------|-------|------------|
-| UC-01 | Login dan Autentikasi | HR Admin / Employee / Legal Officer | FR-PAYANA-101, 102, 103 |
+| UC-01 | Login dan Autentikasi | HR Admin / Employee | FR-PAYANA-101, 102, 103 |
 | UC-02 | Onboarding Perusahaan dan Deploy Vault | Owner SaaS / HR Admin | FR-PAYANA-201, 202 |
 | UC-03 | Deposit IDRX ke Vault Perusahaan | HR Admin | FR-PAYANA-203, 204 |
 | UC-04 | Onboarding Karyawan dan Inisiasi Stream Gaji | HR Admin | FR-PAYANA-301, 302, 303 |
 | UC-05 | Karyawan Klaim Gaji Terakumulasi (EWA) | Karyawan | FR-PAYANA-401, 402 |
 | UC-06 | Inisiasi PHK oleh HR Admin | HR Admin | FR-PAYANA-501, 502 |
-| UC-07 | Persetujuan PHK oleh Legal Officer | Legal Officer | FR-PAYANA-503, 504 |
+| UC-07 | Persetujuan PHK (mode Legal) | HR Admin | FR-PAYANA-503, 504 |
 | UC-08 | Karyawan Resign Mandiri | Karyawan | FR-PAYANA-505 |
 | UC-09 | HR Grant Vesting Schedule ke Karyawan | HR Admin | FR-PAYANA-601, 602 |
 | UC-10 | Karyawan Claim Vested Bonus | Karyawan | FR-PAYANA-603 |
-| UC-11 | Karyawan Bergabung ke Koperasi dan Menyimpan Dana | Karyawan | FR-PAYANA-701, 702 |
-| UC-12 | Karyawan Mengajukan Pinjaman Koperasi | Karyawan | FR-PAYANA-703, 704 |
+| UC-11 | Karyawan Mengajukan dan Melunasi Kasbon | Karyawan | FR-PAYANA-704, 706 |
+| UC-12 | HR Menyetujui/Menolak Kasbon | HR Admin | FR-PAYANA-705 |
 | UC-13 | HR Generate Laporan Kepatuhan (BPJS/PPh21) | HR Admin | FR-PAYANA-801, 802 |
-| UC-14 | Verifikasi Sertifikat Ketenagakerjaan (SBT) | Pihak Ketiga / Karyawan | FR-PAYANA-901, 902 |
+| UC-14 | Verifikasi Sertifikat Ketenagakerjaan (SBT) | HR Admin | FR-PAYANA-901, 902 |
 | UC-15 | Owner SaaS Deploy Company Vault Baru | Owner SaaS | FR-PAYANA-1001 |
 | UC-20 | Owner SaaS Konfigurasi dan Klaim Platform Fee | Owner SaaS | FR-PAYANA-1006, 1007, 1008 |
 | UC-16 | HR Lihat Dashboard Vault dan Status Stream | HR Admin | FR-PAYANA-204, 303 |
@@ -976,25 +984,26 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menerbitkan viewing key 
 
 ---
 
-#### Diagram Use Case — Gambaran Keseluruhan
+#### Diagram Use Case
 
-Diagram berikut menggambarkan seluruh aktor sistem Payana beserta use case yang dapat mereka lakukan.
+Diagram berikut menggambarkan seluruh aktor sistem Payana beserta use case yang dapat mereka lakukan, dalam satu diagram utuh — tidak dipecah per aktor/kelompok agar relasi antar use case (termasuk yang dipakai bersama oleh lebih dari satu aktor, seperti UC-01) tetap terlihat dalam satu pandangan.
 
 ```mermaid
 graph LR
     HR(["👤 HR Admin"])
     EMP(["👤 Karyawan"])
-    LEGAL(["👤 Legal Officer"])
     OWNER(["👤 Owner SaaS"])
-    THIRD(["👤 Pihak Ketiga"])
 
     HR --> UC01["UC-01\nLogin & Autentikasi"]
     HR --> UC02["UC-02\nOnboarding Perusahaan\n& Deploy Vault"]
     HR --> UC03["UC-03\nDeposit IDRX\nke Vault"]
     HR --> UC04["UC-04\nOnboarding Karyawan\n& Start Stream"]
     HR --> UC06["UC-06\nInisiasi PHK"]
+    HR --> UC07["UC-07\nPersetujuan PHK\n(mode Legal)"]
     HR --> UC09["UC-09\nGrant Vesting\nSchedule"]
+    HR --> UC12["UC-12\nSetujui/Tolak\nKasbon"]
     HR --> UC13["UC-13\nGenerate Laporan\nKepatuhan"]
+    HR --> UC14["UC-14\nVerifikasi SBT\nKetenagakerjaan"]
     HR --> UC16["UC-16\nDashboard Vault\n& Status Stream"]
     HR --> UC17["UC-17\nSet Gaji\nTerenkripsi FHE"]
     HR --> UC19["UC-19\nAgregasi Total\nPayroll FHE"]
@@ -1003,110 +1012,19 @@ graph LR
     EMP --> UC05["UC-05\nKlaim Gaji EWA"]
     EMP --> UC08["UC-08\nResign Mandiri"]
     EMP --> UC10["UC-10\nClaim Vested\nBonus"]
-    EMP --> UC11["UC-11\nDeposit Koperasi"]
-    EMP --> UC12["UC-12\nAjukan Pinjaman\nKoperasi"]
+    EMP --> UC11["UC-11\nAjukan & Lunasi\nKasbon"]
     EMP --> UC18["UC-18\nLihat Gaji\nvia Viewing Key"]
-
-    LEGAL --> UC01
-    LEGAL --> UC07["UC-07\nPersetujuan PHK"]
 
     OWNER --> UC01
     OWNER --> UC15["UC-15\nDeploy Company\nVault Baru"]
     OWNER --> UC20["UC-20\nKonfigurasi\nPlatform Fee"]
 
-    THIRD --> UC14["UC-14\nVerifikasi SBT\nKetenagakerjaan"]
-
     style HR fill:#dbeafe,stroke:#2563eb
     style EMP fill:#dcfce7,stroke:#16a34a
-    style LEGAL fill:#fef9c3,stroke:#ca8a04
     style OWNER fill:#fce7f3,stroke:#db2777
-    style THIRD fill:#f3f4f6,stroke:#6b7280
 ```
 
----
-
-#### Diagram Use Case — HR Admin
-
-```mermaid
-graph TD
-    HR(["👤 HR Admin"])
-
-    subgraph Autentikasi
-        UC01["UC-01\nLogin & Autentikasi"]
-    end
-    subgraph Vault["Manajemen Vault"]
-        UC02["UC-02\nOnboarding Perusahaan"]
-        UC03["UC-03\nDeposit IDRX"]
-        UC16["UC-16\nDashboard Vault"]
-    end
-    subgraph Karyawan["Manajemen Karyawan"]
-        UC04["UC-04\nOnboarding & Start Stream"]
-        UC06["UC-06\nInisiasi PHK"]
-        UC09["UC-09\nGrant Vesting"]
-    end
-    subgraph Kepatuhan["Kepatuhan & Privasi"]
-        UC13["UC-13\nGenerate Laporan"]
-        UC17["UC-17\nSet Gaji FHE"]
-        UC19["UC-19\nAgregasi Payroll FHE"]
-    end
-
-    HR --> UC01
-    HR --> UC02 & UC03 & UC16
-    HR --> UC04 & UC06 & UC09
-    HR --> UC13 & UC17 & UC19
-
-    style HR fill:#dbeafe,stroke:#2563eb
-```
-
-#### Diagram Use Case — Karyawan
-
-```mermaid
-graph TD
-    EMP(["👤 Karyawan"])
-
-    subgraph Autentikasi
-        UC01["UC-01\nLogin & Autentikasi"]
-    end
-    subgraph Penggajian["Penggajian & Benefit"]
-        UC05["UC-05\nKlaim Gaji EWA"]
-        UC08["UC-08\nResign Mandiri"]
-        UC10["UC-10\nClaim Vested Bonus"]
-        UC18["UC-18\nLihat Gaji via Viewing Key"]
-    end
-    subgraph Koperasi["Koperasi"]
-        UC11["UC-11\nDeposit ke Pool"]
-        UC12["UC-12\nAjukan Pinjaman"]
-    end
-
-    EMP --> UC01
-    EMP --> UC05 & UC08 & UC10 & UC18
-    EMP --> UC11 & UC12
-
-    style EMP fill:#dcfce7,stroke:#16a34a
-```
-
-#### Diagram Use Case — Legal Officer, Owner SaaS & Pihak Ketiga
-
-```mermaid
-graph TD
-    LEGAL(["👤 Legal Officer"])
-    OWNER(["👤 Owner SaaS"])
-    THIRD(["👤 Pihak Ketiga"])
-
-    UC01["UC-01\nLogin & Autentikasi"]
-    UC07["UC-07\nPersetujuan PHK"]
-    UC15["UC-15\nDeploy Vault Baru"]
-    UC20["UC-20\nKonfigurasi Platform Fee"]
-    UC14["UC-14\nVerifikasi SBT"]
-
-    LEGAL --> UC01 & UC07
-    OWNER --> UC01 & UC15 & UC20
-    THIRD --> UC14
-
-    style LEGAL fill:#fef9c3,stroke:#ca8a04
-    style OWNER fill:#fce7f3,stroke:#db2777
-    style THIRD fill:#f3f4f6,stroke:#6b7280
-```
+> **Catatan:** Diagram disederhanakan menjadi tiga aktor persona utama (HR Admin, Karyawan, Owner SaaS) sesuai arahan pembimbing. Persetujuan PHK (UC-07) dan verifikasi SBT (UC-14), yang secara teknis dijalankan oleh pemegang `LEGAL_ROLE` on-chain atau pihak eksternal, digambarkan sebagai bagian dari domain HR Admin pada level diagram use case — detail teknis peran `LEGAL_ROLE` tetap didokumentasikan pada spesifikasi UC-07 dan pada DPPL (access control on-chain).
 
 ---
 
@@ -1266,7 +1184,6 @@ sequenceDiagram
     participant BE as Backend
     participant Pimlico
     participant CV as CompanyVault
-    participant ELC as EmployeeLiquidityContract
     participant IDRX as IDRX Token
 
     EMP->>FE: Klik "Tarik Gaji" di /employee/ewa
@@ -1279,10 +1196,13 @@ sequenceDiagram
     BE->>BE: Validasi JWT + rate limit (max 10/jam)
     BE->>Pimlico: eth_sendUserOperation
     Pimlico->>CV: claimSalary() via EntryPoint
-    CV->>ELC: autoRepay() — cicil pinjaman jika ada
-    CV->>CV: Split: 93% karyawan / 5% compliance / 2% severance
-    CV->>IDRX: transfer(employee, employeeAmount)
-    CV-->>FE: event SalaryClaimed
+    CV->>CV: Potong platform fee
+    CV->>CV: [Jika kasbon Active] Potong min(20% accrued, sisa kasbon)
+    CV->>CV: Hitung PPh21 (TER/override) + BPJS -> complianceBalance
+    CV->>CV: Hitung severance -> severanceVault
+    CV->>IDRX: transfer(employee, netToEmployee)
+    CV-->>FE: event SalaryClaimed(..., kasbonRepaid)
+    CV-->>FE: event TaxWithheld(pph21Amount, bpjsAmount)
     FE-->>EMP: Notifikasi sukses + saldo reset
 ```
 
@@ -1292,9 +1212,9 @@ sequenceDiagram
 | **Deskripsi Singkat** | Karyawan mengakses fitur Earned Wage Access (EWA) untuk menarik gaji yang telah diakumulasikan secara real-time dari streaming contract. Transaksi dikemas sebagai UserOperation (ERC-4337), ditandatangani secara diam-diam oleh Privy, dan dieksekusi tanpa biaya gas (gasless) melalui Paymaster platform. |
 | **Aktor** | Karyawan |
 | **Pre Kondisi** | Karyawan telah login dengan role `employee`. HR Admin telah memulai stream gaji untuk karyawan tersebut dan stream dalam kondisi aktif. Terdapat saldo IDRX yang telah terakumulasi dan belum diklaim (lebih dari 0). |
-| **Pos Kondisi** | Saldo IDRX terakumulasi direset ke nol. Karyawan menerima 93% dari total akumulasi di wallet mereka (dikurangi cicilan pinjaman koperasi jika ada). Compliance Vault menerima 5% dan Severance Vault menerima 2%. Audit log transaksi tercatat di database. |
-| **Basic Flow** | 1. Karyawan membuka halaman `/employee/ewa`. <br> 2. Frontend membaca saldo terakumulasi secara real-time dari smart contract dan menampilkan nilai dalam IDRX beserta estimasi setara Rupiah. <br> 3. Karyawan mengklik tombol "Tarik Gaji". <br> 4. Frontend mengonstruksi UserOperation (ERC-4337) yang memanggil fungsi `CompanyVault.claimSalary()`. Privy menandatangani UserOperation secara diam-diam menggunakan kunci privat embedded wallet karyawan tanpa popup konfirmasi tambahan. <br> 5. Frontend mengirimkan UserOperation yang telah ditandatangani ke backend melalui `POST /bundler/relay` beserta JWT autentikasi karyawan. <br> 6. Backend memvalidasi JWT, memeriksa rate limit klaim, dan melampirkan Paymaster agar gas dibayarkan oleh platform (karyawan tidak perlu memiliki saldo ETH). <br> 7. Backend mengirimkan UserOperation ke bundler on-chain di jaringan Base Sepolia. <br> 8. Smart contract `CompanyVault.claimSalary()` dieksekusi: apabila karyawan memiliki pinjaman aktif di koperasi, cicilan dipotong otomatis terlebih dahulu melalui `EmployeeLiquidityContract.autoRepay()`. Sisa dana kemudian didistribusikan: 93% ke wallet karyawan, 5% ke Compliance Vault, dan 2% ke Severance Vault. <br> 9. Backend menerima webhook dari Alchemy, memperbarui audit log, dan mengirimkan notifikasi melalui WebSocket ke frontend. <br> 10. Frontend memperbarui tampilan saldo (direset ke nol) dan menampilkan notifikasi "Penarikan berhasil! Dana sebesar [jumlah] IDRX telah dikirim ke wallet Anda." |
-| **Alternative Flow** | A1. Apabila karyawan memiliki pinjaman koperasi aktif, frontend menampilkan rincian potongan cicilan sebelum klaim dieksekusi, sehingga karyawan mengetahui jumlah bersih yang akan diterima. <br> A2. Apabila karyawan mengklik "Batal" setelah langkah 3 namun sebelum UserOperation dikirim ke bundler, proses dibatalkan tanpa efek on-chain apapun. |
+| **Pos Kondisi** | Saldo IDRX terakumulasi direset ke nol. Karyawan menerima sisa akumulasi di wallet mereka setelah dipotong platform fee, cicilan kasbon (jika ada), PPh21+BPJS, dan porsi severance (2% default). Audit log transaksi tercatat di database. |
+| **Basic Flow** | 1. Karyawan membuka halaman `/employee/ewa`. <br> 2. Frontend membaca saldo terakumulasi secara real-time dari smart contract dan menampilkan nilai dalam IDRX beserta estimasi setara Rupiah. <br> 3. Karyawan mengklik tombol "Tarik Gaji". <br> 4. Frontend mengonstruksi UserOperation (ERC-4337) yang memanggil fungsi `CompanyVault.claimSalary()`. Privy menandatangani UserOperation secara diam-diam menggunakan kunci privat embedded wallet karyawan tanpa popup konfirmasi tambahan. <br> 5. Frontend mengirimkan UserOperation yang telah ditandatangani ke backend melalui `POST /bundler/relay` beserta JWT autentikasi karyawan. <br> 6. Backend memvalidasi JWT, memeriksa rate limit klaim, dan melampirkan Paymaster agar gas dibayarkan oleh platform (karyawan tidak perlu memiliki saldo ETH). <br> 7. Backend mengirimkan UserOperation ke bundler on-chain di jaringan Base Sepolia. <br> 8. Smart contract `CompanyVault.claimSalary()` dieksekusi: platform fee dipotong, lalu apabila karyawan memiliki kasbon berstatus `Active`, cicilan `min(20% accrued, sisa kasbon)` dipotong otomatis (lihat UC-11). Sisanya dipotong PPh21 (TER atau override HR) + BPJS ke Compliance Vault, dan porsi severance ke Severance Vault. Sisa bersih ditransfer ke wallet karyawan. <br> 9. Backend menerima webhook dari Alchemy, memperbarui audit log, dan mengirimkan notifikasi melalui WebSocket ke frontend. <br> 10. Frontend memperbarui tampilan saldo (direset ke nol) dan menampilkan notifikasi "Penarikan berhasil! Dana sebesar [jumlah] IDRX telah dikirim ke wallet Anda." |
+| **Alternative Flow** | A1. Apabila karyawan memiliki kasbon aktif, frontend menampilkan rincian potongan cicilan sebelum klaim dieksekusi, sehingga karyawan mengetahui jumlah bersih yang akan diterima. <br> A2. Apabila karyawan mengklik "Batal" setelah langkah 3 namun sebelum UserOperation dikirim ke bundler, proses dibatalkan tanpa efek on-chain apapun. |
 | **Error Flow** | E1. Apabila stream gaji karyawan belum aktif atau telah dihentikan (`StreamNotActive`), smart contract menolak klaim. Frontend menampilkan pesan "Stream gaji Anda belum aktif. Hubungi HR Admin untuk memulai stream." <br> E2. Apabila tidak ada akumulasi gaji yang dapat diklaim (`NothingToClaim`), backend menolak permintaan dengan pesan "Tidak ada saldo yang dapat ditarik saat ini. Saldo Anda akan diperbarui seiring berjalannya waktu." <br> E3. Apabila saldo CompanyVault tidak mencukupi untuk membayar klaim (`InsufficientVaultBalance`), smart contract menolak transaksi. Frontend menampilkan pesan "Dana vault perusahaan tidak mencukupi. Silakan hubungi HR Admin Anda." <br> E4. Apabila batas klaim per jam terlampaui, backend menolak permintaan dengan status `429 Too Many Requests` dan pesan "Batas klaim telah tercapai. Anda dapat melakukan klaim kembali dalam [X] menit." |
 
 ---
@@ -1329,7 +1249,7 @@ sequenceDiagram
 
 ---
 
-#### UC-07: Persetujuan PHK oleh Legal Officer
+#### UC-07: Persetujuan PHK (mode Legal)
 
 ```mermaid
 sequenceDiagram
@@ -1357,9 +1277,9 @@ sequenceDiagram
 
 | | |
 |-|-|
-| **Nama Use Case** | Persetujuan PHK oleh Legal Officer |
-| **Deskripsi Singkat** | Legal Officer meninjau proposal PHK yang diajukan HR Admin, memverifikasi kelengkapan dokumen dan kepatuhan hukum, kemudian memberikan persetujuan atau penolakan. Setelah disetujui Legal Officer, HR Admin dapat mengeksekusi PHK secara final on-chain. |
-| **Aktor** | Legal Officer |
+| **Nama Use Case** | Persetujuan PHK (mode Legal) |
+| **Deskripsi Singkat** | Pemegang wewenang legal (di level persona diagram digambarkan sebagai bagian dari domain HR Admin; secara teknis on-chain dikendalikan oleh alamat pemegang `LEGAL_ROLE`, bisa staf legal internal terpisah atau HR Admin yang juga diberi role tersebut) meninjau proposal PHK yang diajukan, memverifikasi kelengkapan dokumen dan kepatuhan hukum, kemudian memberikan persetujuan atau penolakan. Setelah disetujui, eksekusi PHK final dapat dilakukan on-chain. |
+| **Aktor** | HR Admin (pemegang `LEGAL_ROLE`) |
 | **Pre Kondisi** | Legal Officer telah login dengan role `legal`. Terdapat minimal satu proposal PHK dengan status `menunggu_persetujuan_legal` di database. Proposal belum kedaluwarsa (masih dalam batas waktu persetujuan 30 hari). |
 | **Pos Kondisi** | Status proposal PHK berubah menjadi `disetujui` atau `ditolak`. Apabila disetujui, HR Admin dapat mengeksekusi PHK final yang akan mencabut SBT karyawan, menghentikan stream, dan mencairkan pesangon. |
 | **Basic Flow** | 1. Legal Officer menerima notifikasi melalui email atau in-app bahwa ada proposal PHK yang memerlukan persetujuan. <br> 2. Legal Officer login dan mengakses halaman `/hr/phk`, kemudian melihat daftar proposal dengan status "Menunggu Persetujuan Legal". <br> 3. Legal Officer mengklik proposal untuk melihat detail: nama karyawan, alasan PHK yang diajukan HR, tanggal efektif, catatan pendukung, dan riwayat kinerja karyawan. <br> 4. Legal Officer meninjau kelengkapan dokumen dan memastikan alasan PHK sesuai dengan ketentuan hukum ketenagakerjaan yang berlaku. <br> 5. Legal Officer mengklik "Setujui". Frontend memanggil `CompanyVault.approveTermination(employeeAddress)` menggunakan akun Legal Officer yang memiliki `LEGAL_ROLE`. <br> 6. Smart contract memverifikasi bahwa pemanggil memiliki `LEGAL_ROLE`, proposal masih aktif dan belum kedaluwarsa, serta Legal Officer ini belum pernah menyetujui proposal yang sama sebelumnya. <br> 7. Status proposal berubah menjadi `disetujui` on-chain. <br> 8. Backend menerima webhook, memperbarui status di database, dan mengirimkan notifikasi ke HR Admin bahwa PHK siap dieksekusi. <br> 9. Frontend menampilkan konfirmasi "Persetujuan PHK berhasil diberikan. HR Admin akan mengeksekusi PHK secara final." |
@@ -1468,74 +1388,86 @@ sequenceDiagram
 
 ---
 
-#### UC-11: Karyawan Bergabung ke Koperasi dan Menyimpan Dana
-
-```mermaid
-sequenceDiagram
-    actor EMP as Karyawan
-    participant FE as Frontend
-    participant IDRX as IDRX Token
-    participant ELC as EmployeeLiquidityContract
-
-    EMP->>FE: Input jumlah deposit di /employee/koperasi
-    FE->>IDRX: approve(elcAddress, amount)
-    IDRX-->>FE: Approval dikonfirmasi
-    FE->>ELC: depositToPool(vaultAddress, amount)
-    ELC->>ELC: Validasi VaultNotRegistered + PoolNotInitialized
-    ELC->>ELC: Validasi amount >= 100 IDRX (minimum)
-    ELC->>IDRX: transferFrom(employee, elc, amount)
-    ELC->>ELC: lenderDeposits[employee].principal += amount
-    ELC->>ELC: totalDeposited += amount
-    ELC-->>FE: event Deposited(employee, amount)
-    FE-->>EMP: Simpanan berhasil didepositkan
-```
-
-| | |
-|-|-|
-| **Nama Use Case** | Karyawan Bergabung ke Koperasi dan Menyimpan Dana |
-| **Deskripsi Singkat** | Karyawan mendaftar sebagai anggota koperasi karyawan Payana dan melakukan penyimpanan (deposit) dana IDRX ke dalam Employee Liquidity Pool. Dana simpanan berkontribusi pada ketersediaan likuiditas pool yang digunakan untuk program pinjaman sesama karyawan. |
-| **Aktor** | Karyawan |
-| **Pre Kondisi** | Karyawan telah login dengan role `employee`. Karyawan memiliki stream gaji aktif. Employee Liquidity Pool sudah diinisialisasi oleh Owner SaaS. Karyawan belum atau sudah terdaftar sebagai anggota koperasi. |
-| **Pos Kondisi** | Karyawan terdaftar sebagai anggota koperasi (jika belum). Saldo simpanan karyawan dalam Employee Liquidity Pool bertambah sesuai jumlah yang didepositkan. Bukti simpanan tercatat on-chain. |
-| **Basic Flow** | 1. Karyawan membuka halaman `/employee/koperasi` dan memilih tab "Simpanan". <br> 2. Sistem menampilkan informasi koperasi: total likuiditas pool saat ini, jumlah anggota aktif, suku bunga simpanan, dan saldo simpanan milik karyawan saat ini (jika sudah pernah menyimpan). <br> 3. Apabila karyawan belum terdaftar sebagai anggota, sistem menampilkan tombol "Bergabung ke Koperasi". Karyawan mengklik tombol tersebut. <br> 4. Frontend memanggil `EmployeeLiquidityContract.joinPool()` melalui UserOperation (ERC-4337). Smart contract mendaftarkan karyawan sebagai anggota pool. <br> 5. Setelah terdaftar (atau jika sudah terdaftar sebelumnya), karyawan memasukkan jumlah IDRX yang ingin disimpan. <br> 6. Karyawan mengklik "Simpan Dana". Frontend memanggil `EmployeeLiquidityContract.deposit(amount)` melalui UserOperation. <br> 7. Smart contract menarik IDRX dari wallet karyawan ke dalam pool dan memperbarui saldo simpanan karyawan on-chain. <br> 8. Backend menerima webhook dari Alchemy, mencatat transaksi penyimpanan di database, dan memperbarui data keanggotaan koperasi. <br> 9. Frontend menampilkan konfirmasi "Simpanan berhasil. Dana [jumlah] IDRX telah masuk ke koperasi." dan memperbarui tampilan saldo simpanan. |
-| **Alternative Flow** | A1. Apabila karyawan ingin menarik simpanan (withdrawal), karyawan mengakses tab "Simpanan" dan mengklik "Tarik Dana". Frontend memanggil `EmployeeLiquidityContract.withdraw(amount)`. Smart contract memvalidasi bahwa penarikan tidak menyebabkan likuiditas pool di bawah batas minimum operasional. |
-| **Error Flow** | E1. Apabila Employee Liquidity Pool belum diinisialisasi oleh Owner SaaS (`PoolNotInitialized`), smart contract menolak seluruh operasi deposit maupun penarikan. Frontend menampilkan pesan "Koperasi karyawan belum aktif. Silakan hubungi administrator sistem." <br> E2. Apabila saldo IDRX di wallet karyawan tidak mencukupi jumlah yang ingin disimpan, transaksi approval akan gagal. Frontend menampilkan pesan "Saldo IDRX Anda tidak mencukupi untuk melakukan simpanan sebesar [jumlah]." <br> E3. Apabila karyawan mencoba menarik dana melebihi saldo simpanan yang dimiliki, smart contract menolak transaksi. Frontend menampilkan pesan "Jumlah penarikan melebihi saldo simpanan Anda saat ini." |
-
----
-
-#### UC-12: Karyawan Mengajukan Pinjaman Koperasi
+#### UC-11: Karyawan Mengajukan dan Melunasi Kasbon
 
 ```mermaid
 sequenceDiagram
     actor EMP as Karyawan
     participant FE as Frontend
     participant CV as CompanyVault
-    participant ELC as EmployeeLiquidityContract
-    participant IDRX as IDRX Token
 
-    EMP->>FE: Input jumlah pinjaman di /employee/koperasi
+    EMP->>FE: Input jumlah kasbon di /employee/kasbon
     FE->>CV: getStreamInfo(employee) — cek flowRate
     CV-->>FE: flowRate aktif
-    FE->>ELC: borrowFromPool(vaultAddress, amount)
-    ELC->>ELC: Validasi VaultNotRegistered + ActiveLoanExists
-    ELC->>ELC: Validasi LoanLimitExceeded (max 80% gaji bulanan)
-    ELC->>ELC: Validasi InsufficientPoolLiquidity
-    ELC->>ELC: Hitung bunga di muka, simpan LoanRecord
-    ELC->>IDRX: transfer(employee, amount)
-    ELC-->>FE: event LoanCreated(employee, principal, interest, dueDate)
-    FE-->>EMP: Pinjaman berhasil dicairkan
+    FE->>CV: requestAdvance(amount) — gasless via Paymaster
+    CV->>CV: Validasi amount <= 80% gaji bulanan (MAX_ADVANCE_BPS)
+    CV->>CV: Validasi tidak ada kasbon Pending/Active lain
+    CV->>CV: advances[employee] = {amount, 0, Pending}
+    CV-->>FE: event AdvanceRequested(employee, amount)
+    FE-->>EMP: Pengajuan kasbon terkirim, menunggu persetujuan HR
+
+    Note over CV: Setelah HR approve (UC-12), status jadi Active dan dana ditransfer
+
+    EMP->>FE: Klaim gaji berikutnya (UC-05)
+    FE->>CV: claimSalary()
+    CV->>CV: Potong min(20% accrued, sisa kasbon) sebagai cicilan
+    CV->>CV: advances[employee].repaid += kasbonRepaid
+    alt sisa kasbon == 0
+        CV->>CV: status = Repaid
+    end
+    CV-->>FE: event AdvanceRepaid(employee, kasbonRepaid, remainingDebt)
+    FE-->>EMP: Gaji diterima, kasbon tercatat berkurang
 ```
 
 | | |
 |-|-|
-| **Nama Use Case** | Karyawan Mengajukan Pinjaman Koperasi |
-| **Deskripsi Singkat** | Karyawan mengajukan pinjaman melalui fitur Koperasi Payana dengan limit maksimal 80% dari gaji bulanan. Dana pinjaman bersumber dari Employee Liquidity Pool. Pelunasan dilakukan secara otomatis (auto-repay) setiap kali karyawan melakukan klaim EWA berikutnya. |
+| **Nama Use Case** | Karyawan Mengajukan dan Melunasi Kasbon |
+| **Deskripsi Singkat** | Karyawan mengajukan uang muka gaji (kasbon) hingga 80% dari estimasi gaji bulanan yang belum accrued. Dana kasbon bersumber langsung dari `vaultBalance` perusahaan, disetujui manual oleh HR (UC-12), dan dilunasi otomatis melalui pemotongan sebagian dari setiap klaim gaji berikutnya. |
 | **Aktor** | Karyawan |
-| **Pre Kondisi** | Karyawan telah login dengan role `employee`. Karyawan merupakan anggota koperasi aktif. Karyawan memiliki stream gaji yang sedang berjalan. Karyawan tidak memiliki pinjaman koperasi yang masih aktif. Employee Liquidity Pool telah diinisialisasi dan memiliki likuiditas. |
-| **Pos Kondisi** | Dana pinjaman IDRX masuk ke wallet karyawan. Entri pinjaman aktif tercatat di smart contract `EmployeeLiquidityContract`. Pada setiap klaim EWA berikutnya, cicilan akan dipotong otomatis dari akumulasi gaji karyawan hingga pinjaman lunas. |
-| **Basic Flow** | 1. Karyawan membuka halaman `/employee/koperasi` dan memilih tab "Pinjam". <br> 2. Frontend membaca data dari smart contract: gaji bulanan karyawan (untuk menghitung limit pinjaman = 80% gaji), saldo likuiditas pool saat ini, dan status pinjaman aktif karyawan. <br> 3. Sistem menampilkan informasi limit pinjaman maksimal, estimasi cicilan per klaim EWA, dan ketentuan pinjaman. <br> 4. Karyawan memasukkan jumlah pinjaman yang diinginkan (tidak boleh melebihi 80% gaji bulanan). <br> 5. Karyawan meninjau rincian pinjaman dan mengklik "Ajukan Pinjaman". <br> 6. Frontend memanggil `EmployeeLiquidityContract.borrowFromPool(vaultAddress, amount)` melalui UserOperation (ERC-4337) yang ditandatangani Privy secara diam-diam. <br> 7. Smart contract memvalidasi seluruh kondisi: jumlah tidak melebihi 80% gaji, pool memiliki likuiditas mencukupi, karyawan tidak memiliki pinjaman aktif, dan pool sudah diinisialisasi. <br> 8. Dana pinjaman ditransfer dari liquidity pool ke wallet karyawan secara on-chain. <br> 9. Backend menerima webhook dari Alchemy, mencatat entri pinjaman aktif di database, dan mengirimkan notifikasi konfirmasi ke karyawan. <br> 10. Frontend menampilkan konfirmasi "Pinjaman berhasil. Dana [jumlah] IDRX telah masuk ke wallet Anda. Cicilan akan dipotong otomatis pada setiap klaim gaji berikutnya." dan memperbarui tampilan tab "Pinjaman Aktif". |
-| **Alternative Flow** | A1. Apabila karyawan sudah memiliki pinjaman aktif yang belum lunas, sistem menampilkan informasi pinjaman aktif (pokok sisa, jumlah yang sudah dilunasi, dan estimasi pelunasan penuh). Karyawan tidak dapat mengajukan pinjaman baru hingga pinjaman sebelumnya selesai dilunasi. |
-| **Error Flow** | E1. Apabila karyawan sudah memiliki pinjaman aktif yang belum lunas (`ActiveLoanExists`), smart contract menolak permintaan pinjaman baru. Frontend menampilkan pesan "Anda masih memiliki pinjaman aktif yang belum lunas. Selesaikan pinjaman yang ada terlebih dahulu sebelum mengajukan pinjaman baru." <br> E2. Apabila jumlah pinjaman yang diajukan melebihi batas 80% dari gaji bulanan (`LoanLimitExceeded`), smart contract menolak transaksi. Frontend menampilkan pesan "Jumlah pinjaman melebihi batas maksimal. Limit pinjaman Anda adalah [limit] IDRX (80% dari gaji bulanan)." <br> E3. Apabila Employee Liquidity Pool tidak memiliki IDRX yang cukup untuk memenuhi permintaan pinjaman (`InsufficientPoolLiquidity`), smart contract menolak transaksi. Frontend menampilkan pesan "Dana koperasi saat ini tidak mencukupi untuk memenuhi permintaan pinjaman Anda. Silakan coba kembali nanti atau ajukan jumlah yang lebih kecil." <br> E4. Apabila pool belum diinisialisasi sama sekali (`PoolNotInitialized`), smart contract menolak seluruh operasi pinjaman. Frontend menampilkan pesan "Koperasi karyawan belum aktif. Silakan hubungi administrator sistem Payana." |
+| **Pre Kondisi** | Karyawan telah login dengan role `employee` dan memiliki stream gaji aktif. Karyawan tidak memiliki kasbon berstatus `Pending` atau `Active` lainnya. |
+| **Pos Kondisi** | Pengajuan kasbon tercatat dengan status `Pending` menunggu persetujuan HR. Setelah disetujui dan dana ditransfer (status `Active`), setiap klaim gaji berikutnya otomatis memotong cicilan hingga status menjadi `Repaid`. |
+| **Basic Flow** | 1. Karyawan membuka halaman `/employee/kasbon`. <br> 2. Sistem menampilkan estimasi gaji bulanan, limit kasbon maksimal (80% dari estimasi), dan status kasbon saat ini (jika ada). <br> 3. Karyawan memasukkan jumlah kasbon yang diinginkan (≤ limit) dan mengklik "Ajukan Kasbon". <br> 4. Frontend memanggil `requestAdvance(amount)` melalui UserOperation gasless (ERC-4337, ditandatangani Privy). <br> 5. Smart contract memvalidasi limit 80% dan ketiadaan kasbon aktif/pending lain, lalu mencatat status `Pending` dan menerbitkan event `AdvanceRequested`. <br> 6. Backend menerima webhook, mencatat pengajuan, dan mengirim notifikasi ke HR untuk ditinjau (lanjut ke UC-12). <br> 7. Setelah HR menyetujui, dana kasbon masuk ke wallet karyawan dan status berubah menjadi `Active`. <br> 8. Pada klaim gaji berikutnya (UC-05), sistem otomatis memotong `min(20% accrued, sisa kasbon)` sebagai cicilan sebelum menghitung PPh21/BPJS dan pesangon. <br> 9. Ketika sisa kasbon mencapai nol, status berubah menjadi `Repaid` dan karyawan dapat mengajukan kasbon baru. |
+| **Alternative Flow** | A1. Apabila HR menolak pengajuan (UC-12), status berubah menjadi `Rejected` dan karyawan dapat mengajukan kembali. |
+| **Error Flow** | E1. Apabila jumlah yang diajukan melebihi 80% estimasi gaji bulanan, smart contract menolak transaksi. Frontend menampilkan pesan "Jumlah kasbon melebihi batas maksimal 80% dari estimasi gaji bulanan Anda." <br> E2. Apabila karyawan masih memiliki kasbon berstatus `Pending` atau `Active`, smart contract menolak pengajuan baru. Frontend menampilkan pesan "Anda masih memiliki kasbon yang belum selesai. Selesaikan atau tunggu proses kasbon sebelumnya terlebih dahulu." <br> E3. Apabila karyawan resign atau di-PHK sebelum kasbon lunas, sisa kasbon dihapus sebagai bad debt (trade-off MVP) dan tidak mengurangi hak pesangon yang telah terakumulasi. |
+
+---
+
+#### UC-12: HR Menyetujui/Menolak Kasbon
+
+```mermaid
+sequenceDiagram
+    actor HR as HR Admin
+    participant FE as Frontend
+    participant CV as CompanyVault
+    participant IDRX as IDRX Token
+
+    HR->>FE: Buka daftar kasbon Pending di /hr/kasbon
+    alt HR menyetujui
+        HR->>FE: Klik "Setujui"
+        FE->>CV: approveAdvance(employee)
+        CV->>CV: Validasi vaultBalance mencukupi
+        CV->>IDRX: transfer(employee, amount)
+        CV->>CV: advances[employee].status = Active
+        CV-->>FE: event AdvanceApproved(employee, amount)
+    else HR menolak
+        HR->>FE: Klik "Tolak"
+        FE->>CV: rejectAdvance(employee)
+        CV->>CV: advances[employee].status = Rejected
+        CV-->>FE: event AdvanceRejected(employee)
+    end
+    FE-->>HR: Status kasbon diperbarui
+```
+
+| | |
+|-|-|
+| **Nama Use Case** | HR Menyetujui/Menolak Kasbon |
+| **Deskripsi Singkat** | HR Admin meninjau daftar pengajuan kasbon karyawan berstatus `Pending`, kemudian menyetujui (dana langsung ditransfer ke karyawan) atau menolak pengajuan tersebut. |
+| **Aktor** | HR Admin |
+| **Pre Kondisi** | HR Admin telah login dengan role `hr`. Terdapat minimal satu pengajuan kasbon berstatus `Pending` untuk perusahaannya. |
+| **Pos Kondisi** | Status kasbon berubah menjadi `Active` (disertai transfer dana ke karyawan) atau `Rejected`. |
+| **Basic Flow** | 1. HR Admin membuka halaman `/hr/kasbon` dan melihat daftar pengajuan kasbon berstatus `Pending`. <br> 2. HR Admin meninjau detail pengajuan: nama karyawan, jumlah yang diajukan, dan estimasi gaji bulanan karyawan. <br> 3. HR Admin mengklik "Setujui". Frontend memanggil `approveAdvance(employee)`. <br> 4. Smart contract memvalidasi `vaultBalance` mencukupi, mentransfer dana ke karyawan, dan mengubah status menjadi `Active`. <br> 5. Frontend menampilkan konfirmasi dan memperbarui daftar kasbon. |
+| **Alternative Flow** | A1. HR Admin mengklik "Tolak" pada langkah 3. Frontend memanggil `rejectAdvance(employee)`, status berubah menjadi `Rejected`, dan karyawan dapat mengajukan kembali. |
+| **Error Flow** | E1. Apabila `vaultBalance` perusahaan tidak mencukupi jumlah kasbon yang disetujui, smart contract menolak transaksi. Frontend menampilkan pesan "Saldo vault tidak mencukupi untuk menyetujui kasbon ini. Silakan danai vault terlebih dahulu." |
 
 ---
 
@@ -1604,8 +1536,8 @@ sequenceDiagram
 | | |
 |-|-|
 | **Nama Use Case** | Verifikasi Sertifikat Ketenagakerjaan (SBT) |
-| **Deskripsi Singkat** | Pihak ketiga (misalnya bank, lembaga keuangan, atau calon pemberi kerja) atau karyawan sendiri memverifikasi keaslian dan keabsahan Soulbound Token (SBT) ketenagakerjaan yang diterbitkan sistem Payana sebagai bukti hubungan kerja yang tidak dapat dipalsukan. |
-| **Aktor** | Pihak Ketiga / Karyawan |
+| **Deskripsi Singkat** | Verifikasi keaslian dan keabsahan Soulbound Token (SBT) ketenagakerjaan yang diterbitkan sistem Payana sebagai bukti hubungan kerja yang tidak dapat dipalsukan. Halaman verifikasi bersifat publik (tanpa login) sehingga dapat diakses oleh pihak ketiga (bank, lembaga keuangan, calon pemberi kerja) maupun karyawan sendiri; pada level diagram use case, use case ini digambarkan sebagai bagian dari domain HR Admin karena HR Admin adalah pihak yang menerbitkan dan mengelola SBT yang diverifikasi. |
+| **Aktor** | HR Admin (pengelola SBT); halaman verifikasi itu sendiri dapat diakses publik tanpa autentikasi |
 | **Pre Kondisi** | Karyawan atau pihak ketiga memiliki alamat wallet karyawan yang akan diverifikasi. EmploymentSBT telah diterbitkan oleh sistem Payana ke wallet karyawan saat onboarding. |
 | **Pos Kondisi** | Status verifikasi SBT ditampilkan: valid dan aktif (karyawan masih bekerja) atau tidak valid/dicabut (karyawan sudah tidak bekerja). Informasi ketenagakerjaan yang terenkripsi dapat dibaca oleh pihak yang berwenang. |
 | **Basic Flow** | 1. Pengguna (pihak ketiga atau karyawan) mengakses halaman publik verifikasi SBT Payana di `/verify` tanpa perlu login. <br> 2. Pengguna memasukkan alamat wallet karyawan yang ingin diverifikasi pada kolom pencarian. <br> 3. Frontend mengirimkan permintaan ke backend `GET /verify/sbt/:walletAddress`. <br> 4. Backend membaca data SBT dari smart contract `EmploymentSBT` on-chain: memeriksa apakah token ada, apakah masih aktif (belum dicabut), dan metadata ketenagakerjaan yang terkait. <br> 5. Backend memverifikasi integritas data SBT dengan memeriksa konsistensi antara data on-chain dan database backend. <br> 6. Sistem menampilkan hasil verifikasi: status SBT (aktif atau telah dicabut), nama perusahaan, jabatan karyawan (jika tersedia), dan tanggal penerbitan SBT. <br> 7. Apabila verifikasi dilakukan oleh karyawan pemilik SBT yang sudah login, karyawan dapat membagikan tautan verifikasi unik (shareable link) kepada pihak yang membutuhkan tanpa harus membocorkan alamat wallet mereka. |
@@ -1821,7 +1753,7 @@ sequenceDiagram
 #### 3.4.1 Performance
 
 ID Requirement : NFR-PAYANA-01
-Deskripsi      : Response time API endpoint backend (termasuk /auth/login, /bundler/relay, dan /compliance) harus ≤ 500ms pada 99th percentile (P99) di bawah beban 1.000 concurrent users, diukur menggunakan APM Datadog.
+Deskripsi      : Response time API endpoint backend harus ≤ 500ms pada 99th percentile (P99) di bawah beban 50–100 concurrent users. **Status validasi (2026-06-25):** target awal dokumen ini ("≤500ms P99 @ 1.000 concurrent users, diukur via Datadog APM") tidak pernah benar-benar divalidasi dan Datadog tidak pernah diintegrasikan ke sistem — skala 1.000 concurrent juga tidak realistis diuji terhadap testnet publik Base Sepolia/Alchemy free-tier untuk keperluan skripsi. Stress test aktual dilakukan menggunakan k6 (50→100 concurrent users, ramping, ~2 menit) dengan hasil diukur via dashboard Grafana + InfluxDB (lihat `stress-test/README.md`): `GET /companies` (Ponder) P99 = 10,7ms (lulus jauh di bawah threshold); `POST /auth/login` P99 = 729ms dan `GET /compliance/summary/:hr` P99 = 799ms (keduanya **melebihi** threshold 500ms pada skala 100 concurrent, meski error rate tetap 0% — backend tidak gagal, hanya lebih lambat dari target awal pada deployment single-instance tanpa horizontal scaling/connection pooling). Threshold 500ms P99 dipertahankan sebagai target desain jangka panjang, namun pada kondisi MVP saat ini (single-instance, tanpa caching/scaling) baru tervalidasi tercapai untuk endpoint baca publik (Ponder); endpoint yang melibatkan verifikasi JWT + query database (`/auth/login`, `/compliance/*`) memerlukan optimasi lebih lanjut (connection pooling, caching sesi) sebelum threshold ini realistis tercapai di skala >50 concurrent users. `/bundler/relay` sengaja tidak diikutkan dalam stress test karena mengirim transaksi nyata ke Base Sepolia via Paymaster — lihat `stress-test/README.md` untuk justifikasi.
 Rasional       : Dashboard HR dan karyawan menampilkan data gaji secara real-time. Respons lambat mengganggu kepercayaan pengguna terhadap platform, terutama saat karyawan memverifikasi saldo gaji terakumulasi.
 
 ID Requirement : NFR-PAYANA-02
@@ -1847,7 +1779,7 @@ Deskripsi      : Sistem harus memiliki Recovery Time Objective (RTO) ≤ 30 meni
 Rasional       : Data on-chain (smart contract state) bersifat immutable dan tidak dapat hilang. Namun data off-chain (sesi, profil PII, audit log) harus dipulihkan dengan cepat untuk menghindari gangguan operasional.
 
 ID Requirement : NFR-PAYANA-07
-Deskripsi      : Sistem harus mengimplementasikan mekanisme retry otomatis dengan exponential backoff untuk permintaan RPC ke Alchemy yang gagal, dengan maksimal 3 kali percobaan ulang dan fallback ke RPC alternatif jika Alchemy tidak merespons dalam 10 detik.
+Deskripsi      : Sistem harus mengimplementasikan mekanisme retry otomatis dengan exponential backoff untuk permintaan RPC ke Alchemy yang gagal, dengan maksimal 3 kali percobaan ulang dan fallback ke RPC alternatif jika Alchemy tidak merespons dalam 10 detik. **Status implementasi (2026-06-25):** sebelumnya hanya didokumentasikan di sini tanpa implementasi nyata — `backend/src/services/authz.ts` (`isHr()`, `canViewEmployeeData()`) menelan SETIAP kegagalan RPC (termasuk respons 429 rate-limit yang transien) langsung ke `catch { return false }`, mengubah gangguan infrastruktur sesaat menjadi keputusan otorisasi yang salah ("tidak diizinkan") tanpa pernah mencoba ulang. Sudah diperbaiki: kedua fungsi kini memanggil `readContractWithRetry()` (`backend/src/services/rpcRetry.ts`) yang menerapkan persis seperti dideskripsikan — 3 kali retry dengan backoff eksponensial (200ms/400ms/800ms), lalu fallback ke RPC publik `https://sepolia.base.org` jika RPC utama (Alchemy) tetap gagal. Diverifikasi lewat stress test RPC capacity (lihat `stress-test/README.md`) — hanya dua fungsi ini dan turunannya (`/termination/reason`, `/auth/profile/by-address/:address`, `/bounty/hr/:hrAddress`) yang benar-benar melakukan `eth_call` langsung; seluruh endpoint lain membaca dari Ponder (PostgreSQL terindeks), bukan RPC langsung, sehingga tidak terdampak oleh limit RPC sama sekali.
 Rasional       : Ketergantungan pada satu penyedia RPC menimbulkan single point of failure. Mekanisme fallback memastikan operasional HR (deposit, onboarding) tidak terganggu saat terjadi gangguan infrastruktur Alchemy.
 
 #### 3.4.3 Usability
@@ -2274,16 +2206,17 @@ Keterangan kolom kunci:
 
 ### A.2 Alamat Kontrak Ter-Deploy
 
-> Jaringan: Base Sepolia (Chain ID: 84532) — Redeployment tanggal 4 Juni 2026, blok #42397510
+> Jaringan: Base Sepolia (Chain ID: 84532) — Redeployment Gen8 (cutover Koperasi → Tax Engine + Kasbon)
 
 | Kontrak | Alamat |
 |---------|--------|
-| PayrollFactory | 0x1B5A705Cb11BAF5798DC78fE27b8686C8c986BdF |
-| EmployeeLiquidityContract | 0xd9cd18C33Ef3922810bD1b43B4F09693399d14a9 |
-| EmploymentSBT | 0xF0D52Bc9f3455F0D200bCE6Cf9e8C4f0759a5128 |
+| PayrollFactory | 0xF62dF08b38c6Fbde33E24208BA044907475ca815 |
+| EmploymentSBT | 0x8dA9B60814536364daF77a82cb56B31226De4B62 |
 | MockIDRX (Testnet) | 0x0996e627cE22C4FE2D5c4788b159a83C065D6d09 |
 | ConfidentialCompanyVault (Demo) | 0x4560968670Dd852dACd73c7B8748695eC427e203 |
 | Admin/Treasury | 0x906B34db1a8DD333ff9a84255e4AEc13C054f120 |
+
+> `EmployeeLiquidityContract` tidak lagi dideploy sejak Gen8 — fungsinya digantikan oleh fitur kasbon terintegrasi di `CompanyVault` (lihat Kelompok G, §3.2.6–3.2.11).
 
 > Catatan: IDRX yang digunakan di testnet adalah MockIDRX. IDRX mainnet resmi beralamat `0x18Bc5bcC660cf2B9cE3cd51a404aFe1a0cBD3C22`.
 

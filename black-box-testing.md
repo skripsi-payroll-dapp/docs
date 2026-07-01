@@ -1112,9 +1112,12 @@ Modul ini menyediakan mekanisme pemberian token/gaji dengan periode penguncian (
 | Item | Detail |
 |---|---|
 | Network | Base Sepolia Testnet (Chain ID: 84532) |
-| PayrollContract | `0x05b1DF6d82356CC256D1265cD185B4222E4745b3` |
-| EmployeeLiquidityContract | `0x872af14287370BAFC883237EF390E367d38a8A33` |
-| EmploymentSBT | `0xCB5118AF36907165496Dc028b441ad9152D2D264` |
+| PayrollFactory | `0x1B5A705Cb11BAF5798DC78fE27b8686C8c986BdF` |
+| EmployeeLiquidityContract | `0xd9cd18C33Ef3922810bD1b43B4F09693399d14a9` |
+| EmploymentSBT | `0xF0D52Bc9f3455F0D200bCE6Cf9e8C4f0759a5128` |
+| MockIDRX | `0x0996e627cE22C4FE2D5c4788b159a83C065D6d09` |
+| ConfidentialVault (Demo) | `0x4560968670Dd852dACd73c7B8748695eC427e203` |
+| Deployment Block | 42397510 (2026-06-04) |
 | Frontend | `http://localhost:3000` |
 | Backend | `http://localhost:3001` |
 | Ponder Indexer | `http://localhost:42069` |

@@ -22,6 +22,8 @@ Universitas Atma Jaya Yogyakarta
 | C | Ekspansi rinci Bab 3 (Antarmuka), Bab 5.1 (Smart Contract), Bab 5.2 (Backend API), dan Bab 5.3 (Frontend); penambahan diagram alur, tabel antarmuka, dan algoritma per fungsi | Bonaventura Octavito | - | - |
 | D | Penambahan kelas diagram seluruh smart contract (Bab 2.2), Physical Data Model (Bab 4.4), dan tabel dekomposisi data untuk semua tabel off-chain, Ponder indexed, dan struct on-chain (Bab 4.5–4.7); pembaruan nomor dokumen dan metadata; tanggal: 2026-06-10 | Bonaventura Octavito | - | - |
 | E | Restrukturisasi bab sesuai template UAJY, reformatkan deskripsi kelas dan atribut ke format Input/Output/Deskripsi, pemindahan Bab 5.2/5.3/6 ke lampiran | Bonaventura Octavito | - | - |
+| F | Sinkronisasi dengan SKPL Revisi B: penambahan referensi FR-PAYANA-1201–1203 (Kelompok L) pada seluruh fungsi `IDRXPriceOracle` (Bab 2.2.2.5); penegasan status kontrak sebagai rancangan yang belum di-deploy maupun terintegrasi ke `CompanyVault` per Juni 2026 | Bonaventura Octavito | - | - |
+| G | Sinkronisasi dengan SKPL Revisi C: penghapusan total `IDRXPriceOracle` (FR-PAYANA-1201–1203, subbab 2.2.2.5) dari class diagram, deskripsi kelas, dan ruang lingkup (Bab 1.2) — kontrak dihapus dari kodebase karena IDRX dirancang 1:1 terhadap Rupiah; penghapusan atribut mati `priceOracle` dari class diagram `CompanyVault` | Bonaventura Octavito | - | - |
 
 ---
 
@@ -46,8 +48,8 @@ Payana adalah platform perangkat lunak berbasis web yang menyediakan layanan pen
 
 DPPL ini mencakup rancangan dari komponen-komponen berikut:
 
-1. **Lima smart contract inti** beserta satu ekstensi opsional: `PayrollFactory`, `CompanyVault`, `EmployeeLiquidityContract`, `EmploymentSBT`, `IDRXPriceOracle`, dan `ConfidentialCompanyVault` (ekstensi FHE).
-2. **Backend REST API** berbasis Express yang menangani autentikasi EIP-191, relay UserOperation ERC-4337, pelaporan kepatuhan, registrasi tenant, webhook Alchemy, dan layanan background (likuidasi, pemantauan Paymaster, WebSocket).
+1. **Tiga smart contract inti** yang sudah di-deploy dan beroperasi: `PayrollFactory`, `CompanyVault`, `EmploymentSBT`; serta satu **ekstensi opsional aktif** `ConfidentialCompanyVault` (FHE).
+2. **Backend REST API** berbasis Express yang menangani autentikasi EIP-191, relay UserOperation ERC-4337, pelaporan kepatuhan, registrasi tenant, webhook Alchemy, dan layanan background (kasbon, pemantauan Paymaster, WebSocket).
 3. **Ponder Indexer** yang mengindeks event on-chain ke PostgreSQL skema `public`.
 4. **Frontend Next.js** yang menyajikan empat portal: Autentikasi/Onboarding, Portal HR, Portal Karyawan, dan Portal Owner SaaS.
 
@@ -135,7 +137,7 @@ graph TD
         API_COMP["/compliance — CSV Export"]
         API_REG["/registration — Tenant Approval"]
         API_WH["/webhook — Alchemy HMAC"]
-        SVC["Background: Liquidation / Paymaster Monitor / WebSocket"]
+        SVC["Background: Kasbon Notifier / Paymaster Monitor / WebSocket"]
     end
 
     subgraph Indexer["Lapisan Ponder Indexer (Ponder 0.16 + Hono)"]
@@ -145,10 +147,8 @@ graph TD
 
     subgraph Chain["Lapisan Smart Contract (Base Sepolia 84532)"]
         FACTORY["PayrollFactory"]
-        VAULT["CompanyVault + ConfidentialCompanyVault"]
-        LIQ["EmployeeLiquidityContract"]
+        VAULT["CompanyVault + ConfidentialCompanyVault\n(Tax Engine + Kasbon terintegrasi)"]
         SBT["EmploymentSBT"]
-        ORACLE["IDRXPriceOracle"]
         IDRX["IDRX ERC-20"]
     end
 
@@ -175,7 +175,6 @@ graph TD
     API_COMP --> PDB
     API_REG --> ADB
     API_WH --> SVC
-    SVC -->|liquidateLoan| LIQ
     SVC -->|ws broadcast| HOOKS
     ALCHEMY -->|event push| API_WH
 
@@ -184,15 +183,13 @@ graph TD
     PONDER --> PDB
 
     FACTORY -->|deploy| VAULT
-    VAULT --> LIQ
     VAULT --> SBT
     VAULT --> IDRX
-    VAULT -.optional.-> ORACLE
     VAULT -.FHE.-> INCO
     PIMLICO --> Chain
 ```
 
-**Narasi Alur EWA Gasless End-to-End.** Ketika seorang karyawan menekan tombol "Tarik Gaji", frontend memanggil hook `useAuth` untuk memastikan sesi JWT aktif (atau melakukan tanda tangan EIP-191 baru melalui embedded wallet Privy). Karyawan kemudian menandatangani sebuah `UserOperation` ERC-4337 yang berisi calldata `claimSalary()`. UserOperation tersebut dikirim ke endpoint `POST /bundler/relay`. Backend memverifikasi bahwa alamat JWT sama dengan `userOp.sender`, memvalidasi bahwa selektor calldata adalah `0x5b7e8209` (selektor `claimSalary()`), memeriksa batas laju klaim (maksimum 10 per jam per karyawan), lalu meneruskan UserOperation ke Pimlico Bundler. Pimlico melampirkan sponsor Paymaster dan mengirimkannya ke `EntryPoint` contract di Base. Kontrak `CompanyVault.claimSalary()` mengeksekusi distribusi atomik 93/5/2 (setelah pemotongan platform fee dan auto-repay koperasi), memancarkan event `SalaryClaimed` dan `PlatformFeePaid`. Alchemy mendeteksi event tersebut dan mengirimkannya ke `POST /webhook/alchemy`; backend memverifikasi tanda tangan HMAC, mencatat audit log, dan mem-broadcast pesan `SALARY_CLAIMED` melalui WebSocket ke dashboard karyawan, yang langsung menampilkan konfirmasi real-time. Secara paralel, Ponder mengindeks event tersebut ke tabel `salary_claim` untuk keperluan historis dan pelaporan kepatuhan.
+**Narasi Alur EWA Gasless End-to-End.** Ketika seorang karyawan menekan tombol "Tarik Gaji", frontend memanggil hook `useAuth` untuk memastikan sesi JWT aktif (atau melakukan tanda tangan EIP-191 baru melalui embedded wallet Privy). Karyawan kemudian menandatangani sebuah `UserOperation` ERC-4337 yang berisi calldata `claimSalary()`. UserOperation tersebut dikirim ke endpoint `POST /bundler/relay`. Backend memeriksa batas laju klaim (maksimum 10 per jam per karyawan) lalu meneruskan UserOperation ke Pimlico Bundler tanpa decode calldata tambahan — enforcement otoritatif (kecocokan JWT/sender, selektor, dan target) berada di `CompanyVault._validatePaymasterUserOp()` on-chain yang dipanggil EntryPoint saat validasi (lihat KI-004 di `KNOWN_ISSUES.md`). Pimlico melampirkan sponsor Paymaster dan mengirimkannya ke `EntryPoint` contract di Base. Kontrak `CompanyVault.claimSalary()` mengeksekusi distribusi atomik (platform fee → cicilan kasbon jika ada → PPh21/BPJS → severance → sisa ke karyawan), memancarkan event `SalaryClaimed` dan `PlatformFeePaid`. Alchemy mendeteksi event tersebut dan mengirimkannya ke `POST /webhook/alchemy`; backend memverifikasi tanda tangan HMAC, mencatat audit log, dan mem-broadcast pesan `SALARY_CLAIMED` melalui WebSocket ke dashboard karyawan, yang langsung menampilkan konfirmasi real-time. Secara paralel, Ponder mengindeks event tersebut ke tabel `salary_claim` untuk keperluan historis dan pelaporan kepatuhan.
 
 ### 2.2 Perancangan Rinci
 
@@ -279,13 +276,6 @@ classDiagram
     }
 
     %% ── CompanyVault ─────────────────────────────────────────────────────────
-    class SplitConfig {
-        <<struct>>
-        +uint16 employeeBps
-        +uint16 complianceBps
-        +uint16 severanceBps
-    }
-
     class EmployeeStream {
         <<struct>>
         +uint256 flowRate
@@ -293,7 +283,15 @@ classDiagram
         +uint256 lastWithdrawnTs
         +uint256 settledBalance
         +StreamStatus status
-        +SplitConfig splits
+        +uint16 severanceBps
+    }
+
+    class SalaryAdvance {
+        <<struct>>
+        +uint256 amount
+        +uint256 repaid
+        +uint256 requestedAt
+        +AdvanceStatus status
     }
 
     class SeveranceVault {
@@ -326,22 +324,17 @@ classDiagram
     class CompanyVault {
         +bytes32 HR_ROLE
         +bytes32 LEGAL_ROLE
-        +uint16 DEFAULT_EMPLOYEE_BPS
-        +uint16 DEFAULT_COMPLIANCE_BPS
-        +uint16 DEFAULT_SEVERANCE_BPS
         +uint256 TERMINATION_EXPIRY
-        +uint16 DEFAULT_POOL_RATE_BPS
+        +uint256 MAX_ADVANCE_BPS
+        +uint256 ADVANCE_REPAY_BPS
         +IERC20 immutable IDRX
         +address immutable hrAuthority
-        +IEmployeeLiquidity liquidityContract
         +IEmploymentSBT sbtContract
-        +address priceOracle
         +address factory
         +string companyName
         +VaultStatus status
         +uint16 bpjsBps
         +uint16 pph21Bps
-        +uint16 severanceBps
         +uint16 lowBalanceThresholdBps
         +uint256 vestCounter
         +uint256 totalFlowRate
@@ -352,19 +345,23 @@ classDiagram
         +mapping terminations
         +mapping cliffVests
         +mapping employeeComplianceAccumulated
+        +mapping salaryAdvances
         +fundVault(uint256 amount)
         +withdrawVault(uint256 amount, address recipient)
         +setCompanyConfig(uint16 bpjs, uint16 pph21, uint16 threshold)
         +pauseVault()
         +resumeVault()
         +freezeVault()
-        +startStream(address employee, uint256 flowRate, uint16 empBps, uint16 compBps, uint16 sevBps)
+        +startStream(address employee, uint256 flowRate, uint16 severanceSplitBps)
         +pauseStream(address employee)
         +resumeStream(address employee)
         +updateFlowRate(address employee, uint256 newFlowRate)
-        +updateStreamSplits(address employee, uint16 empBps, uint16 compBps, uint16 sevBps)
+        +updateStreamSplits(address employee, uint16 severanceSplitBps)
         +cancelStream(address employee)
         +claimSalary()
+        +requestAdvance(uint256 amount)
+        +approveAdvance(address employee)
+        +rejectAdvance(address employee)
         +resignEmployee(address employee)
         +proposeTermination(address employee, bytes32 reasonHash)
         +approveTermination(address employee)
@@ -400,73 +397,6 @@ classDiagram
         +encryptedEmployeeAt(uint256 index) address
     }
 
-    %% ── EmployeeLiquidityContract ────────────────────────────────────────────
-    class Pool {
-        <<struct>>
-        +uint256 totalDeposited
-        +uint256 totalLoansOutstanding
-        +uint16 interestRateBps
-        +bool initialized
-        +uint256 yieldPerShareX18
-    }
-
-    class LenderDeposit {
-        <<struct>>
-        +address companyAddress
-        +uint256 principal
-        +uint256 yieldEarned
-        +uint256 depositedTs
-        +uint256 yieldDebtX18
-    }
-
-    class LoanRecord {
-        <<struct>>
-        +address companyAddress
-        +uint256 principal
-        +uint256 interest
-        +uint256 repaidAmount
-        +uint256 dueTs
-        +LoanStatus status
-    }
-
-    class EmployeeLiquidityContract {
-        +bytes32 OPS_ROLE
-        +bytes32 PAYROLL_ROLE
-        +uint256 MAX_LOAN_BPS
-        +uint256 GRACE_PERIOD
-        +uint256 LOAN_TERM
-        +uint256 BPS_DENOMINATOR
-        +uint256 REPAY_FRACTION_BPS
-        +uint256 MINIMUM_DEPOSIT
-        +uint256 PROTOCOL_FEE_BPS
-        +IERC20 immutable IDRX
-        +mapping registeredVaults
-        +address protocolTreasury
-        +uint256 totalProtocolFee
-        +mapping pools
-        +mapping lenderDeposits
-        +mapping loanRecords
-        +registerVault(address vault)
-        +unregisterVault(address vault)
-        +claimProtocolFee()
-        +initializePool(address company, uint16 rateBps)
-        +depositToPool(address company, uint256 amount)
-        +depositToPoolFor(address company, uint256 amount)
-        +withdrawDeposit(uint256 amount)
-        +borrowFromPool(address company, uint256 amount)
-        +borrowFromPoolFor(address company, uint256 amount, uint256 flowRate)
-        +repayLoanManual(uint256 amount)
-        +autoRepay(address borrower, uint256 claimedAmount) uint256
-        +liquidateLoan(address borrower)
-        +getLoanBalance(address borrower) uint256_uint256_uint256
-        +getPoolLiquidity(address company) uint256_uint256
-        +getDepositBalance(address lender) uint256_uint256
-        -_doDeposit(address lender, uint256 amount)
-        -_doBorrow(address borrower, uint256 amount, uint256 flowRate)
-        -_applyRepayment(address borrower, LoanRecord record, uint256 amount)
-        -_syncYield(LenderDeposit deposit, Pool pool) uint256
-    }
-
     %% ── EmploymentSBT ────────────────────────────────────────────────────────
     class EmploymentRecord {
         <<struct>>
@@ -490,28 +420,14 @@ classDiagram
         -_baseURI() string
     }
 
-    %% ── IDRXPriceOracle ──────────────────────────────────────────────────────
-    class IDRXPriceOracle {
-        +AggregatorV3Interface priceFeed
-        +setPriceFeed(address feed)
-        +getLatestRate() uint256
-        +getIDRXPriceInUSD() uint256
-        +convertUSDtoIDRX(uint256 usdAmount) uint256
-        +convertIDRXtoUSD(uint256 idrxAmount) uint256
-    }
-
     %% ── Inheritance ──────────────────────────────────────────────────────────
     CompanyVault --|> ICompanyVault : implements
     CompanyVault --|> ReentrancyGuard : extends
     CompanyVault --|> AccessControl : extends
     ConfidentialCompanyVault --|> CompanyVault : extends
-    EmployeeLiquidityContract --|> IEmployeeLiquidity : implements
-    EmployeeLiquidityContract --|> ReentrancyGuard : extends
-    EmployeeLiquidityContract --|> AccessControl : extends
     EmploymentSBT --|> ERC721 : extends
     EmploymentSBT --|> IERC5192 : implements
     EmploymentSBT --|> AccessControl : extends
-    IDRXPriceOracle --|> Ownable : extends
     PayrollFactory --|> AccessControl : extends
 
     %% ── Composition (structs owned by contract) ──────────────────────────────
@@ -519,17 +435,12 @@ classDiagram
     CompanyVault *-- SeveranceVault : contains
     CompanyVault *-- TerminationProposal : contains
     CompanyVault *-- CliffVest : contains
-    EmployeeStream *-- SplitConfig : contains
-    EmployeeLiquidityContract *-- Pool : contains
-    EmployeeLiquidityContract *-- LenderDeposit : contains
-    EmployeeLiquidityContract *-- LoanRecord : contains
+    CompanyVault *-- SalaryAdvance : contains
     EmploymentSBT *-- EmploymentRecord : contains
 
     %% ── Associations (contract references) ──────────────────────────────────
     PayrollFactory ..> CompanyVault : deploys
-    CompanyVault ..> EmployeeLiquidityContract : calls autoRepay
     CompanyVault ..> EmploymentSBT : calls mint and revoke
-    CompanyVault ..> IDRXPriceOracle : reads price
     CompanyVault ..> PayrollMath : uses
 
     %% ── Enum usage ───────────────────────────────────────────────────────────
@@ -538,7 +449,7 @@ classDiagram
     CompanyVault ..> SeveranceState : uses
     CompanyVault ..> VestType : uses
     CompanyVault ..> VestStatus : uses
-    EmployeeLiquidityContract ..> LoanStatus : uses
+    CompanyVault ..> AdvanceStatus : uses
 ```
 
 
@@ -669,14 +580,14 @@ classDiagram
 
 **Modifier:** `onlyHR` (cek `HR_ROLE`), `vaultActive` (status harus `Active`), `validTermination(employee)` (hrApproved && legalApproved && belum kadaluarsa).
 
-**[constructor(idrx, hrAuthority, companyName, liquidityContract, sbtContract)]**
+**[constructor(idrx, hrAuthority, companyName, sbtContract, entryPoint)]**
 | | |
 |---|---|
-| Input | idrx: address, hrAuthority: address, companyName: string, liquidityContract: address, sbtContract: address |
+| Input | idrx: address, hrAuthority: address, companyName: string, sbtContract: address, entryPoint: address |
 | Output | - |
 | Deskripsi | internal; dipanggil oleh `PayrollFactory.deployVault()` untuk inisialisasi vault baru |
 
-Algoritma: Disetel oleh `PayrollFactory`. Set `IDRX`, `factory=msg.sender`, `hrAuthority`, `companyName`, `status=Active`. Berikan `DEFAULT_ADMIN_ROLE`, `HR_ROLE`, dan `LEGAL_ROLE` ke `hrAuthority`. Inisialisasi pool koperasi via `liquidityContract.initializePool(address(this), DEFAULT_POOL_RATE_BPS)` (dibungkus try/catch). Emit `VaultInitialized`.
+Algoritma: Disetel oleh `PayrollFactory`. Set `IDRX`, `factory=msg.sender`, `hrAuthority`, `companyName`, `status=Active`, `sbtContract`. Berikan `DEFAULT_ADMIN_ROLE`, `HR_ROLE`, dan `LEGAL_ROLE` ke `hrAuthority`. Emit `VaultInitialized`.
 
 **[fundVault(amount)]**
 | | |
@@ -782,7 +693,6 @@ sequenceDiagram
     actor E as Karyawan
     participant V as CompanyVault
     participant F as PayrollFactory
-    participant L as EmployeeLiquidityContract
     participant T as protocolTreasury
     E->>V: claimSalary()
     V->>V: hitung accrued (settled + live)
@@ -790,13 +700,14 @@ sequenceDiagram
     V->>V: Effects: settledBalance=0, vaultBalance-=accrued, _checkLowBalance()
     V->>F: platformFeeBps()
     F-->>V: feeBps
-    V->>L: autoRepay(employee, accrued)
-    L-->>V: repaid (maks 20%)
-    V->>V: net = accrued - platformCut - repaid; split 93/5/2
+    V->>V: net = accrued - platformCut
+    V->>V: kasbonRepaid = _autoRepayAdvance(employee, net); net -= kasbonRepaid
+    V->>V: hitung PPh21 (TER/override) + BPJS -> toCompliance; toSeverance = bpsOf(net, severanceBps)
+    V->>V: toEmployee = net - toCompliance - toSeverance
     V->>T: safeTransfer(platformCut) + PlatformFeePaid
-    V->>L: safeTransfer(repaid)
     V->>E: safeTransfer(toEmployee)
-    V-->>E: SalaryClaimed
+    V-->>E: SalaryClaimed(..., kasbonRepaid)
+    V-->>E: TaxWithheld(pph21Amount, bpjsAmount)
 ```
 
 **Algoritma (CEI):**
@@ -804,11 +715,11 @@ sequenceDiagram
 1. **Check:** stream tidak `Inactive` (`NotWhitelisted`) dan tidak `Paused` (`StreamNotActive`).
 2. **Check:** hitung `accrued = settledBalance + calcAccrued(flowRate, lastWithdrawnTs)` (atau hanya `settledBalance` bila tidak aktif); tolak `accrued == 0` (`NothingToClaim`) dan `vaultBalance < accrued` (`InsufficientVaultBalance`).
 3. **Effect:** `settledBalance = 0`; perbarui `lastWithdrawnTs` jika aktif; `vaultBalance -= accrued`; `_checkLowBalance()`.
-4. **Effect:** hitung `platformCut = bpsOf(accrued, feeBps)` jika `feeBps > 0`.
-5. **Interaction (akuntansi):** `repaid = liquidityContract.autoRepay(msg.sender, accrued)`.
-6. **Effect:** `net = accrued - platformCut - repaid`; bagi `toEmployee/toCompliance/toSeverance` via `bpsOf`; sisa pembulatan (dust) ke karyawan.
+4. **Effect:** hitung `platformCut = bpsOf(accrued, feeBps)` jika `feeBps > 0`; `net = accrued - platformCut`.
+5. **Effect:** `kasbonRepaid = _autoRepayAdvance(msg.sender, net)` — memotong `min(20% net, sisa kasbon)` jika kasbon berstatus `Active`; `net -= kasbonRepaid`; `vaultBalance += kasbonRepaid` (dana kembali ke pool payroll).
+6. **Effect:** `effectivePph21Bps = pph21Bps > 0 ? pph21Bps : PayrollMath.calcPPh21TerBps(annualGross)`; `toCompliance = bpsOf(net, effectivePph21Bps + bpjsBps)`; `toSeverance = bpsOf(net, severanceBps)`; `toEmployee = net - toCompliance - toSeverance` (dust ke karyawan).
 7. **Effect:** tambah `complianceBalance` dan `employeeComplianceAccumulated`; tambah `severanceVaults.amount`; perbarui `tenureMonths = (now - startTs)/SECONDS_PER_MONTH`.
-8. **Interaction:** `safeTransfer(platformCut)` ke treasury (+`PlatformFeePaid`), `safeTransfer(repaid)` ke koperasi, `safeTransfer(toEmployee)` ke karyawan; emit `SalaryClaimed`.
+8. **Interaction:** `safeTransfer(platformCut)` ke treasury (+`PlatformFeePaid`), `safeTransfer(toEmployee)` ke karyawan; emit `SalaryClaimed(..., kasbonRepaid)` dan `TaxWithheld(pph21Amount, bpjsAmount)`.
 
 **[resignEmployee(employee)]**
 | | |
@@ -951,190 +862,62 @@ sequenceDiagram
 | `getAccrued(employee)` | saldo terakumulasi (settled + live) | FR-PAYANA-402 |
 | `getVaultBalance()` | `vaultBalance` | FR-PAYANA-202 |
 | `getSeveranceBalance(employee)` | `severanceVaults[employee].amount` | FR-PAYANA-506 |
-| `getStreamInfo(employee)` | `(address(this), flowRate)` — kunci pool koperasi | FR-PAYANA-703 |
+| `getStreamInfo(employee)` | `(address(this), flowRate)` — dipakai frontend untuk hitung limit kasbon (80% gaji bulanan) | FR-PAYANA-704 |
 
-##### 2.2.2.3 EmployeeLiquidityContract
+##### 2.2.2.3 Mesin Pajak & Kasbon (terintegrasi di CompanyVault)
 
-Pool likuiditas koperasi closed-loop per perusahaan (Koperasi Karyawan). Mewarisi `IEmployeeLiquidity`, `ReentrancyGuard`, `AccessControl`. Satu pool per `CompanyVault`, keyed alamat vault, sebagai pemenuhan model closed-loop (OJK).
+Sejak Gen8, `EmployeeLiquidityContract` (pool koperasi closed-loop) dihapus total dari kodebase. Fungsinya digantikan oleh dua kapabilitas baru yang terintegrasi langsung di `CompanyVault`: (1) perhitungan PPh21/BPJS otomatis saat `claimSalary()` (lihat 2.2.2.2), dan (2) fasilitas kasbon (`SalaryAdvance`) yang dananya bersumber langsung dari `vaultBalance` perusahaan — bukan pool lender pihak ketiga.
 
-```mermaid
-classDiagram
-    class EmployeeLiquidityContract {
-        +bytes32 OPS_ROLE
-        +bytes32 PAYROLL_ROLE
-        +uint256 MAX_LOAN_BPS = 8000
-        +uint256 GRACE_PERIOD = 7 days
-        +uint256 LOAN_TERM = 30 days
-        +uint256 REPAY_FRACTION_BPS = 2000
-        +uint256 MINIMUM_DEPOSIT = 100
-        +uint256 PROTOCOL_FEE_BPS = 100
-        +IERC20 IDRX
-        +address protocolTreasury
-        +uint256 totalProtocolFee
-        +mapping registeredVaults
-        +mapping pools
-        +mapping lenderDeposits
-        +mapping loanRecords
-    }
-```
+**Konstanta terkait:** `MAX_ADVANCE_BPS = 8000` (80% dari gaji bulanan), `ADVANCE_REPAY_BPS = 2000` (20% dari net setiap klaim).
 
-**Konstanta:** `MAX_LOAN_BPS=8000` (80%), `GRACE_PERIOD=7 days`, `LOAN_TERM=30 days`, `REPAY_FRACTION_BPS=2000` (20%), `MINIMUM_DEPOSIT=100`, `PROTOCOL_FEE_BPS=100` (1%), `BPS_DENOMINATOR=10.000`, hard cap pinjam `8.000.000 IDRX`.
+**Custom Errors:** `AdvancePendingExists`, `ActiveAdvanceExists`, `NoAdvancePending`, `AdvanceAmountTooHigh`.
 
-**Custom Errors:** `VaultNotRegistered`, `PoolAlreadyInitialized`, `PoolNotInitialized`, `InsufficientPoolLiquidity`, `LoanLimitExceeded`, `ActiveLoanExists`, `NoActiveLoan`, `GracePeriodNotExpired`, `NothingToWithdraw`, `NotPoolMember`.
-
-**Modifier:** `onlyOps` (`OPS_ROLE`), `onlyPayroll` (`PAYROLL_ROLE`), `poolExists(company)`.
-
-**Akuntansi Yield:** indeks kumulatif `yieldPerShareX18` (skala 1e18). Pending yield lender = `principal * (yieldPerShareX18 - yieldDebtX18) / 1e18`.
-
-**[registerVault(vault) / unregisterVault(vault)]**
-| | |
-|---|---|
-| Input | vault: address |
-| Output | - |
-| Deskripsi | external; modifier `onlyRole(DEFAULT_ADMIN_ROLE)`; sesuai FR-PAYANA-1001 |
-
-**Algoritma:** `registerVault`: tolak alamat nol; `registeredVaults[vault]=true`; `_grantRole(PAYROLL_ROLE, vault)`; emit `VaultRegistered`. `unregisterVault`: set false; `_revokeRole(PAYROLL_ROLE, vault)`; emit `VaultUnregistered`.
-
-**[claimProtocolFee()]**
-| | |
-|---|---|
-| Input | - |
-| Output | - |
-| Deskripsi | external; modifier `onlyRole(DEFAULT_ADMIN_ROLE)`; sesuai FR-PAYANA-1003 |
-
-**Algoritma:** Check `totalProtocolFee > 0`; set `totalProtocolFee=0`; `safeTransfer(protocolTreasury, amount)`.
-
-**[initializePool(companyAddress, interestRateBps)]**
-| | |
-|---|---|
-| Input | companyAddress: address, interestRateBps: uint16 |
-| Output | - |
-| Deskripsi | external override; modifier `DEFAULT_ADMIN_ROLE` atau `PAYROLL_ROLE`; sesuai FR-PAYANA-706 |
-
-**Algoritma:** Check belum diinisialisasi (`PoolAlreadyInitialized`); buat `Pool` dengan `interestRateBps` (default 150 dari konstruktor vault); emit `PoolInitialized`.
-
-**[depositToPool(vaultAddress, amount) / depositToPoolFor(companyAddress, amount)]**
-| | |
-|---|---|
-| Input | companyAddress: address, amount: uint256 |
-| Output | - |
-| Deskripsi | external override / external; modifier `nonReentrant` (`depositToPoolFor` + `poolExists`); sesuai FR-PAYANA-701 |
-
-**Algoritma:**
-
-1. **Check:** `amount >= MINIMUM_DEPOSIT` (`"BelowMinDeposit"`).
-2. **Check (deposit pertama):** vault terdaftar (`VaultNotRegistered`) dan pemanggil memiliki stream aktif (`getStreamInfo` mengembalikan vault non-nol); pool terinisialisasi (`PoolNotInitialized`).
-3. **Effect/Interaction:** `_doDeposit`: jika pertama set `companyAddress`, `depositedTs`, `yieldDebtX18`; jika ulang `_syncYield` lebih dahulu; `safeTransferFrom(amount)`; `principal += amount`; `pool.totalDeposited += amount`; emit `Deposited`.
-
-**[withdrawDeposit(amount)]**
+**[requestAdvance(amount)]**
 | | |
 |---|---|
 | Input | amount: uint256 |
 | Output | - |
-| Deskripsi | external override; modifier `nonReentrant`; sesuai FR-PAYANA-702 |
+| Deskripsi | external override; modifier `vaultActive`; sesuai FR-PAYANA-704 |
+
+**Algoritma:**
+
+1. **Check:** stream pemanggil `Active` (`StreamNotActive`); tidak ada `SalaryAdvance` berstatus `Pending` (`AdvancePendingExists`) atau `Active` (`ActiveAdvanceExists`).
+2. **Check:** `monthlyGross = flowRate * SECONDS_PER_MONTH`; `maxAdvance = bpsOf(monthlyGross, MAX_ADVANCE_BPS)`; tolak jika `amount > maxAdvance` (`AdvanceAmountTooHigh`).
+3. **Effect:** `salaryAdvances[msg.sender] = {amount, repaid: 0, requestedAt: now, status: Pending}`; emit `AdvanceRequested`.
+
+**[approveAdvance(employee)]**
+| | |
+|---|---|
+| Input | employee: address |
+| Output | - |
+| Deskripsi | external override; modifier `onlyHR nonReentrant`; sesuai FR-PAYANA-705 |
 
 **Algoritma (CEI):**
 
-1. **Check:** ada deposit (`NothingToWithdraw`); `_syncYield` (emit `YieldAccrued` jika ada); cek principal/yield tidak nol; likuiditas idle `totalDeposited - totalLoansOutstanding >= amount` (`InsufficientPoolLiquidity`).
-2. **Effect:** `principal -= amount`; `yieldEarned = 0`; `pool.totalDeposited -= amount`.
-3. **Interaction:** `safeTransfer(msg.sender, amount + yieldToSend)`; emit `Withdrawn`.
+1. **Check:** status `Pending` (`NoAdvancePending`); `vaultBalance >= adv.amount` (`InsufficientVaultBalance`).
+2. **Effect:** status = `Active`; `vaultBalance -= adv.amount`; `_checkLowBalance()`.
+3. **Interaction:** `safeTransfer(employee, adv.amount)`; emit `AdvanceApproved`.
 
-**[borrowFromPool(vaultAddress, amount) / borrowFromPoolFor(companyAddress, amount, expectedMonthlySalary)]**
+**[rejectAdvance(employee)]**
 | | |
 |---|---|
-| Input | companyAddress: address, amount: uint256, expectedMonthlySalary: uint256 |
+| Input | employee: address |
 | Output | - |
-| Deskripsi | external override / external; modifier `nonReentrant` (`borrowFromPoolFor`: `onlyOps poolExists`); sesuai FR-PAYANA-703 |
+| Deskripsi | external override; modifier `onlyHR`; sesuai FR-PAYANA-705 |
 
-**Alur Interaksi:**
+**Algoritma:** Check status `Pending` (`NoAdvancePending`); `delete salaryAdvances[employee]`; emit `AdvanceRejected`.
 
-```mermaid
-sequenceDiagram
-    actor E as Karyawan
-    participant L as EmployeeLiquidityContract
-    participant V as CompanyVault
-    E->>L: borrowFromPool(vaultAddress, amount)
-    L->>L: cek vault terdaftar (VaultNotRegistered)
-    L->>V: getStreamInfo(employee)
-    V-->>L: (vault, flowRate)
-    L->>L: expectedMonthlySalary = flowRate * SECONDS_PER_MONTH
-    L->>L: _doBorrow: cek 1 loan aktif, cap 80%, hard cap 8jt, likuiditas
-    L->>L: interest = amount * interestRateBps / 10000; dueTs = now+30d
-    L->>L: pool.totalLoansOutstanding += amount
-    L->>E: safeTransfer(amount)
-    L-->>E: LoanCreated
-```
+**[_autoRepayAdvance(employee, available) — internal]**
 
-**Algoritma `_doBorrow`:**
-
-1. **Check:** tidak ada pinjaman `Active` (`ActiveLoanExists`); `amount <= 80% expectedMonthlySalary` (`LoanLimitExceeded`); `amount <= 8.000.000 IDRX` (`LoanLimitExceeded`); likuiditas idle cukup (`InsufficientPoolLiquidity`).
-2. **Effect:** `interest = amount * interestRateBps / 10000`; buat `LoanRecord` (`Active`, `dueTs = now + 30 days`); `pool.totalLoansOutstanding += amount`.
-3. **Interaction:** `safeTransfer(msg.sender, amount)`; emit `LoanCreated`.
-
-**[repayLoanManual(amount)]**
-| | |
-|---|---|
-| Input | amount: uint256 |
-| Output | - |
-| Deskripsi | external override; modifier `nonReentrant`; sesuai FR-PAYANA-705 |
-
-**Algoritma:** Check ada pinjaman `Active` (`NoActiveLoan`) dan `amount > 0`; `safeTransferFrom(msg.sender, this, amount)`; `_applyRepayment(msg.sender, loan, amount)`.
-
-**[autoRepay(employee, accrued)]**
-| | |
-|---|---|
-| Input | employee: address, accrued: uint256 |
-| Output | `uint256 repaid` |
-| Deskripsi | external override; modifier `onlyPayroll nonReentrant`; sesuai FR-PAYANA-704 |
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    participant V as CompanyVault
-    participant L as EmployeeLiquidityContract
-    V->>L: autoRepay(employee, accrued)
-    alt tidak ada pinjaman aktif
-        L-->>V: return 0
-    else ada pinjaman
-        L->>L: outstanding = principal + interest - repaidAmount
-        L->>L: fraction = accrued * 20% ; repaid = min(fraction, outstanding)
-        L->>L: _applyRepayment(employee, loan, repaid)
-        Note over L: jika lunas penuh: bunga bersih (setelah fee 1%)<br/>didistribusikan ke yieldPerShareX18
-        L-->>V: return repaid + LoanRepaid
-    end
-```
+Dipanggil dari dalam `claimSalary()` (lihat 2.2.2.2, langkah 5). Bukan fungsi publik.
 
 **Algoritma:**
 
-1. **Check:** jika tidak ada pinjaman `Active`, kembalikan 0.
-2. **Effect:** `outstanding = principal + interest - repaidAmount`; `fraction = accrued * 20% / 10000`; `repaid = min(fraction, outstanding)`; jika 0 kembalikan 0.
-3. **Effect:** `_applyRepayment(employee, loan, repaid)`; emit `LoanRepaid(employee, repaid, lunas?)`. CompanyVault bertanggung jawab memotong `repaid` dari net gaji.
+1. **Check:** jika status bukan `Active`, kembalikan 0.
+2. **Effect:** `outstanding = adv.amount - adv.repaid`; `maxRepay = bpsOf(available, ADVANCE_REPAY_BPS)`; `repaid = min(outstanding, maxRepay)`; `adv.repaid += repaid`.
+3. **Effect:** jika `adv.amount - adv.repaid == 0`, `delete salaryAdvances[employee]` (status implisit menjadi `Repaid`); emit `AdvanceRepaid(employee, repaid, remaining)`. Nilai `repaid` dikembalikan ke `claimSalary()` yang menambahkannya kembali ke `vaultBalance`.
 
-**[liquidateLoan(borrower)]**
-| | |
-|---|---|
-| Input | borrower: address |
-| Output | - |
-| Deskripsi | external override; modifier `onlyOps`; sesuai FR-PAYANA-704 (lanjutan) |
-
-**Algoritma:**
-
-1. **Check:** pinjaman `Active` (`NoActiveLoan`); `now > dueTs + GRACE_PERIOD` (`GracePeriodNotExpired`).
-2. **Effect:** `outstanding = principal + interest - repaidAmount`; `pool.totalLoansOutstanding -= principal`; kurangi `pool.totalDeposited` sebesar outstanding (loss disosialisasikan ke seluruh lender); set status `Defaulted`; emit `LoanDefaulted`.
-
-**Fungsi Internal**
-
-- `_applyRepayment(borrower, loan, amount)`: `actualRepaid = min(amount, outstanding)`; `loan.repaidAmount += actualRepaid`; pada pelunasan penuh kurangi `totalLoansOutstanding`, hitung `fee = interest * 1% `, `totalProtocolFee += fee`, distribusikan `netInterest` ke `yieldPerShareX18` (jika `totalDeposited > 0`), set status `Repaid`.
-- `_syncYield(dep, pool)`: `accrued = principal * (yieldPerShareX18 - yieldDebtX18)/1e18`; `yieldEarned += accrued`; perbarui `yieldDebtX18`.
-
-**Fungsi View**
-
-| Fungsi | Return | FR Terkait |
-|--------|--------|-----------|
-| `getLoanBalance(borrower)` | `(principal, interest, repaid)` | FR-PAYANA-705 |
-| `getPoolLiquidity(company)` | `(total, available)` | FR-PAYANA-706 |
-| `getDepositBalance(lender)` | `(principal, yieldEarned+pending)` | FR-PAYANA-701/702 |
+**Catatan siklus hidup:** pada `resignEmployee()` dan `executeTermination()`, `salaryAdvances[employee]` dihapus tanpa penagihan lebih lanjut atas sisa kasbon (bad debt — trade-off desain MVP yang disengaja; pesangon yang telah terakumulasi tetap dapat diklaim penuh oleh karyawan, lihat FR-PAYANA-706).
 
 ##### 2.2.2.4 EmploymentSBT
 
@@ -1211,68 +994,9 @@ Algoritma: Deklarasi dukungan `IERC5192`.
 
 Algoritma: Blokir transfer P2P (`SoulboundTransferNotAllowed`); hanya mint (from=0) dan burn (to=0) diizinkan.
 
-##### 2.2.2.5 IDRXPriceOracle
+> **Catatan:** Subbab IDRXPriceOracle (sebelumnya 2.2.2.5, FR-PAYANA-1201–1203/SKPL Kelompok L) telah dihapus pada Revisi G — kontrak dihapus total dari kodebase karena IDRX dirancang 1:1 terhadap Rupiah, sehingga price oracle tidak punya kasus penggunaan nyata.
 
-Oracle harga berbasis Chainlink untuk tampilan treasury berdenominasi USD (opsional). Mewarisi `Ownable`.
-
-```mermaid
-classDiagram
-    class IDRXPriceOracle {
-        +AggregatorV3Interface priceFeed
-        +setPriceFeed(priceFeed)
-        +getLatestRate() uint256
-        +getIDRXPriceInUSD() uint256
-        +convertUSDtoIDRX(usdAmount) uint256
-        +convertIDRXtoUSD(idrxAmount) uint256
-    }
-```
-
-**[getLatestRate()]**
-| | |
-|---|---|
-| Input | - |
-| Output | uint256 (rate 8 desimal) |
-| Deskripsi | external view |
-
-Algoritma: Baca `latestRoundData()`; validasi `answer > 0` (`OracleNegativeRate`), `answeredInRound >= roundId` (`OracleStaleData`), `updatedAt > 0` (`OracleRoundIncomplete`); kembalikan rate 8 desimal.
-
-**[getIDRXPriceInUSD()]**
-| | |
-|---|---|
-| Input | - |
-| Output | uint256 (18 desimal) |
-| Deskripsi | external view |
-
-Algoritma: `10^26 / rate` (18 desimal).
-
-**[convertUSDtoIDRX(usdAmount)]**
-| | |
-|---|---|
-| Input | usdAmount: uint256 |
-| Output | uint256 |
-| Deskripsi | external view |
-
-Algoritma: `usdAmount * rate / 10^8`.
-
-**[convertIDRXtoUSD(idrxAmount)]**
-| | |
-|---|---|
-| Input | idrxAmount: uint256 |
-| Output | uint256 |
-| Deskripsi | external view |
-
-Algoritma: `idrxAmount * 10^8 / rate`.
-
-**[setPriceFeed(feed)]**
-| | |
-|---|---|
-| Input | feed: address |
-| Output | - |
-| Deskripsi | external; modifier `onlyOwner` |
-
-Algoritma: Perbarui `priceFeed`; emit `PriceFeedUpdated`.
-
-##### 2.2.2.6 ConfidentialCompanyVault (Ekstensi FHE)
+##### 2.2.2.5 ConfidentialCompanyVault (Ekstensi FHE)
 
 Ekstensi opsional `CompanyVault` yang menyimpan gaji sebagai ciphertext `euint256` Inco Lightning. Lapisan streaming tetap plaintext; hanya nominal gaji yang dienkripsi.
 
@@ -1355,11 +1079,11 @@ Algoritma: Set `auditorExpiry[auditor]=0`.
 
 Data dalam sistem Payana didistribusikan ke dalam tiga lapisan penyimpanan yang saling melengkapi:
 
-1. **On-Chain (Solidity storage di Base Sepolia).** Menyimpan seluruh state finansial dan logika bisnis inti: saldo vault, konfigurasi stream per karyawan (`employeeStreams`), vault pesangon (`severanceVaults`), proposal PHK (`terminations`), cliff vest (`cliffVests`), pool koperasi (`pools`, `lenderDeposits`, `loanRecords`), serta gaji terenkripsi (`encryptedSalaries`). State on-chain bersifat immutable dan menjadi sumber kebenaran (source of truth) untuk semua nilai moneter.
+1. **On-Chain (Solidity storage di Base Sepolia).** Menyimpan seluruh state finansial dan logika bisnis inti: saldo vault, konfigurasi stream per karyawan (`employeeStreams`), vault pesangon (`severanceVaults`), proposal PHK (`terminations`), cliff vest (`cliffVests`), kasbon (`salaryAdvances`), serta gaji terenkripsi (`encryptedSalaries`). State on-chain bersifat immutable dan menjadi sumber kebenaran (source of truth) untuk semua nilai moneter.
 
-2. **Off-Chain PostgreSQL (skema `app`, Azure Indonesia Central).** Menyimpan data yang tidak boleh atau tidak efisien disimpan on-chain: sesi JWT (`sessions`), profil PII karyawan terenkripsi AES-256-GCM (`employees`), audit log backend (`audit_logs`), deduplikasi event webhook (`webhook_events`), counter rate limit (`rate_limits`), dan antrian registrasi tenant (`pending_registrations`). Penyimpanan PII off-chain merupakan pemenuhan UU PDP No. 27/2022.
+2. **Off-Chain PostgreSQL (skema `app`, Azure Indonesia Central).** Menyimpan data yang tidak boleh atau tidak efisien disimpan on-chain: sesi JWT (`sessions`), profil PII karyawan terenkripsi AES-256-GCM (`employees`), audit log backend (`audit_logs`), deduplikasi event webhook (`webhook_events`), counter rate limit (`rate_limits`), catatan kasbon sisi backend (`salary_advances`), dan antrian registrasi tenant (`pending_registrations`). Penyimpanan PII off-chain merupakan pemenuhan UU PDP No. 27/2022.
 
-3. **Ponder Indexed PostgreSQL (skema `public`).** Menyimpan salinan terindeks dari event on-chain dalam bentuk tabel relasional yang dapat dikueri cepat: `company`, `employee_stream`, `salary_claim`, `severance_vault`, `termination_proposal`, `cliff_vest`, `compliance_vault`, `liquidity_pool`, `lender_deposit`, `loan_record`, `employment_certificate`, `platform_fee_payment`, `encrypted_salary`, `auditor_grant`, dan `low_balance_alert`. Lapisan ini menghindarkan frontend dan backend dari kebutuhan iterasi RPC langsung untuk pembacaan agregat.
+3. **Ponder Indexed PostgreSQL (skema `public`).** Menyimpan salinan terindeks dari event on-chain dalam bentuk tabel relasional yang dapat dikueri cepat: `company`, `employee_stream`, `salary_claim`, `severance_vault`, `termination_proposal`, `cliff_vest`, `compliance_vault`, `salary_advance`, `employment_certificate`, `platform_fee_payment`, `encrypted_salary`, `auditor_grant`, dan `low_balance_alert`. Lapisan ini menghindarkan frontend dan backend dari kebutuhan iterasi RPC langsung untuk pembacaan agregat.
 
 ##### ERD On-Chain (Solidity Structs & Mappings)
 
@@ -1373,9 +1097,7 @@ erDiagram
     COMPANY_VAULT ||--o{ TERMINATION_PROPOSAL : "terminations[address]"
     COMPANY_VAULT ||--o{ CLIFF_VEST : "cliffVests[address][vestId]"
     COMPANY_VAULT ||--o{ EMPLOYMENT_SBT_RECORD : "mint/revoke"
-    EMPLOYEE_LIQUIDITY ||--o{ POOL : "pools[companyAddress]"
-    EMPLOYEE_LIQUIDITY ||--o{ LENDER_DEPOSIT : "lenderDeposits[address]"
-    EMPLOYEE_LIQUIDITY ||--o{ LOAN_RECORD : "loanRecords[address]"
+    COMPANY_VAULT ||--o{ SALARY_ADVANCE : "salaryAdvances[address]"
     CONFIDENTIAL_VAULT ||--o{ ENCRYPTED_SALARY : "encryptedSalaries[address]"
     CONFIDENTIAL_VAULT ||--o{ AUDITOR_EXPIRY : "auditorExpiry[address]"
 
@@ -1405,7 +1127,7 @@ erDiagram
         uint256 lastWithdrawnTs
         uint256 settledBalance
         StreamStatus status
-        SplitConfig splits
+        uint16 severanceBps
     }
     SEVERANCE_VAULT {
         uint256 amount
@@ -1428,27 +1150,11 @@ erDiagram
         VestType vestType
         VestStatus status
     }
-    POOL {
-        uint256 totalDeposited
-        uint256 totalLoansOutstanding
-        uint16 interestRateBps
-        bool initialized
-        uint256 yieldPerShareX18
-    }
-    LENDER_DEPOSIT {
-        address companyAddress
-        uint256 principal
-        uint256 yieldEarned
-        uint256 depositedTs
-        uint256 yieldDebtX18
-    }
-    LOAN_RECORD {
-        address companyAddress
-        uint256 principal
-        uint256 interest
-        uint256 repaidAmount
-        uint256 dueTs
-        LoanStatus status
+    SALARY_ADVANCE {
+        uint256 amount
+        uint256 repaid
+        uint256 requestedAt
+        AdvanceStatus status
     }
     ENCRYPTED_SALARY {
         euint256 ciphertext
@@ -1463,8 +1169,7 @@ erDiagram
 - `SeveranceState`: Locked, Returned, Released.
 - `VestType`: Retention, Probation, ESOP.
 - `VestStatus`: Locked, Claimed, Forfeited.
-- `LoanStatus`: Active, Repaid, Defaulted.
-- `SplitConfig`: { employeeBps, complianceBps, severanceBps } — total harus 10.000.
+- `AdvanceStatus`: None, Pending, Active. Tidak ada nilai enum terpisah untuk "Rejected"/"Repaid" — `rejectAdvance()` dan pelunasan penuh via `_autoRepayAdvance()` sama-sama melakukan `delete salaryAdvances[employee]`, yang mengembalikan status ke `None` secara on-chain. Status "Rejected"/"Repaid" yang ditampilkan di UI berasal dari riwayat event (`AdvanceRejected`/`AdvanceRepaid`) yang diindeks off-chain oleh Ponder, bukan dari pembacaan langsung state kontrak saat ini.
 
 ##### ERD Off-Chain (PostgreSQL — skema `app`)
 
@@ -1541,8 +1246,7 @@ erDiagram
     EMPLOYEE_STREAM ||--o| SEVERANCE_VAULT : id
     EMPLOYEE_STREAM ||--o{ CLIFF_VEST : employee
     EMPLOYEE_STREAM ||--o| EMPLOYMENT_CERTIFICATE : id
-    LIQUIDITY_POOL ||--o{ LENDER_DEPOSIT : company_address
-    LIQUIDITY_POOL ||--o{ LOAN_RECORD : company_address
+    COMPANY ||--o{ SALARY_ADVANCE : hrAuthority
 
     COMPANY {
         hex id PK "hrAuthority/vault"
@@ -1559,28 +1263,17 @@ erDiagram
         bigint net_to_employee
         bigint to_compliance
         bigint to_severance
+        bigint kasbon_repaid
         bigint timestamp
     }
-    LIQUIDITY_POOL {
-        hex id PK "company_address"
-        bigint totalDeposited
-        bigint totalLoansOutstanding
-        integer interestRateBps
-    }
-    LOAN_RECORD {
-        hex id PK "borrower"
-        hex company_address
-        bigint principal
-        bigint interest
-        bigint repaidAmount
-        bigint due_ts
+    SALARY_ADVANCE {
+        hex id PK "employee"
+        hex hrAuthority
+        bigint amount
+        bigint repaid
         text status
-    }
-    LENDER_DEPOSIT {
-        hex id PK "lender"
-        hex company_address
-        bigint principal
-        bigint yieldEarned
+        bigint requestedAt
+        bigint updatedAt
     }
     CLIFF_VEST {
         text id PK
@@ -1601,9 +1294,7 @@ erDiagram
 | `salary_claim` | `id` | `SalaryClaimed` | `/compliance/*`, `/employee/audit` |
 | `severance_vault` | `id` | `SeveranceReleased/Returned` | `/employee/severance` |
 | `cliff_vest` | `id` | `CliffVestCreated/Claimed/Forfeited` | `/hr/vesting`, `/employee/vesting` |
-| `liquidity_pool` | `company_address` | `PoolInitialized`, deposit/loan | `/hr/koperasi`, `/employee/koperasi` |
-| `lender_deposit` | `lender` | `Deposited`, `Withdrawn`, `YieldAccrued` | `/employee/koperasi` |
-| `loan_record` | `borrower` | `LoanCreated/Repaid/Defaulted` | liquidation cron, `/employee/koperasi` |
+| `salary_advance` | `employee` | `AdvanceRequested/Approved/Rejected/Repaid` | `/hr/kasbon`, `/employee/kasbon` |
 | `platform_fee_payment` | `id` | `PlatformFeePaid` | `/owner` |
 | `employment_certificate` | `id` | `EmploymentCertified/Revoked` | `/verify` |
 | `encrypted_salary` | `employee` | `EncryptedSalarySet` | portal FHE |
@@ -1715,6 +1406,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `net_to_employee` | `bigint` | NOT NULL | — | ≥ 0 | — | IDRX wei yang dikirim ke wallet karyawan |
 | `to_compliance` | `bigint` | NOT NULL | — | ≥ 0 | — | IDRX wei yang dialokasikan ke compliance vault |
 | `to_severance` | `bigint` | NOT NULL | — | ≥ 0 | — | IDRX wei yang ditambahkan ke severance vault |
+| `kasbon_repaid` | `bigint` | NOT NULL | — | ≥ 0 | `0` | IDRX wei yang dipotong sebagai cicilan kasbon pada klaim ini |
 | `block_number` | `bigint` | NOT NULL | — | ≥ 0 | — | Nomor blok saat event ter-emit |
 | `timestamp` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp klaim |
 
@@ -1763,38 +1455,17 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `accumulated` | `bigint` | NOT NULL | — | ≥ 0 | — | Total akumulasi dana compliance IDRX wei |
 | `last_updated` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pembaruan terakhir |
 
-**Tabel `liquidity_pool`**
+**Tabel `salary_advance`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `hex` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Alamat vault pemilik pool |
-| `interest_rate_bps` | `integer` | NOT NULL | — | 0–10000 | — | Suku bunga pinjaman (bps) per 30 hari |
-| `total_deposited` | `bigint` | NOT NULL | — | ≥ 0 | — | Total principal yang didepositkan IDRX wei |
-| `total_loans_outstanding` | `bigint` | NOT NULL | — | ≥ 0 | — | Total pinjaman aktif IDRX wei |
-| `created_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp inisialisasi pool |
-
-**Tabel `lender_deposit`**
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `hex` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Alamat lender (karyawan deposan) |
-| `company_address` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat vault / pool tempat deposit |
-| `principal` | `bigint` | NOT NULL | — | ≥ 0 | — | Principal aktif yang didepositkan IDRX wei |
-| `yield_earned` | `bigint` | NOT NULL | — | ≥ 0 | — | Yield terakumulasi menunggu penarikan IDRX wei |
-| `last_updated` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp sinkronisasi yield terakhir |
-
-**Tabel `loan_record`**
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `hex` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Alamat peminjam (karyawan) |
-| `company_address` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat vault pool sumber pinjaman |
-| `principal` | `bigint` | NOT NULL | — | ≥ 0 | — | Pokok pinjaman IDRX wei |
-| `interest` | `bigint` | NOT NULL | — | ≥ 0 | — | Bunga pre-computed IDRX wei |
-| `repaid_amount` | `bigint` | NOT NULL | — | ≥ 0 | — | Total yang telah dibayar kembali IDRX wei |
-| `due_ts` | `bigint` | NOT NULL | — | > created_at | — | Unix timestamp jatuh tempo pinjaman |
-| `status` | `text` | NOT NULL | — | `Active` \| `Repaid` \| `Defaulted` | — | Status pinjaman saat ini |
-| `created_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pinjaman dibuat |
+| `id` | `hex` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Alamat karyawan pengaju kasbon |
+| `hr_authority` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat HR vault sumber dana |
+| `amount` | `bigint` | NOT NULL | — | ≥ 0 | — | Jumlah kasbon yang disetujui IDRX wei |
+| `repaid` | `bigint` | NOT NULL | — | ≥ 0 | `0` | Jumlah yang sudah dilunasi via auto-repay IDRX wei |
+| `status` | `text` | NOT NULL | — | `Pending` \| `Active` \| `Rejected` \| `Repaid` | — | Status kasbon (diturunkan dari riwayat event, lihat catatan `AdvanceStatus`) |
+| `requested_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pengajuan |
+| `updated_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp update status terakhir |
 
 **Tabel `employment_certificate`**
 
@@ -1854,14 +1525,6 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 
 Bagian ini mendokumentasikan struct Solidity yang mendefinisikan state storage dalam smart contract. Kolom "Null" dan "Default" mengacu pada nilai awal variabel Solidity (uninitialized = zero value).
 
-**Struct `SplitConfig` (CompanyVault)**
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `employeeBps` | `uint16` | NOT NULL | `employeeBps + complianceBps + severanceBps = 10000` | 0–10000 | `9300` | Porsi gaji bersih karyawan (basis poin) |
-| `complianceBps` | `uint16` | NOT NULL | sum = 10000 | 0–10000 | `500` | Porsi BPJS/PPh21 (basis poin) |
-| `severanceBps` | `uint16` | NOT NULL | sum = 10000 | 0–10000 | `200` | Porsi dana pesangon (basis poin) |
-
 **Struct `EmployeeStream` (CompanyVault)**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
@@ -1871,7 +1534,16 @@ Bagian ini mendokumentasikan struct Solidity yang mendefinisikan state storage d
 | `lastWithdrawnTs` | `uint256` | NOT NULL | ≥ 0 | ≥ startTs | `0` | Timestamp klaim atau settle terakhir |
 | `settledBalance` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Akrual tersimpan saat pause/cancel stream |
 | `status` | `StreamStatus` | NOT NULL | — | `Inactive`\|`Active`\|`Paused`\|`Cancelled` | `Inactive` | Status stream saat ini |
-| `splits` | `SplitConfig` | NOT NULL | — | — | default splits | Konfigurasi split akrual |
+| `severanceBps` | `uint16` | NOT NULL | 0–10000 | 0–10000 | `200` | Porsi severance per klaim (basis poin). PPh21/BPJS tidak lagi bagian dari struct ini — dihitung dinamis di `claimSalary()` dari `pph21Bps`/`bpjsBps` level-vault (lihat FR-PAYANA-701/702). |
+
+**Struct `SalaryAdvance` (CompanyVault)**
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `amount` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Total kasbon yang disetujui IDRX wei |
+| `repaid` | `uint256` | NOT NULL | ≤ amount | ≥ 0 | `0` | Total yang sudah dilunasi via auto-repay IDRX wei |
+| `requestedAt` | `uint256` | NOT NULL | ≥ 0 | Unix timestamp | `0` | Block.timestamp saat pengajuan |
+| `status` | `AdvanceStatus` | NOT NULL | — | `None`\|`Pending`\|`Active` | `None` | Status on-chain (lihat catatan `AdvanceStatus` di atas — "Rejected"/"Repaid" hanya ada di level event/off-chain) |
 
 **Struct `SeveranceVault` (CompanyVault)**
 
@@ -1902,37 +1574,6 @@ Bagian ini mendokumentasikan struct Solidity yang mendefinisikan state storage d
 | `cliffTs` | `uint256` | NOT NULL | > block.timestamp saat dibuat | Unix timestamp | `0` | Block.timestamp saat vest boleh diklaim |
 | `vestType` | `VestType` | NOT NULL | — | `Retention`\|`Probation`\|`ESOP` | `Retention` | Jenis vest |
 | `status` | `VestStatus` | NOT NULL | — | `Locked`\|`Claimed`\|`Forfeited` | `Locked` | Status vest |
-
-**Struct `Pool` (EmployeeLiquidityContract)**
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `totalDeposited` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Total principal yang didepositkan lender IDRX wei |
-| `totalLoansOutstanding` | `uint256` | NOT NULL | ≤ totalDeposited | 0–totalDeposited | `0` | Total pinjaman aktif IDRX wei |
-| `interestRateBps` | `uint16` | NOT NULL | 0–10000 | 0–10000 | `150` | Suku bunga per LOAN_TERM (30 hari) dalam basis poin |
-| `initialized` | `bool` | NOT NULL | — | `true`\|`false` | `false` | Flag apakah pool sudah diinisialisasi |
-| `yieldPerShareX18` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Indeks yield kumulatif dalam skala 1e18 (EIP-4626-style) |
-
-**Struct `LenderDeposit` (EmployeeLiquidityContract)**
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `companyAddress` | `address` | NOT NULL | ≠ address(0) | Hex 0x + 40 char | `address(0)` | Alamat vault pool tempat deposit |
-| `principal` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Principal aktif yang masih didepositkan IDRX wei |
-| `yieldEarned` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Yield yang sudah termaterialisasi IDRX wei |
-| `depositedTs` | `uint256` | NOT NULL | ≥ 0 | Unix timestamp | `0` | Block.timestamp deposit pertama |
-| `yieldDebtX18` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Snapshot `yieldPerShareX18` saat sinkronisasi terakhir |
-
-**Struct `LoanRecord` (EmployeeLiquidityContract)**
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `companyAddress` | `address` | NOT NULL | ≠ address(0) | Hex 0x + 40 char | `address(0)` | Alamat vault pool sumber pinjaman |
-| `principal` | `uint256` | NOT NULL | > 0 | ≥ 0 | `0` | Pokok pinjaman IDRX wei |
-| `interest` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Bunga pre-computed IDRX wei (`principal × bps / 10000`) |
-| `repaidAmount` | `uint256` | NOT NULL | ≤ principal + interest | ≥ 0 | `0` | Total yang telah dibayar kembali IDRX wei |
-| `dueTs` | `uint256` | NOT NULL | > block.timestamp saat borrow | Unix timestamp | `0` | `block.timestamp + LOAN_TERM (30 days)` |
-| `status` | `LoanStatus` | NOT NULL | — | `None`\|`Active`\|`Repaid`\|`Defaulted` | `Active` | Status pinjaman saat ini |
 
 **Struct `EmploymentRecord` (EmploymentSBT)**
 
@@ -1970,8 +1611,6 @@ erDiagram
         bigint flowRate
         bigint startTs
         text status
-        int employeeBps
-        int complianceBps
         int severanceBps
     }
 
@@ -1983,6 +1622,9 @@ erDiagram
         bigint net_to_employee
         bigint to_compliance
         bigint to_severance
+        bigint kasbon_repaid
+        bigint pph21_amount
+        bigint bpjs_amount
         bigint block_number
         bigint timestamp
     }
@@ -2024,31 +1666,14 @@ erDiagram
         bigint lastUpdated
     }
 
-    liquidity_pool {
+    salary_advance {
         hex id PK
-        int interestRateBps
-        bigint totalDeposited
-        bigint totalLoansOutstanding
-        bigint createdAt
-    }
-
-    lender_deposit {
-        hex id PK
-        hex company_address FK
-        bigint principal
-        bigint yield_earned
-        bigint last_updated
-    }
-
-    loan_record {
-        hex id PK
-        hex company_address FK
-        bigint principal
-        bigint interest
-        bigint repaid_amount
-        bigint due_ts
+        hex hrAuthority FK
+        bigint amount
+        bigint repaid
         text status
-        bigint created_at
+        bigint requestedAt
+        bigint updatedAt
     }
 
     employment_certificate {
@@ -2155,9 +1780,7 @@ erDiagram
     company ||--o{ cliff_vest : "grants"
     company ||--o{ salary_claim : "pays"
     company ||--o| compliance_vault : "owns"
-    company ||--o| liquidity_pool : "manages"
-    company ||--o{ lender_deposit : "receives"
-    company ||--o{ loan_record : "lends"
+    company ||--o{ salary_advance : "grants"
     company ||--o{ employment_certificate : "issues"
     company ||--o{ platform_fee_payment : "incurs"
     company ||--o{ encrypted_salary : "stores"
@@ -2413,7 +2036,7 @@ sequenceDiagram
 
 **Method/Algoritma Utama:**
 
-1. `handleDeploy`: panggil `deployVault(address, companyName, EMPLOYEE_LIQUIDITY, EMPLOYMENT_SBT)` via `useContractWrite`.
+1. `handleDeploy`: panggil `deployVault(address, companyName, EMPLOYMENT_SBT)` via `useContractWrite`.
 2. Polling `ponder.getCompany(address)` hingga 20 kali (interval 3 detik) sampai alamat vault terindeks; simpan ke `deployedVault`.
 3. `handleDeposit`: konversi nominal ke wei (`BigInt(amount) * 1e18`), panggil `approve(deployedVault, amountWei)` pada IDRX, lalu `fundVault(amountWei)` pada vault.
 4. Tampilkan langkah selesai dengan tautan ke `/hr/vault`.
@@ -2502,35 +2125,7 @@ sequenceDiagram
 2. Berlangganan WebSocket; tampilkan banner saat tipe `LOW_VAULT_BALANCE` diterima.
 3. Deposit: `approve(vault, amount)` → `fundVault(amount)`. Penarikan: `withdrawVault(amount, recipient)`.
 
-##### 2.4.2.4 Absensi HR (`/hr/attendance`)
-
-**Deskripsi:** Tampilan dan pengelolaan data kehadiran karyawan untuk rekonsiliasi payroll.
-**Aktor:** HR Admin.
-**FR Terkait:** — (fitur pelengkap antarmuka tingkat aplikasi; tidak memengaruhi logika stream on-chain).
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor HR
-    participant FE as Frontend /hr/attendance
-    HR->>FE: Buka rekap absensi
-    FE-->>HR: Render tabel kehadiran (data aplikasi off-chain)
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Tabel kehadiran | Tabel data | Daftar clock-in/clock-out per karyawan. |
-| Filter periode | Dropdown | Memilih rentang tanggal rekap. |
-
-**Method/Algoritma Utama:**
-
-1. Muat data absensi tingkat aplikasi (off-chain).
-2. Render tabel; sediakan filter periode untuk rekonsiliasi manual.
-
-##### 2.4.2.5 Reimburse HR (`/hr/reimburse`)
+##### 2.4.2.4 Reimburse HR (`/hr/reimburse`)
 
 **Deskripsi:** Manajemen klaim reimbursement yang diajukan karyawan: daftar, persetujuan, dan pencatatan pembayaran.
 **Aktor:** HR Admin.
@@ -2559,7 +2154,7 @@ sequenceDiagram
 1. Muat daftar klaim reimbursement tingkat aplikasi.
 2. Aksi persetujuan/penolakan memperbarui status klaim dan mencatat pembayaran.
 
-##### 2.4.2.6 Bounty HR (`/hr/bounty`)
+##### 2.4.2.5 Bounty HR (`/hr/bounty`)
 
 **Deskripsi:** Manajemen program bounty/insentif kinerja: pembuatan papan bounty, penetapan hadiah IDRX, dan pencatatan klaim disetujui.
 **Aktor:** HR Admin.
@@ -2588,7 +2183,7 @@ sequenceDiagram
 1. Buat papan bounty dengan hadiah IDRX.
 2. Tinjau klaim penyelesaian dan catat pembayaran hadiah.
 
-##### 2.4.2.7 Compliance HR (`/hr/compliance`)
+##### 2.4.2.6 Compliance HR (`/hr/compliance`)
 
 **Deskripsi:** Laporan kepatuhan BPJS/PPh21: pratinjau ringkasan bulanan, unduhan CSV, dan penarikan akumulasi dana kepatuhan.
 **Aktor:** HR Admin.
@@ -2631,42 +2226,49 @@ sequenceDiagram
 2. Tombol unduh memanggil endpoint export; berkas CSV dikembalikan sebagai attachment.
 3. Penarikan memanggil `withdrawCompliance(amount, recipient)` (hanya `complianceBalance`).
 
-##### 2.4.2.8 Koperasi HR (`/hr/koperasi`)
+##### 2.4.2.7 Kasbon HR (`/hr/kasbon`)
 
-**Deskripsi:** Pemantauan pool likuiditas koperasi perusahaan: total deposit, pinjaman berjalan, utilisasi, dan daftar peminjam aktif.
+**Deskripsi:** Daftar pengajuan kasbon karyawan (Pending/Active/Rejected/Repaid), tombol setujui/tolak, dan riwayat pemotongan pajak (PPh21 + BPJS) per klaim gaji.
 **Aktor:** HR Admin.
-**FR Terkait:** FR-PAYANA-706.
+**FR Terkait:** FR-PAYANA-703, FR-PAYANA-705.
 
 **Alur Interaksi:**
 
 ```mermaid
 sequenceDiagram
     actor HR
-    participant FE as Frontend /hr/koperasi
+    participant FE as Frontend /hr/kasbon
     participant PO as Ponder
-    participant L as EmployeeLiquidityContract
-    FE->>PO: getPool(vaultAddress)
-    PO-->>FE: liquidity_pool (deposit, outstanding, rate)
-    FE->>L: getPoolLiquidity(vaultAddress)
-    L-->>FE: (total, available)
-    FE-->>HR: Tampilkan utilisasi + daftar peminjam (loan_record)
+    participant V as CompanyVault
+    FE->>PO: getSalaryAdvances(vaultAddress)
+    PO-->>FE: salary_advance[] (Pending/Active/Rejected/Repaid)
+    alt HR menyetujui
+        HR->>FE: Klik "Setujui"
+        FE->>V: approveAdvance(employee)
+        V-->>FE: event AdvanceApproved
+    else HR menolak
+        HR->>FE: Klik "Tolak"
+        FE->>V: rejectAdvance(employee)
+        V-->>FE: event AdvanceRejected
+    end
+    FE-->>HR: Tampilkan status kasbon terkini + riwayat TaxWithheld
 ```
 
 **Deskripsi Antarmuka:**
 
 | Komponen | Tipe | Deskripsi |
 |----------|------|-----------|
-| Kartu likuiditas | Panel data | Total deposit, pinjaman berjalan, likuiditas idle. |
-| Indikator utilisasi | Progress bar | Rasio `totalLoansOutstanding / totalDeposited`. |
-| Tabel peminjam | Tabel data | Daftar `loan_record` aktif beserta status. |
+| Tabel kasbon Pending | Tabel data | Daftar pengajuan menunggu persetujuan, dengan tombol Setujui/Tolak per baris. |
+| Tabel riwayat kasbon | Tabel data | Kasbon `Active`/`Rejected`/`Repaid` beserta sisa yang harus dilunasi. |
+| Panel riwayat pajak | Panel data | Ringkasan `TaxWithheld` (PPh21 + BPJS) per klaim gaji, terindeks Ponder. |
 
 **Method/Algoritma Utama:**
 
-1. Baca `ponder.getPool(vaultAddress)` untuk data terindeks pool.
-2. Baca `getPoolLiquidity(vaultAddress)` on-chain untuk total dan likuiditas idle.
-3. Hitung utilisasi dan render daftar peminjam aktif.
+1. Baca `ponder.getSalaryAdvances(vaultAddress)` untuk daftar kasbon terindeks (status diturunkan dari riwayat event, lihat catatan `AdvanceStatus`).
+2. Tombol Setujui memanggil `approveAdvance(employee)`; Tolak memanggil `rejectAdvance(employee)`.
+3. Render riwayat `TaxWithheld` per karyawan dari data Ponder untuk transparansi potongan pajak.
 
-##### 2.4.2.9 Vesting HR (`/hr/vesting`)
+##### 2.4.2.8 Vesting HR (`/hr/vesting`)
 
 **Deskripsi:** Manajemen cliff vest: pembuatan vest baru bertipe Retention/Probation/ESOP dan pembatalan vest yang belum matang.
 **Aktor:** HR Admin.
@@ -2705,7 +2307,7 @@ sequenceDiagram
 2. Panggil `createCliffVest(employee, amount, cliffTs, vestType)`.
 3. Daftar vest dibaca dari `ponder.getVests`; pembatalan memanggil `cancelCliffVest`.
 
-##### 2.4.2.10 PHK (`/hr/phk`)
+##### 2.4.2.9 PHK (`/hr/phk`)
 
 **Deskripsi:** Antrian dan alur PHK multi-tanda tangan (HR mengajukan, Legal menyetujui, HR mengeksekusi), termasuk pembatalan proposal.
 **Aktor:** HR Admin dan Legal Officer (mode terbatas).
@@ -2747,7 +2349,7 @@ sequenceDiagram
 3. HR: panggil `executeTermination(employee)` (memerlukan kedua persetujuan dan belum kadaluarsa).
 4. Pembatalan memanggil `cancelProposal(employee)` selama belum disetujui Legal.
 
-##### 2.4.2.11 Audit HR (`/hr/audit`)
+##### 2.4.2.10 Audit HR (`/hr/audit`)
 
 **Deskripsi:** Riwayat aksi backend yang relevan dengan perusahaan (relay, ekspor kepatuhan, likuidasi, platform fee, peringatan saldo).
 **Aktor:** HR Admin.
@@ -2777,7 +2379,7 @@ sequenceDiagram
 1. Ambil entri `audit_logs` yang aktor/metanya terkait perusahaan HR.
 2. Render tabel terurut waktu dengan tautan transaksi.
 
-##### 2.4.2.12 Pengaturan HR (`/hr/settings`)
+##### 2.4.2.11 Pengaturan HR (`/hr/settings`)
 
 **Deskripsi:** Konfigurasi parameter vault: BPS BPJS, BPS PPh21, dan threshold peringatan saldo rendah.
 **Aktor:** HR Admin.
@@ -2861,35 +2463,7 @@ sequenceDiagram
 2. `fetchAccrued`: baca `getAccrued(address)` on-chain sebagai seed `StreamCounter`; polling tiap 10 detik (NFR-10).
 3. `handleClaim`: panggil `claimSalary()` melalui jalur write (gasless), tampilkan banner sukses, lalu refresh `getAccrued` dan `balanceOf`.
 
-##### 2.4.3.2 Absensi Karyawan (`/employee/attendance`)
-
-**Deskripsi:** Riwayat clock-in/clock-out dan status kehadiran harian karyawan.
-**Aktor:** Karyawan.
-**FR Terkait:** — (fitur pelengkap antarmuka tingkat aplikasi).
-
-**Alur Interaksi:**
-
-```mermaid
-sequenceDiagram
-    actor E as Karyawan
-    participant FE as Frontend /employee/attendance
-    E->>FE: Buka riwayat kehadiran
-    FE-->>E: Render tabel clock-in/out
-```
-
-**Deskripsi Antarmuka:**
-
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Tabel kehadiran | Tabel data | Tanggal, jam masuk, jam keluar, status. |
-| Tombol clock-in/out | Tombol | Mencatat kehadiran tingkat aplikasi. |
-
-**Method/Algoritma Utama:**
-
-1. Muat riwayat kehadiran tingkat aplikasi.
-2. Aksi clock-in/out memperbarui status harian.
-
-##### 2.4.3.3 Reimburse Karyawan (`/employee/reimburse`)
+##### 2.4.3.2 Reimburse Karyawan (`/employee/reimburse`)
 
 **Deskripsi:** Formulir pengajuan reimbursement dan pemantauan status persetujuan HR.
 **Aktor:** Karyawan.
@@ -2918,7 +2492,7 @@ sequenceDiagram
 1. Submit klaim reimbursement tingkat aplikasi.
 2. Pantau status persetujuan dari HR.
 
-##### 2.4.3.4 Bounty Karyawan (`/employee/bounty`)
+##### 2.4.3.3 Bounty Karyawan (`/employee/bounty`)
 
 **Deskripsi:** Daftar program bounty yang tersedia beserta tombol klaim hadiah IDRX setelah tugas selesai.
 **Aktor:** Karyawan.
@@ -2947,57 +2521,46 @@ sequenceDiagram
 1. Muat daftar bounty terbuka.
 2. Ajukan klaim hadiah; tunggu verifikasi HR.
 
-##### 2.4.3.5 Koperasi Karyawan (`/employee/koperasi`)
+##### 2.4.3.4 Kasbon Karyawan (`/employee/kasbon`)
 
-**Deskripsi:** Modul simpan-pinjam koperasi: deposit, penarikan, pinjam (maks 80% gaji bulanan), dan pelunasan manual.
+**Deskripsi:** Status kasbon aktif beserta sisa yang harus dilunasi, tombol pengajuan kasbon baru, dan rincian potongan PPh21/BPJS pada setiap klaim gaji.
 **Aktor:** Karyawan.
-**FR Terkait:** FR-PAYANA-701 s.d. FR-PAYANA-705.
+**FR Terkait:** FR-PAYANA-703, FR-PAYANA-704, FR-PAYANA-706.
 
 **Alur Interaksi:**
 
 ```mermaid
 sequenceDiagram
     actor E as Karyawan
-    participant FE as Frontend /employee/koperasi
+    participant FE as Frontend /employee/kasbon
     participant PO as Ponder
-    participant IDRX as IDRX ERC-20
-    participant L as EmployeeLiquidityContract
-    FE->>PO: getPool / getDeposit / getLoan / getStream
-    PO-->>FE: data pool, deposit, pinjaman, stream
-    alt Simpan
-        E->>FE: Deposit nominal
-        FE->>IDRX: approve(liquidity, amount)
-        FE->>L: depositToPool(vaultAddress, amount)
-    else Pinjam
-        E->>FE: Pinjam (<= 80% gaji bulanan)
-        FE->>L: borrowFromPool(vaultAddress, amount)
-    else Lunasi
-        E->>FE: Bayar manual
-        FE->>IDRX: approve(liquidity, amount)
-        FE->>L: repayLoanManual(amount)
-    end
-    L-->>FE: event terkait
-    FE-->>E: Refresh saldo & pinjaman
+    participant V as CompanyVault
+    FE->>PO: getSalaryAdvance(employee) / getStream(employee)
+    PO-->>FE: status kasbon, sisa, riwayat TaxWithheld
+    E->>FE: Ajukan kasbon (<= 80% gaji bulanan)
+    FE->>V: requestAdvance(amount) — gasless via Paymaster
+    V-->>FE: event AdvanceRequested
+    FE-->>E: Refresh status kasbon (Pending)
 ```
 
 **Deskripsi Antarmuka:**
 
 | Komponen | Tipe | Deskripsi |
 |----------|------|-----------|
-| Tab Pinjam/Simpan | Tab navigasi | Beralih antara mode meminjam dan menyimpan. |
-| Kartu pool | Panel data | Total deposit, pinjaman berjalan, suku bunga. |
-| Slider/Input nominal | Field | Nominal pinjam/deposit; pinjam dibatasi `maxBorrow` (80% gaji bulanan). |
-| Indikator pelunasan | Progress bar | `repaidAmount / (principal + interest)`. |
-| Tombol aksi | Tombol tulis | `depositToPool`, `withdrawDeposit`, `borrowFromPool`, `repayLoanManual`. |
+| Kartu status kasbon | Panel data | Status saat ini (Pending/Active/Rejected/Repaid), jumlah, dan sisa yang harus dilunasi. |
+| Input nominal pengajuan | Field | Nominal kasbon; dibatasi `maxAdvance` (80% dari estimasi gaji bulanan). |
+| Indikator pelunasan | Progress bar | `repaid / amount`. |
+| Panel riwayat pajak | Panel data | Rincian `TaxWithheld` (PPh21 + BPJS) per klaim gaji. |
+| Tombol aksi | Tombol tulis | `requestAdvance(amount)`. |
 
 **Method/Algoritma Utama:**
 
-1. Muat paralel `getPool(vaultAddress)`, `getDeposit(address)`, `getLoan(address)`, `getStream(address)`.
-2. Hitung `maxBorrow = floor(monthlySalary * 0.8)` dengan `monthlySalary = (flowRate/1e18) * 2.592.000`.
-3. Hitung `totalRepay = amount * (1 + interestRateBps/10000)` dan outstanding pinjaman.
-4. Aksi memanggil fungsi kontrak terkait (didahului `approve` untuk deposit/pelunasan), lalu `refreshData`.
+1. Muat paralel `getSalaryAdvance(employee)` dan `getStream(employee)` dari Ponder.
+2. Hitung `maxAdvance = floor(monthlySalary * 0.8)` dengan `monthlySalary = (flowRate/1e18) * 2.592.000`.
+3. Tombol ajukan memanggil `requestAdvance(amount)` (gasless, ditandatangani Privy), lalu `refreshData`.
+4. Render riwayat `TaxWithheld` dari data Ponder untuk transparansi potongan pajak per klaim.
 
-##### 2.4.3.6 Vesting Karyawan (`/employee/vesting`)
+##### 2.4.3.5 Vesting Karyawan (`/employee/vesting`)
 
 **Deskripsi:** Daftar cliff vest milik karyawan beserta tombol klaim setelah cliff tercapai.
 **Aktor:** Karyawan.
@@ -3033,7 +2596,7 @@ sequenceDiagram
 2. Tombol klaim aktif jika `block.timestamp >= cliffTs` dan status `Locked`.
 3. Panggil `claimCliffVest(vestId)`; perbarui status.
 
-##### 2.4.3.7 Transfer (`/employee/transfer`)
+##### 2.4.3.6 Transfer (`/employee/transfer`)
 
 **Deskripsi:** Transfer IDRX dari Smart Account karyawan ke alamat EVM eksternal menggunakan fungsi standar ERC-20.
 **Aktor:** Karyawan.
@@ -3068,7 +2631,7 @@ sequenceDiagram
 1. Baca `balanceOf(address)` untuk validasi kecukupan saldo.
 2. Konversi nominal ke wei; panggil `transfer(recipient, amountWei)` pada IDRX.
 
-##### 2.4.3.8 Pesangon (`/employee/severance`)
+##### 2.4.3.7 Pesangon (`/employee/severance`)
 
 **Deskripsi:** Tampilan saldo pesangon yang terakumulasi on-chain (2% dari setiap klaim) beserta status dan estimasi besaran berdasarkan masa kerja.
 **Aktor:** Karyawan.
@@ -3102,9 +2665,9 @@ sequenceDiagram
 1. Baca `getSeveranceBalance(address)` on-chain dan `severance_vault` terindeks.
 2. Tampilkan status (Locked/Released/Returned) dan estimasi statutori berdasarkan `tenureMonths`.
 
-##### 2.4.3.9 Audit Karyawan (`/employee/audit`)
+##### 2.4.3.8 Audit Karyawan (`/employee/audit`)
 
-**Deskripsi:** Riwayat klaim gaji dan transaksi koperasi milik karyawan yang login.
+**Deskripsi:** Riwayat klaim gaji dan transaksi kasbon milik karyawan yang login.
 **Aktor:** Karyawan.
 **FR Terkait:** FR-PAYANA-1002 (transparansi pribadi).
 
@@ -3124,7 +2687,7 @@ sequenceDiagram
 
 | Komponen | Tipe | Deskripsi |
 |----------|------|-----------|
-| Tabel riwayat | Tabel data | Klaim gaji + transaksi koperasi, waktu, jumlah IDRX. |
+| Tabel riwayat | Tabel data | Klaim gaji + transaksi kasbon, waktu, jumlah IDRX. |
 | Tautan transaksi | OnChainLink | Tautan Basescan per transaksi. |
 
 **Method/Algoritma Utama:**
@@ -3132,7 +2695,7 @@ sequenceDiagram
 1. Ambil `ponder.getClaims(address)`; render terurut waktu.
 2. Sertakan tautan transaksi ke Basescan.
 
-##### 2.4.3.10 Pengaturan Karyawan (`/employee/settings`)
+##### 2.4.3.9 Pengaturan Karyawan (`/employee/settings`)
 
 **Deskripsi:** Pembaruan profil PII karyawan (nama, NIK 16 digit, telepon) yang disimpan terenkripsi.
 **Aktor:** Karyawan.
@@ -3321,12 +2884,12 @@ sequenceDiagram
 | FR-PAYANA-603 | CompanyVault.cancelCliffVest / _forfeitAllVests | — | /hr/vesting |
 | FR-PAYANA-604 | CompanyVault.cliffVests (view) | — | /hr/vesting, /employee/vesting |
 | FR-PAYANA-605 | CompanyVault.vestCounter, VestType | — | /hr/vesting |
-| FR-PAYANA-701 | EmployeeLiquidityContract.depositToPool | — | /employee/koperasi |
-| FR-PAYANA-702 | EmployeeLiquidityContract.withdrawDeposit | — | /employee/koperasi |
-| FR-PAYANA-703 | EmployeeLiquidityContract.borrowFromPool | — | /employee/koperasi |
-| FR-PAYANA-704 | EmployeeLiquidityContract.autoRepay/liquidateLoan | liquidation cron | /employee/koperasi |
-| FR-PAYANA-705 | EmployeeLiquidityContract.repayLoanManual | — | /employee/koperasi |
-| FR-PAYANA-706 | EmployeeLiquidityContract.getPoolLiquidity | — | /hr/koperasi |
+| FR-PAYANA-701 | PayrollMath.calcPPh21TerBps (via claimSalary) | — | /hr/compliance, /employee/kasbon |
+| FR-PAYANA-702 | CompanyVault.claimSalary (bpjsBps cut) | — | /hr/compliance |
+| FR-PAYANA-703 | event TaxWithheld (indexed) | Ponder handler | /hr/compliance, /employee/kasbon |
+| FR-PAYANA-704 | CompanyVault.requestAdvance | — | /employee/kasbon |
+| FR-PAYANA-705 | CompanyVault.approveAdvance / rejectAdvance | — | /hr/kasbon |
+| FR-PAYANA-706 | CompanyVault.claimSalary (_autoRepayAdvance) | — | /employee/kasbon |
 | FR-PAYANA-801 | CompanyVault.claimSalary (complianceBalance) | — | /hr/compliance |
 | FR-PAYANA-802 | CompanyVault.setCompanyConfig | — | /hr/settings |
 | FR-PAYANA-803 | CompanyVault.withdrawCompliance | — | /hr/compliance |
@@ -3339,7 +2902,7 @@ sequenceDiagram
 | FR-PAYANA-905 | EmploymentSBT.locked/supportsInterface | — | /verify |
 | FR-PAYANA-1001 | PayrollFactory.deployVault | — | /owner |
 | FR-PAYANA-1002 | PayrollFactory.getTotalVaults | — | /owner, /hr/audit |
-| FR-PAYANA-1003 | EmployeeLiquidityContract.claimProtocolFee | — | /owner |
+| FR-PAYANA-1003 | PayrollFactory.setPlatformFee / setProtocolTreasury | — | /owner |
 | FR-PAYANA-1004 | PayrollFactory.emergencyFreezeAll | — | /owner |
 | FR-PAYANA-1005 | — | (blocklist sesi — backend) | /owner |
 | FR-PAYANA-1006 | PayrollFactory.setPlatformFee | — | /owner |
@@ -3353,16 +2916,17 @@ sequenceDiagram
 
 ### A.3 Alamat Kontrak Ter-Deploy
 
-Jaringan: **Base Sepolia**, Chain ID **84532**. Redeployment **2026-06-04**, mulai block **42397510**.
+Jaringan: **Base Sepolia**, Chain ID **84532**. Redeployment Gen8 (cutover Koperasi → Tax Engine + Kasbon).
 
 | Kontrak | Alamat |
 |---------|--------|
-| PayrollFactory | `0x1B5A705Cb11BAF5798DC78fE27b8686C8c986BdF` |
-| EmployeeLiquidityContract | `0xd9cd18C33Ef3922810bD1b43B4F09693399d14a9` |
-| EmploymentSBT | `0xF0D52Bc9f3455F0D200bCE6Cf9e8C4f0759a5128` |
+| PayrollFactory | `0xF62dF08b38c6Fbde33E24208BA044907475ca815` |
+| EmploymentSBT | `0x8dA9B60814536364daF77a82cb56B31226De4B62` |
 | MockIDRX (ERC-20) | `0x0996e627cE22C4FE2D5c4788b159a83C065D6d09` |
 | ConfidentialCompanyVault (Demo) | `0x4560968670Dd852dACd73c7B8748695eC427e203` |
 | Admin/Treasury | `0x906B34db1a8DD333ff9a84255e4AEc13C054f120` |
+
+> `EmployeeLiquidityContract` tidak lagi dideploy sejak Gen8 — fungsinya digantikan oleh fitur kasbon terintegrasi di `CompanyVault`.
 
 Catatan: `CompanyVault` per tenant tidak memiliki alamat tetap karena di-deploy dinamis oleh `PayrollFactory.deployVault()`; alamatnya dapat diresolusi melalui `companyVaults(hrAuthority)`.
 
@@ -3378,15 +2942,12 @@ Bagian ini merinci seluruh struct, enum, dan mapping yang menjadi state on-chain
 
 | Struct | Field | Tipe | Keterangan |
 |--------|-------|------|------------|
-| `SplitConfig` | `employeeBps` | uint16 | Porsi gaji ke karyawan. |
-| | `complianceBps` | uint16 | Porsi ke sub-pool kepatuhan (BPJS/PPh21). |
-| | `severanceBps` | uint16 | Porsi ke vault pesangon. Total ketiganya harus 10.000. |
 | `EmployeeStream` | `flowRate` | uint256 | IDRX wei per detik. |
 | | `startTs` | uint256 | Timestamp pembuatan stream (basis perhitungan masa kerja). |
 | | `lastWithdrawnTs` | uint256 | Timestamp klaim/settle terakhir. |
 | | `settledBalance` | uint256 | Saldo akrual yang sudah di-settle saat pause/update rate. |
 | | `status` | StreamStatus | Inactive/Active/Paused/Cancelled. |
-| | `splits` | SplitConfig | Konfigurasi split per karyawan. |
+| | `severanceBps` | uint16 | Porsi severance per klaim; PPh21/BPJS dihitung dinamis di level vault, bukan bagian struct ini. |
 | `SeveranceVault` | `amount` | uint256 | Total IDRX pesangon terakumulasi. |
 | | `state` | SeveranceState | Locked/Returned/Released. |
 | | `tenureMonths` | uint256 | Masa kerja di klaim terakhir (perhitungan UU Cipta Kerja). |
@@ -3403,30 +2964,18 @@ Bagian ini merinci seluruh struct, enum, dan mapping yang menjadi state on-chain
 | | `vestType` | VestType | Retention/Probation/ESOP. |
 | | `status` | VestStatus | Locked/Claimed/Forfeited. |
 
-**Mapping CompanyVault:** `employeeStreams[address]`, `severanceVaults[address]`, `terminations[address]`, `cliffVests[address][vestId]`, `employeeComplianceAccumulated[address]`.
+**Mapping CompanyVault:** `employeeStreams[address]`, `severanceVaults[address]`, `terminations[address]`, `cliffVests[address][vestId]`, `employeeComplianceAccumulated[address]`, `salaryAdvances[address]`.
 
-#### A.4.2 Struct EmployeeLiquidityContract
+#### A.4.2 Struct SalaryAdvance (CompanyVault, Gen8)
 
 | Struct | Field | Tipe | Keterangan |
 |--------|-------|------|------------|
-| `Pool` | `totalDeposited` | uint256 | Total principal seluruh lender. |
-| | `totalLoansOutstanding` | uint256 | Total principal pinjaman berjalan. |
-| | `interestRateBps` | uint16 | Bunga per `LOAN_TERM` (mis. 150 = 1,5%). |
-| | `initialized` | bool | Status inisialisasi pool. |
-| | `yieldPerShareX18` | uint256 | Indeks kumulatif yield per unit principal (skala 1e18). |
-| `LenderDeposit` | `companyAddress` | address | Pool tempat deposit berada. |
-| | `principal` | uint256 | Principal aktif. |
-| | `yieldEarned` | uint256 | Yield termaterialisasi, menunggu penarikan. |
-| | `depositedTs` | uint256 | Timestamp deposit pertama. |
-| | `yieldDebtX18` | uint256 | Snapshot `yieldPerShareX18` saat sinkronisasi terakhir. |
-| `LoanRecord` | `companyAddress` | address | Pool sumber pinjaman. |
-| | `principal` | uint256 | Jumlah pinjaman pokok. |
-| | `interest` | uint256 | Bunga pre-computed (`principal * interestRateBps / 10000`). |
-| | `repaidAmount` | uint256 | Total terbayar (pokok + bunga). |
-| | `dueTs` | uint256 | Jatuh tempo (`now + LOAN_TERM`). |
-| | `status` | LoanStatus | Active/Repaid/Defaulted. |
+| `SalaryAdvance` | `amount` | uint256 | Total kasbon yang disetujui. |
+| | `repaid` | uint256 | Total sudah dilunasi via auto-repay. |
+| | `requestedAt` | uint256 | Timestamp pengajuan. |
+| | `status` | AdvanceStatus | None/Pending/Active (lihat catatan `AdvanceStatus`, §2.3.1). |
 
-**Mapping:** `registeredVaults[address]`, `pools[companyAddress]`, `lenderDeposits[lender]`, `loanRecords[borrower]`.
+> `EmployeeLiquidityContract` dan struct `Pool`/`LenderDeposit`/`LoanRecord` sudah tidak ada sejak Gen8, digantikan oleh `SalaryAdvance` di atas.
 
 #### A.4.3 Enum Lengkap
 
@@ -3437,7 +2986,7 @@ Bagian ini merinci seluruh struct, enum, dan mapping yang menjadi state on-chain
 | `SeveranceState` | Locked, Returned, Released | CompanyVault |
 | `VestType` | Retention, Probation, ESOP | CompanyVault |
 | `VestStatus` | Locked, Claimed, Forfeited | CompanyVault |
-| `LoanStatus` | Active, Repaid, Defaulted | EmployeeLiquidityContract |
+| `AdvanceStatus` | None, Pending, Active | CompanyVault |
 
 ### A.5 Spesifikasi Pustaka PayrollMath
 
@@ -3490,10 +3039,10 @@ Tabel berikut memetakan event ke pemicu fungsi, konsumen indeksasi (Ponder), dan
 | `CliffVestCreated`/`CliffVestClaimed`/`CliffVestForfeited` | CompanyVault | alur vesting | Ponder `cliff_vest` |
 | `ComplianceWithdrawn` | CompanyVault | `withdrawCompliance` | Ponder, `/hr/compliance` |
 | `EmploymentCertified`/`EmploymentRevoked` | CompanyVault | mint/revoke SBT | Ponder `employment_certificate` |
-| `Deposited`/`Withdrawn`/`YieldAccrued` | EmployeeLiquidityContract | operasi lender | Ponder `lender_deposit` |
-| `LoanCreated`/`LoanRepaid`/`LoanDefaulted` | EmployeeLiquidityContract | borrow/repay/liquidate | Ponder `loan_record`, liquidation cron |
-| `PoolInitialized` | EmployeeLiquidityContract | `initializePool` | Ponder `liquidity_pool` |
-| `VaultRegistered`/`VaultUnregistered` | EmployeeLiquidityContract | register/unregister | Ponder |
+| `AdvanceRequested` | CompanyVault | `requestAdvance` | Ponder `salary_advance` |
+| `AdvanceApproved`/`AdvanceRejected` | CompanyVault | `approveAdvance`/`rejectAdvance` | Ponder `salary_advance` |
+| `AdvanceRepaid` | CompanyVault | `_autoRepayAdvance` (dipanggil dari `claimSalary`) | Ponder `salary_advance` |
+| `TaxWithheld` | CompanyVault | `claimSalary` (PPh21 + BPJS) | Ponder, `/hr/compliance` |
 | `Locked` | EmploymentSBT | `mint` | `/verify` (ERC-5192) |
 | `EncryptedSalarySet` | ConfidentialCompanyVault | `setEncryptedSalary` | webhook → WS `ENCRYPTED_SALARY_SET` |
 
@@ -3506,9 +3055,6 @@ Tabel berikut memetakan event ke pemicu fungsi, konsumen indeksasi (Ponder), dan
 | `HR_ROLE` | CompanyVault | Manajemen stream, vault, kepatuhan, vesting, proposal PHK. |
 | `LEGAL_ROLE` | CompanyVault | `approveTermination` (tanda tangan kedua PHK). |
 | `MINTER_ROLE` | EmploymentSBT | `mint`/`revoke` (dipegang `CompanyVault`). |
-| `DEFAULT_ADMIN_ROLE` | EmployeeLiquidityContract | `registerVault`, `unregisterVault`, `initializePool`, `claimProtocolFee`. |
-| `OPS_ROLE` | EmployeeLiquidityContract | `liquidateLoan`, `borrowFromPoolFor` (wallet backend). |
-| `PAYROLL_ROLE` | EmployeeLiquidityContract | `autoRepay` (dipegang tiap `CompanyVault` terdaftar). |
 | Owner SaaS | Backend/Frontend | `requireOwner` (registrasi); akses `/owner`. |
 
 ---
@@ -3528,8 +3074,8 @@ Bagian ini merinci variabel state React, komputasi turunan, aturan validasi, dan
 | Langkah | Aksi | Pemanggilan |
 |---------|------|-------------|
 | 1 Registrasi | Validasi `companyName && npwp && email` | — |
-| 2 Konfigurasi | Tampilkan alamat kontrak (`PAYROLL_FACTORY`, `EMPLOYMENT_SBT`, `EMPLOYEE_LIQUIDITY`) | — |
-| 2→3 Deploy | `handleDeploy` | `write(deployVault(address, companyName, EMPLOYEE_LIQUIDITY, EMPLOYMENT_SBT))` |
+| 2 Konfigurasi | Tampilkan alamat kontrak (`PAYROLL_FACTORY`, `EMPLOYMENT_SBT`) | — |
+| 2→3 Deploy | `handleDeploy` | `write(deployVault(address, companyName, EMPLOYMENT_SBT))` |
 | (polling) | 20× interval 3 detik | `ponder.getCompany(address)` hingga `company.id != 0x0` |
 | 3 Deposit | `handleDeposit` | `write(approve(deployedVault, amountWei))` → `write(fundVault(amountWei))` |
 | 4 Selesai | Tautan ke `/hr/vault` | — |
@@ -3551,22 +3097,20 @@ Bagian ini merinci variabel state React, komputasi turunan, aturan validasi, dan
 
 **handleClaim:** `write(claimSalary())` → set `successTxHash`, banner 5 detik → refresh `getAccrued` (2 dtk) dan `balanceOf` (3 dtk).
 
-#### A.8.3 /employee/koperasi (Simpan-Pinjam)
+#### A.8.3 /employee/kasbon (Uang Muka Gaji)
 
-**State React:** `activeTab` ("pinjam"/"simpan"), `borrowAmount` (default 1.000.000), `depositAmount` (default 2.000.000), `withdrawAmount`, `repayAmount`, `pool`, `myDeposit`, `myLoan`, `stream`, `loading`.
+**State React:** `advanceAmount` (default 1.000.000), `advance`, `stream`, `taxHistory`, `loading`.
 
-**Pemanggilan data:** `Promise.all([getPool(vaultAddress), getDeposit(address), getLoan(address), getStream(address)])`.
+**Pemanggilan data:** `Promise.all([getSalaryAdvance(address), getStream(address), getTaxWithheldHistory(address)])`.
 
 **Komputasi turunan:**
 
-- `maxBorrow = floor(monthlySalary * 0.8)` dengan `monthlySalary = (flowRate/1e18) * 2.592.000`; fallback 4.000.000.
-- `interestRatePct = (interestRateBps / 100).toFixed(2)` (default 1,50%).
-- `totalRepay = borrowAmount * (1 + interestRateBps/10000)`.
-- `loanOutstanding = max(0, principal + interest - repaidAmount)`.
-- `loanProgress = min(100, round(repaidAmount / (principal + interest) * 100))`.
+- `maxAdvance = floor(monthlySalary * 0.8)` dengan `monthlySalary = (flowRate/1e18) * 2.592.000`; fallback 4.000.000.
+- `advanceOutstanding = max(0, amount - repaid)`.
+- `advanceProgress = min(100, round(repaid / amount * 100))`.
 - `toWei(amount) = BigInt(round(amount * 1e18))`.
 
-**Aksi:** `depositToPool(vaultAddress, amount)`, `withdrawDeposit(amount)`, `borrowFromPool(vaultAddress, amount)`, `repayLoanManual(amount)` — diikuti `refreshData()`.
+**Aksi:** `requestAdvance(amount)` (gasless via Paymaster) — diikuti `refreshData()`.
 
 #### A.8.4 /hr/vault (Treasury)
 
@@ -4034,18 +3578,7 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
 
 ### B.6 Layanan Background
 
-**[Liquidation Cron (`liquidation.ts`)]**
-| | |
-|---|---|
-| Input | - |
-| Output | - |
-| Deskripsi | ; sesuai FR-PAYANA-704 |
-
-**Algoritma:**
-
-1. Hitung `cutoff = now - 7 hari`; kueri `loan_record` berstatus `Active` dengan `due_ts < cutoff`.
-2. Untuk setiap borrower, gunakan wallet `OPS_PRIVATE_KEY` (OPS_ROLE) memanggil `liquidateLoan(borrower)`.
-3. Tunggu receipt; catat `LOAN_LIQUIDATED` di `audit_logs`.
+> `liquidation.ts` (Liquidation Cron) dihapus sejak Gen8 bersamaan dengan `EmployeeLiquidityContract` — kasbon tidak memiliki mekanisme likuidasi paksa; sisa kasbon yang belum lunas dihapus sebagai bad debt saat `resignEmployee()`/`executeTermination()` (lihat FR-PAYANA-706).
 
 **[Paymaster Monitor (`paymasterMonitor.ts`)]**
 | | |
@@ -4217,7 +3750,7 @@ Catatan: untuk aksi HR/Owner/Legal (mis. `startStream`, `proposeTermination`, `f
 ### D.1 Keamanan Smart Contract
 
 1. **Pola CEI (Checks-Effects-Interactions):** `claimSalary()`, `withdrawDeposit()`, `executeTermination()`, dan `withdrawVault()` melakukan seluruh perubahan state sebelum transfer eksternal untuk mencegah reentrancy.
-2. **ReentrancyGuard:** modifier `nonReentrant` pada fungsi yang melakukan transfer IDRX (`claimSalary`, `withdrawVault`, `executeTermination`, `resignEmployee`, `withdrawCompliance`, `claimCliffVest`, serta fungsi koperasi `depositToPool`, `withdrawDeposit`, `borrowFromPool`, `repayLoanManual`, `autoRepay`).
+2. **ReentrancyGuard:** modifier `nonReentrant` pada fungsi yang melakukan transfer IDRX (`claimSalary`, `withdrawVault`, `executeTermination`, `resignEmployee`, `withdrawCompliance`, `claimCliffVest`, `approveAdvance`).
 3. **AccessControl Berbasis Peran:** `SUPERADMIN_ROLE` (Factory), `HR_ROLE` & `LEGAL_ROLE` (Vault), `MINTER_ROLE` (SBT), `OPS_ROLE` & `PAYROLL_ROLE` (Liquidity). Setiap fungsi sensitif dilindungi modifier peran.
 4. **Multi-Sig PHK:** PHK memerlukan dua tanda tangan berurutan (HR via `proposeTermination`, Legal via `approveTermination`) dengan kadaluarsa 7 hari, mencegah PHK sewenang-wenang.
 5. **SafeERC20:** seluruh transfer IDRX memakai `safeTransfer`/`safeTransferFrom`.
