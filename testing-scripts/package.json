@@ -1,0 +1,10 @@
+{
+  "name": "payana-pdhupl-testing-scripts",
+  "private": true,
+  "type": "module",
+  "description": "Standalone viem/fetch scripts to execute the PDHUPL v2 integration-test checklist against a real Base Sepolia deployment, without needing browser/Privy login.",
+  "dependencies": {
+    "viem": "^2.21.3",
+    "dotenv": "^16.4.5"
+  }
+}

@@ -48,7 +48,7 @@ Payana adalah platform perangkat lunak berbasis web yang menyediakan layanan pen
 
 DPPL ini mencakup rancangan dari komponen-komponen berikut:
 
-1. **Tiga smart contract inti** yang sudah di-deploy dan beroperasi: `PayrollFactory`, `CompanyVault`, `EmploymentSBT`; serta satu **ekstensi opsional aktif** `ConfidentialCompanyVault` (FHE).
+1. **Tiga smart contract inti** yang sudah di-deploy dan beroperasi: `PayrollFactory`, `CompanyVault`, `EmploymentSBT`.
 2. **Backend REST API** berbasis Express yang menangani autentikasi EIP-191, relay UserOperation ERC-4337, pelaporan kepatuhan, registrasi tenant, webhook Alchemy, dan layanan background (kasbon, pemantauan Paymaster, WebSocket).
 3. **Ponder Indexer** yang mengindeks event on-chain ke PostgreSQL skema `public`.
 4. **Frontend Next.js** yang menyajikan empat portal: Autentikasi/Onboarding, Portal HR, Portal Karyawan, dan Portal Owner SaaS.
@@ -64,7 +64,6 @@ Rancangan yang berada **di luar ruang lingkup** dokumen ini mengikuti batasan SK
 | flowRate | Laju akrual gaji dalam satuan IDRX wei per detik. |
 | EWA | Earned Wage Access — akses gaji yang sudah diperoleh sebelum tanggal gajian. |
 | SBT | Soulbound Token — token non-transferable (ERC-5192). |
-| FHE | Fully Homomorphic Encryption — komputasi atas data terenkripsi (Inco Lightning). |
 | CEI | Checks-Effects-Interactions — pola keamanan smart contract. |
 | BPS | Basis Points — 1 bps = 0,01%; 10.000 bps = 100%. |
 | PHK | Pemutusan Hubungan Kerja. |
@@ -105,9 +104,8 @@ Rancangan yang berada **di luar ruang lingkup** dokumen ini mengikuti batasan SK
 6. OpenZeppelin Contracts v5, AccessControl, ReentrancyGuard, SafeERC20, ERC721, OpenZeppelin, 2024.
 7. Undang-Undang Nomor 6 Tahun 2023 tentang Cipta Kerja (Pasal 156 Formula Pesangon), Pemerintah Republik Indonesia, 2023.
 8. Undang-Undang Nomor 27 Tahun 2022 tentang Pelindungan Data Pribadi, Pemerintah Republik Indonesia, 2022.
-9. Inco Lightning v1 Documentation, FHE Co-processor, Inco Network, 2024.
-10. Base Network Developer Documentation, Base L2 (Chain ID 84532 / 8453), Coinbase, 2024.
-11. Foundry Book, Toolkit Kompilasi dan Deployment Smart Contract, Paradigm, 2024.
+9. Base Network Developer Documentation, Base L2 (Chain ID 84532 / 8453), Coinbase, 2024.
+10. Foundry Book, Toolkit Kompilasi dan Deployment Smart Contract, Paradigm, 2024.
 
 ---
 
@@ -147,7 +145,7 @@ graph TD
 
     subgraph Chain["Lapisan Smart Contract (Base Sepolia 84532)"]
         FACTORY["PayrollFactory"]
-        VAULT["CompanyVault + ConfidentialCompanyVault\n(Tax Engine + Kasbon terintegrasi)"]
+        VAULT["CompanyVault\n(Tax Engine + Kasbon terintegrasi)"]
         SBT["EmploymentSBT"]
         IDRX["IDRX ERC-20"]
     end
@@ -156,7 +154,6 @@ graph TD
         PRIVY["Privy WaaS"]
         ALCHEMY["Alchemy RPC + Webhook"]
         PIMLICO["Pimlico Bundler + Paymaster"]
-        INCO["Inco Lightning FHE"]
         ADB[("Azure PostgreSQL skema app")]
     end
 
@@ -185,7 +182,6 @@ graph TD
     FACTORY -->|deploy| VAULT
     VAULT --> SBT
     VAULT --> IDRX
-    VAULT -.FHE.-> INCO
     PIMLICO --> Chain
 ```
 
@@ -380,23 +376,6 @@ classDiagram
         -_revokeSBT(address employee)
     }
 
-    %% ── ConfidentialCompanyVault ─────────────────────────────────────────────
-    class ConfidentialCompanyVault {
-        +mapping encryptedSalaries
-        +mapping hasEncryptedSalary
-        +mapping auditorExpiry
-        +address[] _encryptedEmployeeList
-        +mapping _inEncryptedList
-        +setEncryptedSalary(address employee, bytes ciphertext) payable
-        +getEncryptedSalary(address employee) euint256
-        +aggregateTotalPayroll() euint256
-        +grantViewingKey(address auditor, uint256 expiresAt)
-        +isAuditorActive(address auditor) bool
-        +revokeAuditorAccess(address auditor)
-        +encryptedEmployeeCount() uint256
-        +encryptedEmployeeAt(uint256 index) address
-    }
-
     %% ── EmploymentSBT ────────────────────────────────────────────────────────
     class EmploymentRecord {
         <<struct>>
@@ -424,7 +403,6 @@ classDiagram
     CompanyVault --|> ICompanyVault : implements
     CompanyVault --|> ReentrancyGuard : extends
     CompanyVault --|> AccessControl : extends
-    ConfidentialCompanyVault --|> CompanyVault : extends
     EmploymentSBT --|> ERC721 : extends
     EmploymentSBT --|> IERC5192 : implements
     EmploymentSBT --|> AccessControl : extends
@@ -552,11 +530,9 @@ classDiagram
     class CompanyVault {
         +bytes32 HR_ROLE
         +bytes32 LEGAL_ROLE
-        +uint16 DEFAULT_EMPLOYEE_BPS = 9300
-        +uint16 DEFAULT_COMPLIANCE_BPS = 500
-        +uint16 DEFAULT_SEVERANCE_BPS = 200
         +uint256 TERMINATION_EXPIRY = 7 days
-        +uint16 DEFAULT_POOL_RATE_BPS = 150
+        +uint256 MAX_ADVANCE_BPS = 8000
+        +uint256 ADVANCE_REPAY_BPS = 2000
         +IERC20 IDRX
         +address hrAuthority
         +VaultStatus status
@@ -568,13 +544,11 @@ classDiagram
         +mapping terminations
         +mapping cliffVests
     }
-    CompanyVault <|-- ConfidentialCompanyVault
-    CompanyVault ..> IEmployeeLiquidity : autoRepay
     CompanyVault ..> IEmploymentSBT : mint/revoke
     CompanyVault ..> IPayrollFactory : platformFeeBps
 ```
 
-**Konstanta:** `DEFAULT_EMPLOYEE_BPS=9300`, `DEFAULT_COMPLIANCE_BPS=500`, `DEFAULT_SEVERANCE_BPS=200`, `TERMINATION_EXPIRY=7 days`, `DEFAULT_POOL_RATE_BPS=150`.
+**Konstanta:** `TERMINATION_EXPIRY=7 days`, `MAX_ADVANCE_BPS=8000` (80%), `ADVANCE_REPAY_BPS=2000` (20%).
 
 **Custom Errors:** `VaultFrozen`, `InsufficientVaultBalance`, `StreamAlreadyActive`, `StreamNotActive`, `NotWhitelisted`, `NothingToClaim`, `SplitInvalid`, `TerminationAlreadyProposed`, `TerminationNotFound`, `ProposalExpired`, `AlreadyApproved`, `NotVestedYet`, `AlreadyClaimed`, `VestNotFound`, `SeveranceAlreadySettled`, `InsufficientComplianceBalance`, `CliffNotReached`, `VestAlreadySettled`, `Unauthorized`, `NoActiveProposal`.
 
@@ -996,81 +970,7 @@ Algoritma: Blokir transfer P2P (`SoulboundTransferNotAllowed`); hanya mint (from
 
 > **Catatan:** Subbab IDRXPriceOracle (sebelumnya 2.2.2.5, FR-PAYANA-1201–1203/SKPL Kelompok L) telah dihapus pada Revisi G — kontrak dihapus total dari kodebase karena IDRX dirancang 1:1 terhadap Rupiah, sehingga price oracle tidak punya kasus penggunaan nyata.
 
-##### 2.2.2.5 ConfidentialCompanyVault (Ekstensi FHE)
-
-Ekstensi opsional `CompanyVault` yang menyimpan gaji sebagai ciphertext `euint256` Inco Lightning. Lapisan streaming tetap plaintext; hanya nominal gaji yang dienkripsi.
-
-```mermaid
-classDiagram
-    class ConfidentialCompanyVault {
-        +mapping encryptedSalaries "euint256"
-        +mapping hasEncryptedSalary
-        +mapping auditorExpiry
-        +setEncryptedSalary(employee, encryptedSalary) payable
-        +getEncryptedSalary(employee) euint256
-        +aggregateTotalPayroll() euint256
-        +grantViewingKey(auditor, expiresAt)
-        +isAuditorActive(auditor) bool
-        +revokeAuditorAccess(auditor)
-    }
-```
-
-**[setEncryptedSalary(employee, ciphertext)]**
-| | |
-|---|---|
-| Input | employee: address, ciphertext: bytes |
-| Output | - |
-| Deskripsi | external payable; modifier `onlyHR`; sesuai FR-1102 |
-
-Algoritma: Bayar `inco.getFee()`; verifikasi input proof via `newEuint256(msg.sender)`; beri ACL ke contract/HR/karyawan; emit `EncryptedSalarySet` tanpa plaintext.
-
-**[getEncryptedSalary(employee)]**
-| | |
-|---|---|
-| Input | employee: address |
-| Output | euint256 (handle ciphertext) |
-| Deskripsi | external view; sesuai FR-1103 |
-
-Algoritma: Hanya karyawan sendiri atau HR; kembalikan handle ciphertext untuk dekripsi client-side.
-
-**[aggregateTotalPayroll()]**
-| | |
-|---|---|
-| Input | - |
-| Output | euint256 |
-| Deskripsi | external; sesuai FR-1104 |
-
-Algoritma: Penjumlahan homomorfik O(n) via `.add()`; ACL hasil ke HR.
-
-**[grantViewingKey(auditor, expiresAt)]**
-| | |
-|---|---|
-| Input | auditor: address, expiresAt: uint256 |
-| Output | - |
-| Deskripsi | external; modifier `onlyHR`; sesuai FR-1105 |
-
-Algoritma: Beri ACL Inco ke auditor dengan batas waktu Solidity-level (`auditorExpiry`).
-
-**[isAuditorActive(auditor)]**
-| | |
-|---|---|
-| Input | auditor: address |
-| Output | bool |
-| Deskripsi | external view; sesuai FR-1105 |
-
-Algoritma: `now < auditorExpiry[auditor]`.
-
-**[revokeAuditorAccess(auditor)]**
-| | |
-|---|---|
-| Input | auditor: address |
-| Output | - |
-| Deskripsi | external; modifier `onlyHR`; sesuai FR-1105 |
-
-Algoritma: Set `auditorExpiry[auditor]=0`.
-
----
-
+> **Catatan:** Subbab ConfidentialCompanyVault (sebelumnya 2.2.2.5, FR-PAYANA-1101–1105/SKPL Kelompok K) telah dihapus pada Revisi Gen9. `ConfidentialCompanyVault.sol` dihapus total dari kodebase — verifikasi langsung terhadap kontrak yang di-deploy (`0x4560968670Dd852dACd73c7B8748695eC427e203`) dan co-processor Inco Lightning live di Base Sepolia menunjukkan `setEncryptedSalary()` gagal (revert) secara konsisten, kemungkinan besar akibat ketidakcocokan versi antara SDK JS sisi klien (`@inco/lightning-js@1.0.1`) dan library Solidity sisi kontrak (`@inco/lightning@0.7.12`). Fitur ini sebelumnya sudah diposisikan sebagai demonstratif/proof-of-concept, single-tenant demo, bukan jaminan privasi produksi. Detail lengkap ada di catatan yang sama di `SKPL.md` Kelompok K.
 
 ### 2.3 Perancangan Data
 
@@ -1079,11 +979,11 @@ Algoritma: Set `auditorExpiry[auditor]=0`.
 
 Data dalam sistem Payana didistribusikan ke dalam tiga lapisan penyimpanan yang saling melengkapi:
 
-1. **On-Chain (Solidity storage di Base Sepolia).** Menyimpan seluruh state finansial dan logika bisnis inti: saldo vault, konfigurasi stream per karyawan (`employeeStreams`), vault pesangon (`severanceVaults`), proposal PHK (`terminations`), cliff vest (`cliffVests`), kasbon (`salaryAdvances`), serta gaji terenkripsi (`encryptedSalaries`). State on-chain bersifat immutable dan menjadi sumber kebenaran (source of truth) untuk semua nilai moneter.
+1. **On-Chain (Solidity storage di Base Sepolia).** Menyimpan seluruh state finansial dan logika bisnis inti: saldo vault, konfigurasi stream per karyawan (`employeeStreams`), vault pesangon (`severanceVaults`), proposal PHK (`terminations`), cliff vest (`cliffVests`), serta kasbon (`salaryAdvances`). State on-chain bersifat immutable dan menjadi sumber kebenaran (source of truth) untuk semua nilai moneter.
 
 2. **Off-Chain PostgreSQL (skema `app`, Azure Indonesia Central).** Menyimpan data yang tidak boleh atau tidak efisien disimpan on-chain: sesi JWT (`sessions`), profil PII karyawan terenkripsi AES-256-GCM (`employees`), audit log backend (`audit_logs`), deduplikasi event webhook (`webhook_events`), counter rate limit (`rate_limits`), catatan kasbon sisi backend (`salary_advances`), dan antrian registrasi tenant (`pending_registrations`). Penyimpanan PII off-chain merupakan pemenuhan UU PDP No. 27/2022.
 
-3. **Ponder Indexed PostgreSQL (skema `public`).** Menyimpan salinan terindeks dari event on-chain dalam bentuk tabel relasional yang dapat dikueri cepat: `company`, `employee_stream`, `salary_claim`, `severance_vault`, `termination_proposal`, `cliff_vest`, `compliance_vault`, `salary_advance`, `employment_certificate`, `platform_fee_payment`, `encrypted_salary`, `auditor_grant`, dan `low_balance_alert`. Lapisan ini menghindarkan frontend dan backend dari kebutuhan iterasi RPC langsung untuk pembacaan agregat.
+3. **Ponder Indexed PostgreSQL (skema `public`).** Menyimpan salinan terindeks dari event on-chain dalam bentuk tabel relasional yang dapat dikueri cepat: `company`, `employee_stream`, `salary_claim`, `severance_vault`, `termination_proposal`, `cliff_vest`, `compliance_vault`, `salary_advance`, `employment_certificate`, `platform_fee_payment`, dan `low_balance_alert`. Lapisan ini menghindarkan frontend dan backend dari kebutuhan iterasi RPC langsung untuk pembacaan agregat.
 
 ##### ERD On-Chain (Solidity Structs & Mappings)
 
@@ -1098,8 +998,6 @@ erDiagram
     COMPANY_VAULT ||--o{ CLIFF_VEST : "cliffVests[address][vestId]"
     COMPANY_VAULT ||--o{ EMPLOYMENT_SBT_RECORD : "mint/revoke"
     COMPANY_VAULT ||--o{ SALARY_ADVANCE : "salaryAdvances[address]"
-    CONFIDENTIAL_VAULT ||--o{ ENCRYPTED_SALARY : "encryptedSalaries[address]"
-    CONFIDENTIAL_VAULT ||--o{ AUDITOR_EXPIRY : "auditorExpiry[address]"
 
     PAYROLL_FACTORY {
         address IDRX
@@ -1155,10 +1053,6 @@ erDiagram
         uint256 repaid
         uint256 requestedAt
         AdvanceStatus status
-    }
-    ENCRYPTED_SALARY {
-        euint256 ciphertext
-        bool hasEncryptedSalary
     }
 ```
 
@@ -1297,7 +1191,6 @@ erDiagram
 | `salary_advance` | `employee` | `AdvanceRequested/Approved/Rejected/Repaid` | `/hr/kasbon`, `/employee/kasbon` |
 | `platform_fee_payment` | `id` | `PlatformFeePaid` | `/owner` |
 | `employment_certificate` | `id` | `EmploymentCertified/Revoked` | `/verify` |
-| `encrypted_salary` | `employee` | `EncryptedSalarySet` | portal FHE |
 | `low_balance_alert` | `id` | `LowVaultBalance` | `/hr/vault` |
 
 ---
@@ -1365,6 +1258,146 @@ Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh
 | `status` | `text` | NOT NULL | — | `pending` \| `approved` \| `rejected` | `'pending'` | Status persetujuan registrasi |
 | `requested_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu pengajuan registrasi |
 | `updated_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu status terakhir diperbarui |
+
+**Tabel `employee_invitations`** `[BARU — invitation-only registration, lihat SKPL UC-21]`
+
+> Menutup celah keamanan/integritas data di mana employee sebelumnya dapat memilih `hrAddress`
+> bebas dari dropdown tak terfilter di `/onboarding`. Sekarang `POST /registration/request` untuk
+> `type:"employee"` **wajib** menyertakan `inviteToken` yang valid, belum dipakai, belum
+> kedaluwarsa — `hrAddress` di-resolve server-side dari baris ini, tidak pernah diambil dari
+> input client.
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `token` | `text` | NOT NULL | PRIMARY KEY | Token acak sulit ditebak | — | Dibagikan via `/onboarding?invite=<token>` |
+| `hr_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | HR pembuat undangan (diisi dari caller, bukan input) |
+| `email` | `text` | NULL | — | Format email | `NULL` | Referensi opsional — email calon karyawan yang dituju HR |
+| `name` | `text` | NULL | — | — | `NULL` | Referensi opsional — nama calon karyawan yang dituju HR |
+| `status` | `text` | NOT NULL | — | `pending` \| `used` \| `revoked` | `'pending'` | Status token |
+| `used_by_address` | `text` | NULL | — | Hex 0x + 40 char | `NULL` | Terisi begitu ada employee yang registrasi dengan token ini |
+| `expires_at` | `timestamptz` | NOT NULL | — | — | — | Token kedaluwarsa 7 hari setelah dibuat |
+| `created_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu token dibuat |
+| `used_at` | `timestamptz` | NULL | — | — | `NULL` | Waktu token dipakai |
+
+**Endpoint terkait (`backend/src/routes/invitations.ts`):**
+
+| Method & Path | Auth | Deskripsi |
+|---|---|---|
+| `POST /invitations` | HR (JWT) | Membuat token baru; `hrAddress` diisi dari caller, `expiresAt = now + 7 hari`. |
+| `GET /invitations/:token` | Publik | Dipakai `/onboarding?invite=<token>` untuk resolve `hrAddress`/`companyName` sebelum menampilkan form; menolak jika tidak ditemukan/kedaluwarsa/sudah dipakai/dicabut. |
+| `GET /invitations/hr/:hrAddress` | HR (JWT, harus sesuai) | Riwayat undangan yang pernah dibuat HR tersebut. |
+| `PATCH /invitations/:token/revoke` | HR (JWT, harus pemilik) | Mencabut token yang belum dipakai (`status pending → revoked`); token yang sudah `revoked`/`used` tidak bisa dipakai lagi. |
+
+---
+
+**Tabel `reimbursement_claims`** `[BARU — lihat SKPL UC-22, FR-PAYANA-1301/1302]`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `bigint` | NOT NULL | PRIMARY KEY, identity | — | auto-increment | ID klaim |
+| `employee_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Karyawan pengaju |
+| `hr_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | HR yang meninjau |
+| `category` | `text` | NOT NULL | — | — | — | Kategori biaya (mis. "Transport") |
+| `amount` | `text` | NOT NULL | — | IDRX wei (string) | — | Disimpan string untuk hindari presisi bigint |
+| `date` | `text` | NOT NULL | — | `YYYY-MM-DD` | — | Tanggal biaya terjadi |
+| `description` | `text` | NOT NULL | — | — | — | Keterangan klaim |
+| `receipt_url` | `text` | NULL | — | URL | `NULL` | Bukti pendukung (opsional) |
+| `status` | `text` | NOT NULL | — | `pending` \| `approved` \| `rejected` | `'pending'` | Status peninjauan |
+| `tx_hash` | `text` | NULL | — | Hex 0x + 64 char | `NULL` | Terisi begitu `approved` — transfer IDRX terverifikasi |
+| `requested_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu pengajuan |
+| `reviewed_at` | `timestamptz` | NULL | — | — | `NULL` | Waktu ditinjau HR |
+
+**Tabel `bounties`** `[BARU — lihat SKPL UC-23, FR-PAYANA-1401]`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `bigint` | NOT NULL | PRIMARY KEY, identity | — | auto-increment | ID bounty |
+| `hr_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | HR pembuat |
+| `title` | `text` | NOT NULL | — | — | — | Judul bounty |
+| `description` | `text` | NOT NULL | — | — | — | Deskripsi tugas |
+| `reward_idrx` | `text` | NOT NULL | — | IDRX wei (string) | — | Hadiah per klaim |
+| `quota` | `integer` | NOT NULL | — | ≥ 1 | — | Jumlah klaim maksimum yang dapat disetujui |
+| `claimed_count` | `integer` | NOT NULL | — | ≥ 0 | `0` | Jumlah klaim yang sudah disetujui/dibayar |
+| `status` | `text` | NOT NULL | — | `open` \| `closed` | `'open'` | Otomatis `closed` saat `claimed_count == quota` |
+| `created_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu dibuat |
+
+**Tabel `bounty_claims`** `[BARU — lihat SKPL UC-23, FR-PAYANA-1401/1402]`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `bigint` | NOT NULL | PRIMARY KEY, identity | — | auto-increment | ID klaim |
+| `bounty_id` | `bigint` | NOT NULL | FK → `bounties.id` | — | — | Bounty yang diklaim |
+| `employee_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Karyawan pengklaim |
+| `proof_url` | `text` | NOT NULL | — | URL | — | Bukti penyelesaian tugas |
+| `status` | `text` | NOT NULL | — | `pending` \| `approved` \| `rejected` \| `paid` | `'pending'` | Status klaim |
+| `paid_tx_hash` | `text` | NULL | — | Hex 0x + 64 char | `NULL` | Terisi begitu `paid` — transfer IDRX terverifikasi |
+| `submitted_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu klaim diajukan |
+
+**Tabel `tips`** `[BARU — lihat SKPL UC-23, FR-PAYANA-1403]`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `bigint` | NOT NULL | PRIMARY KEY, identity | — | auto-increment | ID tip |
+| `from_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Pengirim |
+| `to_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Penerima |
+| `amount` | `text` | NOT NULL | — | IDRX wei (string) | — | Jumlah tip |
+| `message` | `text` | NULL | — | — | `NULL` | Pesan opsional |
+| `tx_hash` | `text` | NOT NULL | — | Hex 0x + 64 char | — | Transfer sudah terjadi on-chain sebelum dicatat (bukan diverifikasi backend seperti reimburse/bounty) |
+| `created_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu dicatat |
+
+**Tabel `notifications`** `[BARU — lihat SKPL UC-24, FR-PAYANA-1501]`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `bigint` | NOT NULL | PRIMARY KEY, identity | — | auto-increment | ID notifikasi |
+| `recipient_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Penerima |
+| `type` | `text` | NOT NULL | — | mis. `KASBON_APPROVED`, `REIMBURSE_PAID`, `REIMBURSE_REJECTED` | — | Jenis peristiwa |
+| `title` | `text` | NOT NULL | — | — | — | Judul notifikasi |
+| `body` | `text` | NOT NULL | — | — | — | Isi notifikasi |
+| `read` | `boolean` | NOT NULL | — | — | `false` | Status telah dibaca |
+| `meta` | `text` | NULL | — | JSON string | `NULL` | Konteks tambahan (mis. `txHash`, `amount`) |
+| `created_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu diterbitkan |
+
+**Tabel `employee_profiles`** `[BARU — lihat SKPL UC-28, FR-PAYANA-1901]`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `address` | `text` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Karyawan (lowercase) |
+| `hr_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Perusahaan karyawan tsb |
+| `department` | `text` | NULL | — | mis. "Engineering" | `NULL` | Departemen |
+| `position` | `text` | NULL | — | mis. "Software Engineer" | `NULL` | Jabatan |
+| `updated_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu terakhir diperbarui |
+
+**Tabel `employment_letters`** `[BARU — lihat SKPL UC-27, FR-PAYANA-1801]`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `bigint` | NOT NULL | PRIMARY KEY, identity | — | auto-increment | ID permohonan |
+| `employee_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Pemohon |
+| `hr_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | HR yang meninjau |
+| `purpose` | `text` | NOT NULL | — | `KPR` \| `Kredit` \| `Visa` \| `Umum` \| `Lainnya` | — | Tujuan penggunaan surat |
+| `status` | `text` | NOT NULL | — | `pending` \| `approved` \| `rejected` | `'pending'` | Status peninjauan |
+| `notes` | `text` | NULL | — | — | `NULL` | Catatan HR / alasan penolakan |
+| `requested_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu pengajuan |
+| `reviewed_at` | `timestamptz` | NULL | — | — | `NULL` | Waktu ditinjau |
+
+**Tabel `company_settings`** `[BARU — lihat SKPL UC-29, FR-PAYANA-2001]`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `hr_address` | `text` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | HR pemilik pengaturan |
+| `name` | `text` | NULL | — | — | `NULL` | Nama tampilan perusahaan |
+| `country` | `text` | NULL | — | — | `NULL` | Negara |
+| `logo_url` | `text` | NULL | — | URL | `NULL` | Logo perusahaan |
+| `ewa_limit_bps` | `integer` | NULL | — | 0–10000 | `NULL` | Batas EWA (basis poin, kosmetik/preferensi) |
+| `yield_rate_bps` | `integer` | NULL | — | 0–10000 | `NULL` | Tarif yield (kosmetik/preferensi) |
+| `legal_address` | `text` | NULL | — | Hex 0x + 40 char | `NULL` | Cermin tampilan dari `LEGAL_ROLE` on-chain — bukan sumber otoritatif |
+| `updated_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu terakhir diperbarui |
+
+> **Catatan:** Slip Gaji (Payslip, UC-25/FR-1601) dan Bukti Potong Pajak (Tax Cert, UC-26/FR-1701)
+> TIDAK memiliki tabel tersendiri — keduanya murni membaca dan mengagregasi tabel `salary_claim`
+> yang sudah diindeks Ponder (lihat subbab berikut), dikombinasikan dengan `employees` untuk
+> nama/NIK terdekripsi.
 
 ---
 
@@ -1488,26 +1521,6 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `employee` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat karyawan yang memicu klaim |
 | `amount` | `bigint` | NOT NULL | — | ≥ 0 | — | Jumlah platform fee IDRX wei |
 | `timestamp` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pembayaran |
-
-**Tabel `encrypted_salary`**
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `hex` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Alamat karyawan pemilik gaji terenkripsi |
-| `hr_authority` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat HR yang menetapkan gaji FHE |
-| `set_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pertama kali gaji dienkripsi |
-| `updated_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pembaruan ciphertext terakhir |
-
-**Tabel `auditor_grant`**
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `text` | NOT NULL | PRIMARY KEY | `${hrAuthority}-${auditor}` | — | ID unik grant per pasang HR–auditor |
-| `hr_authority` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat HR pemberi akses audit |
-| `auditor` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat auditor penerima akses FHE |
-| `expires_at` | `bigint` | NOT NULL | — | > granted_at | — | Unix timestamp kadaluarsa akses |
-| `granted_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pemberian akses |
-| `active` | `boolean` | NOT NULL | — | `true` \| `false` | — | Status aktif grant |
 
 **Tabel `low_balance_alert`**
 
@@ -1694,22 +1707,6 @@ erDiagram
         bigint timestamp
     }
 
-    encrypted_salary {
-        hex id PK
-        hex hr_authority FK
-        bigint set_at
-        bigint updated_at
-    }
-
-    auditor_grant {
-        text id PK
-        hex hr_authority FK
-        hex auditor
-        bigint expires_at
-        bigint granted_at
-        boolean active
-    }
-
     low_balance_alert {
         text id PK
         hex hrAuthority FK
@@ -1783,8 +1780,6 @@ erDiagram
     company ||--o{ salary_advance : "grants"
     company ||--o{ employment_certificate : "issues"
     company ||--o{ platform_fee_payment : "incurs"
-    company ||--o{ encrypted_salary : "stores"
-    company ||--o{ auditor_grant : "delegates"
     company ||--o{ low_balance_alert : "triggers"
 
     employee_stream ||--o{ salary_claim : "generates"
@@ -1908,46 +1903,60 @@ sequenceDiagram
 4. Kirim `{address, message, signature, timestamp}` ke `POST /auth/login`; simpan `token` (akses) dan `refreshToken`.
 5. Jalankan `useRole()` untuk menentukan peran dan mengarahkan ke `/owner`, `/hr/*`, `/hr/phk` (Legal), atau `/employee/*`.
 
-##### 2.4.1.3 Halaman Onboarding HR (`/onboarding`)
+##### 2.4.1.3 Halaman Onboarding Karyawan (`/onboarding`) — invitation-only
 
-**Deskripsi:** Formulir pengajuan permohonan akses platform bagi calon HR Admin, lengkap dengan pemantauan status persetujuan.
-**Aktor:** Calon HR Admin.
+> **[Diperbaiki]** Subbab ini sebelumnya mendeskripsikan `/onboarding` sebagai formulir
+> registrasi HR/company (arsitektur lama, sebelum invitation-only). Sejak perubahan arsitektur
+> registrasi karyawan (lihat SKPL UC-21, PDHUPL AU-02-02/06..09), `/onboarding` adalah halaman
+> **karyawan**, bukan HR — registrasi company sekarang ada di `/hr/onboarding` (lihat 2.4.2.1).
+
+**Deskripsi:** Halaman registrasi karyawan yang **wajib** diakses melalui link undangan berisi `inviteToken` (`?invite=<token>`) yang dibuat oleh HR — tidak ada lagi jalur "pilih perusahaan bebas" dari dropdown tak terfilter. `hrAddress` di-resolve server-side dari token, tidak pernah diambil langsung dari input karyawan.
+**Aktor:** Calon Karyawan.
 **FR Terkait:** FR-PAYANA-107.
 
 **Alur Interaksi:**
 
 ```mermaid
 sequenceDiagram
-    actor HR as Calon HR
+    actor EMP as Calon Karyawan
     participant FE as Frontend /onboarding
-    participant BE as Backend /registration
-    participant DB as PostgreSQL (pending_registrations)
-    HR->>FE: Isi alamat, email, nama
-    FE->>BE: POST /registration/request {address, email, name}
-    BE->>DB: upsert by address (status=pending)
-    BE-->>FE: {ok: true}
-    HR->>FE: Buka kembali halaman
-    FE->>BE: GET /registration/status/:address
-    BE->>DB: SELECT status
-    BE-->>FE: {status, requestedAt}
-    FE-->>HR: Tampilkan badge pending/approved/rejected
+    participant BE as Backend /invitations, /registration
+    participant DB as PostgreSQL (employee_invitations, pending_registrations)
+    EMP->>FE: Buka /onboarding?invite=<token>
+    FE->>BE: GET /invitations/:token
+    BE->>DB: SELECT token WHERE status=pending AND belum kedaluwarsa
+    alt token tidak valid/kedaluwarsa/sudah dipakai
+        BE-->>FE: 404/409
+        FE-->>EMP: Tampilkan layar "undangan tidak valid" (bukan form)
+    else token valid
+        BE-->>FE: {hrAddress, companyName}
+        FE-->>EMP: Tampilkan nama perusahaan pengundang, form isi nama/NIK/telepon
+        EMP->>FE: Isi profil, klik "Daftar"
+        FE->>BE: POST /registration/request {address, type:"employee", inviteToken}
+        BE->>BE: Resolve hrAddress dari token (BUKAN dari input client)
+        BE->>DB: insert pending_registrations (status=pending)
+        BE->>DB: update employee_invitations SET status=used
+        BE-->>FE: {ok: true}
+        FE-->>EMP: Tampilkan status "menunggu persetujuan HR"
+    end
 ```
 
 **Deskripsi Antarmuka:**
 
 | Komponen | Tipe | Deskripsi |
 |----------|------|-----------|
-| Input alamat dompet | Field teks | Alamat EVM calon HR. |
-| Input email | Field email | Email PIC HR. |
-| Input nama | Field teks | Nama PIC/perusahaan. |
-| Tombol "Ajukan" | Tombol | Memanggil `registration.submit`. |
-| Badge status | Komponen status | Menampilkan `pending`/`approved`/`rejected`/`none`. |
+| Layar "undangan tidak valid" | Panel blokir | Ditampilkan jika `?invite=` tidak ada, tidak ditemukan, sudah dipakai, atau kedaluwarsa — tidak ada fallback ke form pilih-perusahaan. |
+| Nama perusahaan pengundang | Teks read-only | Diambil dari `hrAddress` hasil resolve token, ditampilkan agar karyawan yakin mendaftar ke perusahaan yang benar. |
+| Input nama / NIK / telepon | Field teks | Profil dasar karyawan (NIK harus 16 digit, divalidasi di `POST /auth/profile` setelah akun disetujui). |
+| Tombol "Daftar" | Tombol | Memanggil `POST /registration/request` dengan `inviteToken` disertakan otomatis dari query param. |
+| Badge status | Komponen status | Menampilkan `pending`/`approved`/`rejected`. |
 
 **Method/Algoritma Utama:**
 
-1. Validasi field tidak kosong; submit ke `POST /registration/request` (upsert by address).
-2. Polling/`GET /registration/status/:address` untuk menampilkan status terkini.
-3. Jika status `approved`, arahkan pengguna untuk login dan melanjutkan deployment vault (dilakukan oleh Owner pada `/owner`).
+1. Baca `inviteToken` dari query param `?invite=`; jika tidak ada, tampilkan layar blokir langsung (tidak render form).
+2. `GET /invitations/:token` — validasi token ada, `status=pending`, belum melewati `expiresAt` (7 hari). Jika gagal, tampilkan layar blokir dengan alasan spesifik.
+3. Jika valid, submit `POST /registration/request {address, type:"employee", inviteToken}` — backend me-resolve `hrAddress` dari token, lalu menandai token `used` (sekali pakai, tidak bisa dipakai ulang oleh pendaftar lain).
+4. Polling/`GET /registration/status/:address` untuk menampilkan status terkini setelah submit.
 
 ##### 2.4.1.4 Halaman Verifikasi SBT (`/verify`)
 
@@ -1966,11 +1975,23 @@ sequenceDiagram
     FE->>SC: employeeTokenId(address)
     SC-->>FE: tokenId
     FE->>SC: employmentRecords(tokenId)
-    SC-->>FE: {hrAuthority, companyName, startTs}
+    SC-->>FE: [hrAuthority, companyName, startTs] (3 output ARRAY, bukan 1 tuple object)
     FE->>SC: locked(tokenId)
     SC-->>FE: true (ERC-5192)
     FE-->>V: Tampilkan detail sertifikat + status terkunci
 ```
+
+> **[Diperbaiki — ditemukan lewat klik UI sungguhan, lihat PDHUPL AU-14-01]** ABI
+> `employmentRecords` sebelumnya dideklarasikan di frontend sebagai satu output tuple/objek
+> `{hrAuthority, companyName, startTs}`. Getter Solidity otomatis untuk
+> `mapping(uint256 => Struct) public` yang struct-nya punya field `string` (di sini
+> `companyName`) sebenarnya mem-flatten menjadi **3 output terpisah** (dikonfirmasi langsung via
+> `cast call employmentRecords(uint256)(address,string,uint256)` terhadap kontrak live), bukan
+> satu tuple — viem mengembalikan hasil multi-output sebagai **array**, bukan objek. ABI di
+> `frontend/src/app/verify/page.tsx` sudah diperbaiki menjadi 3 output bernama, dan destructuring
+> diubah dari `const {hrAuthority, companyName, startTs} = record` menjadi
+> `const [hrAuthority, companyName, startTs] = record`. Sebelum fix ini, klik "Verifikasi" di
+> `/verify` gagal dengan `IntegerOutOfRangeError`.
 
 **Deskripsi Antarmuka:**
 
@@ -1983,7 +2004,7 @@ sequenceDiagram
 **Method/Algoritma Utama:**
 
 1. Baca `employeeTokenId(address)`; jika 0, tampilkan "sertifikat tidak ditemukan".
-2. Baca `employmentRecords(tokenId)` untuk metadata perusahaan dan tanggal mulai.
+2. Baca `employmentRecords(tokenId)` — hasil berupa **array 3 elemen** `[hrAuthority, companyName, startTs]` (destructuring array, bukan objek) untuk metadata perusahaan dan tanggal mulai.
 3. Baca `locked(tokenId)` (selalu `true`) untuk mengonfirmasi sifat soulbound.
 
 #### 2.4.2 Portal HR (`/hr/*`)
@@ -1992,9 +2013,17 @@ Seluruh halaman portal HR dibungkus oleh layout `hr/layout.tsx` yang menyediakan
 
 ##### 2.4.2.1 Dashboard HR Onboarding (`/hr/onboarding`)
 
-**Deskripsi:** Wizard tiga langkah untuk men-deploy `CompanyVault`, mengonfigurasi parameter potongan (BPS), dan melakukan deposit awal IDRX.
+> **[Diperbaiki]** Diagram dan tabel di bawah sebelumnya menyertakan parameter `liquidity` pada
+> `deployVault(...)` — parameter ini sudah tidak ada sejak Gen8 (`EmployeeLiquidityContract`
+> dihapus, lihat SKPL A.1). Signature saat ini: `deployVault(hrAuthority, companyName,
+> sbtContract)`, 3 parameter. Langkah 1 (registrasi company) juga sebelumnya hanya menyebut
+> nama/NPWP/email — field NIB, nama & NIK direktur, dan dokumen akta pendirian (semuanya
+> divalidasi format server-side) belum tercantum. Lihat SKPL UC-21 untuk spesifikasi penuh alur
+> registrasi company yang mendahului wizard ini.
+
+**Deskripsi:** Wizard yang mencakup registrasi profil company (ditinjau Owner SaaS, lihat UC-21) diikuti deploy `CompanyVault`, konfigurasi parameter potongan (BPS), dan deposit awal IDRX.
 **Aktor:** HR Admin.
-**FR Terkait:** FR-PAYANA-201, FR-PAYANA-202, FR-PAYANA-901.
+**FR Terkait:** FR-PAYANA-107, FR-PAYANA-108, FR-PAYANA-109, FR-PAYANA-201, FR-PAYANA-202, FR-PAYANA-901.
 
 **Alur Interaksi:**
 
@@ -2002,14 +2031,21 @@ Seluruh halaman portal HR dibungkus oleh layout `hr/layout.tsx` yang menyediakan
 sequenceDiagram
     actor HR
     participant FE as Frontend /hr/onboarding
+    participant BE as Backend /registration
+    participant OWNER as Owner SaaS
     participant F as PayrollFactory
     participant PO as Ponder
     participant IDRX as IDRX ERC-20
     participant V as CompanyVault
-    HR->>FE: Langkah 1 isi nama, NPWP, email
+    HR->>FE: Langkah 1 isi nama, NPWP, NIB, directorName, directorNik, deedUrl, email
+    FE->>BE: POST /registration/request {type:"company", ...}
+    BE->>BE: Validasi format NPWP(15/16)/NIB(13)/directorNik(16)
+    BE-->>FE: {ok:true, status:pending}
+    OWNER->>BE: PATCH /registration/:address/approve
+    Note over HR,FE: HR login ulang setelah approved, lanjut ke Langkah 2
     HR->>FE: Langkah 2 isi BPS BPJS/pesangon
     HR->>FE: Klik "Deploy Vault"
-    FE->>F: deployVault(hr, name, liquidity, sbt)
+    FE->>F: deployVault(hr, name, sbt)
     F-->>FE: tx terkirim
     loop polling hingga terindeks
         FE->>PO: getCompany(hr)
@@ -2027,9 +2063,9 @@ sequenceDiagram
 | Komponen | Tipe | Deskripsi |
 |----------|------|-----------|
 | Stepper | Indikator langkah | Empat tahap: Registrasi, Konfigurasi, Deposit, Selesai. |
-| Input Nama Perusahaan / NPWP / Email | Field teks | Metadata perusahaan; nama digunakan untuk metadata SBT. |
+| Input Nama Perusahaan / NPWP / NIB / Nama & NIK Direktur / Dokumen Akta / Email | Field teks | Metadata perusahaan untuk peninjauan Owner (UC-21); NPWP/NIB/NIK Direktur divalidasi format server-side, opsional saat submit tapi harus valid jika diisi. Nama digunakan untuk metadata SBT. |
 | Input BPS BPJS / Pesangon | Field angka | Konfigurasi potongan (informatif untuk `setCompanyConfig`). |
-| Tombol "Deploy Vault" | Tombol tulis | Memanggil `PayrollFactory.deployVault`. |
+| Tombol "Deploy Vault" | Tombol tulis | Memanggil `PayrollFactory.deployVault(hrAuthority, companyName, sbtContract)` — hanya aktif setelah registrasi company disetujui Owner. |
 | Kartu alamat vault | Panel hasil | Menampilkan alamat vault terindeks + tombol salin. |
 | Input Deposit (IDRX) | Field angka | Nominal deposit awal. |
 | Tombol "Approve & Deposit" | Tombol tulis | Memanggil `approve` lalu `fundVault`. |
@@ -2381,11 +2417,15 @@ sequenceDiagram
 
 ##### 2.4.2.11 Pengaturan HR (`/hr/settings`)
 
-**Deskripsi:** Konfigurasi parameter vault: BPS BPJS, BPS PPh21, dan threshold peringatan saldo rendah.
-**Aktor:** HR Admin.
-**FR Terkait:** FR-PAYANA-204, FR-PAYANA-802.
+> **[Diperbaiki]** Subbab ini sebelumnya hanya mendokumentasikan tab konfigurasi ON-CHAIN
+> (`setCompanyConfig`). Halaman ini sebenarnya juga memiliki tab "Profil" dan "Aturan" yang
+> murni OFF-CHAIN (`GET`/`PUT /company-settings`, lihat B.16/SKPL UC-29) — ditambahkan di bawah.
 
-**Alur Interaksi:**
+**Deskripsi:** Konfigurasi parameter vault ON-CHAIN (BPS BPJS, BPS PPh21, threshold peringatan saldo rendah) sekaligus preferensi branding OFF-CHAIN (nama tampilan, negara, logo, batas EWA, tarif yield) dalam satu halaman.
+**Aktor:** HR Admin.
+**FR Terkait:** FR-PAYANA-204, FR-PAYANA-802, FR-PAYANA-2001.
+
+**Alur Interaksi (bagian on-chain):**
 
 ```mermaid
 sequenceDiagram
@@ -2398,19 +2438,105 @@ sequenceDiagram
     FE-->>HR: Konfirmasi
 ```
 
+**Alur Interaksi (bagian off-chain — Profil & Aturan):**
+
+```mermaid
+sequenceDiagram
+    actor HR
+    participant FE as Frontend /hr/settings
+    participant BE as Backend /company-settings
+    FE->>BE: GET /company-settings
+    BE-->>FE: {name, country, logoUrl, ewaLimitBps, yieldRateBps, legalAddress} atau null
+    HR->>FE: Ubah nama/negara/logo (tab Profil) atau batas EWA/yield (tab Aturan)
+    FE->>BE: PUT /company-settings {...}
+    BE->>BE: Upsert by hrAddress
+    BE-->>FE: Tersimpan
+```
+
 **Deskripsi Antarmuka:**
 
 | Komponen | Tipe | Deskripsi |
 |----------|------|-----------|
-| Input BPJS Bps | Field angka | Tarif BPJS (informatif). |
-| Input PPh21 Bps | Field angka | Tarif PPh21 (informatif). |
-| Input Threshold Bps | Field angka | Ambang peringatan saldo rendah. |
-| Tombol Simpan | Tombol tulis | `setCompanyConfig(...)`. |
+| Input BPJS Bps | Field angka | Tarif BPJS on-chain (informatif). |
+| Input PPh21 Bps | Field angka | Tarif PPh21 on-chain (informatif). |
+| Input Threshold Bps | Field angka | Ambang peringatan saldo rendah on-chain. |
+| Tombol Simpan (on-chain) | Tombol tulis | `setCompanyConfig(...)`. |
+| Tab "Profil" — Nama/Negara/Logo | Field teks | Off-chain, `company_settings.name/country/logoUrl`. |
+| Tab "Aturan" — Batas EWA/Tarif Yield | Field angka (%) | Off-chain, `company_settings.ewaLimitBps/yieldRateBps` — dikonversi persen↔bps (×100). |
+| Tombol Simpan (off-chain) | Tombol tulis | `PUT /company-settings`. |
 
 **Method/Algoritma Utama:**
 
-1. Baca konfigurasi saat ini dari kontrak untuk prapengisian form.
+1. Baca konfigurasi saat ini dari kontrak untuk prapengisian form on-chain.
 2. Panggil `setCompanyConfig(bpjsBps, pph21Bps, lowBalanceThresholdBps)` via `useContractWrite`.
+3. `useCompanySettings()` memanggil `GET /company-settings` untuk prapengisian tab Profil/Aturan; `null` berarti belum pernah disimpan (field kosong).
+4. Simpan tab Profil atau Aturan secara independen via `PUT /company-settings` (upsert parsial — hanya field yang diubah dikirim).
+
+##### 2.4.2.12 Direktori Karyawan (`/hr/directory`) `[BARU]`
+
+**Deskripsi:** Daftar seluruh karyawan perusahaan beserta departemen dan jabatan, dengan kemampuan meng-assign/memperbarui keduanya per karyawan.
+**Aktor:** HR Admin.
+**FR Terkait:** FR-PAYANA-1901.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor HR
+    participant FE as Frontend /hr/directory
+    participant BE as Backend /directory
+    HR->>FE: Buka /hr/directory
+    FE->>BE: GET /directory/:hrAddress
+    BE-->>FE: Daftar karyawan (nama, departemen, jabatan, status, flowRate)
+    HR->>FE: Pilih karyawan, isi department/position
+    FE->>BE: PATCH /directory/:address {department, position}
+    BE-->>FE: Tersimpan
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Tabel direktori | Tabel data | Nama, departemen, jabatan, status stream, flow rate per karyawan. |
+| Input Departemen / Jabatan | Field teks (inline edit) | Ditugaskan per baris karyawan. |
+
+**Method/Algoritma Utama:**
+
+1. `GET /directory/:hrAddress` memuat daftar karyawan (join data stream Ponder dengan `employee_profiles`).
+2. `PATCH /directory/:address` menyimpan department/position; hasilnya langsung tercermin di baris tabel tanpa reload penuh.
+
+##### 2.4.2.13 Surat Keterangan Kerja — HR (`/hr/employment-letters`) `[BARU]`
+
+**Deskripsi:** Antrian permohonan surat keterangan kerja dari karyawan, dengan aksi setujui/tolak.
+**Aktor:** HR Admin.
+**FR Terkait:** FR-PAYANA-1801.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor HR
+    participant FE as Frontend /hr/employment-letters
+    participant BE as Backend /employment-letter
+    HR->>FE: Buka /hr/employment-letters
+    FE->>BE: GET daftar permohonan pending
+    BE-->>FE: Daftar {employeeAddress, purpose, requestedAt}
+    HR->>FE: Klik Setujui/Tolak
+    FE->>BE: PATCH /employment-letter/:id/approve|reject
+    BE-->>FE: Status ter-update
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Daftar permohonan | Tabel data | Karyawan pemohon, tujuan (purpose), tanggal pengajuan, status. |
+| Tombol Setujui/Tolak | Grup tombol | Memutuskan permohonan. |
+
+**Method/Algoritma Utama:**
+
+1. Muat daftar `employment_letters` milik `hrAddress` caller.
+2. `PATCH /employment-letter/:id/approve|reject` mengubah status; karyawan dapat mengunduh dokumen setelah `approved`.
 
 #### 2.4.3 Portal Karyawan (`/employee/*`)
 
@@ -2732,6 +2858,141 @@ sequenceDiagram
 1. Ambil profil terkini via `backend.getProfile(token)`; prapengisian form.
 2. Validasi NIK 16 digit; submit `POST /auth/profile` (server mengenkripsi AES-256-GCM).
 
+##### 2.4.3.10 Notifikasi (`/employee/notifications`) `[BARU]`
+
+**Deskripsi:** Daftar notifikasi peristiwa signifikan milik karyawan (maks 50 terbaru), dengan aksi tandai telah dibaca.
+**Aktor:** Karyawan (endpoint juga dapat dipanggil HR, namun hanya karyawan yang punya halaman khusus di frontend saat ini).
+**FR Terkait:** FR-PAYANA-1501.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor EMP as Karyawan
+    participant FE as Frontend /employee/notifications
+    participant BE as Backend /notifications
+    EMP->>FE: Buka halaman
+    FE->>BE: GET /notifications
+    BE-->>FE: Maks 50 notifikasi, urut terbaru
+    EMP->>FE: Klik notifikasi / "Tandai semua dibaca"
+    FE->>BE: PATCH /notifications/:id/read atau /read-all
+    BE-->>FE: read = true
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Daftar notifikasi | List item | Judul, isi, waktu, indikator belum dibaca. |
+| Tombol "Tandai semua dibaca" | Tombol | `PATCH /notifications/read-all`. |
+
+**Method/Algoritma Utama:**
+
+1. `GET /notifications` memuat maksimum 50 notifikasi terbaru milik caller.
+2. Klik satu notifikasi memanggil `PATCH /notifications/:id/read`; tombol massal memanggil `/read-all`.
+
+##### 2.4.3.11 Slip Gaji (`/employee/payslip`) `[BARU]`
+
+**Deskripsi:** Rincian breakdown satu transaksi klaim gaji, ditampilkan sebagai slip gaji digital yang dapat dicetak/disimpan.
+**Aktor:** Karyawan (HR terkait juga dapat mengakses via `claimId`).
+**FR Terkait:** FR-PAYANA-1601.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor EMP as Karyawan
+    participant FE as Frontend /employee/payslip
+    participant BE as Backend /payslip
+    EMP->>FE: Pilih klaim dari riwayat
+    FE->>BE: GET /payslip/:claimId
+    BE-->>FE: Breakdown lengkap
+    FE-->>EMP: Tampilkan slip, tombol cetak (window.print)
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Kartu breakdown | Panel hasil | Gaji bruto, potongan fee/kasbon/pajak/severance, gaji bersih. |
+| Tombol Cetak | Tombol | `window.print()` — tidak ada generasi PDF sisi server. |
+
+**Method/Algoritma Utama:**
+
+1. `GET /payslip/:claimId` mengembalikan breakdown lengkap satu klaim.
+2. Halaman dirender sebagai layout printable; unduh PDF dilakukan lewat dialog cetak browser.
+
+##### 2.4.3.12 Bukti Potong Pajak (`/employee/tax-cert`) `[BARU]`
+
+**Deskripsi:** Agregasi tahunan gaji dan potongan untuk keperluan pelaporan SPT pribadi karyawan.
+**Aktor:** Karyawan.
+**FR Terkait:** FR-PAYANA-1701.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor EMP as Karyawan
+    participant FE as Frontend /employee/tax-cert
+    participant BE as Backend /tax-cert
+    EMP->>FE: Pilih tahun pajak
+    FE->>BE: GET /tax-cert/:year
+    BE-->>FE: totalGrossAccrued, totalCompliance, totalSeverance, totalNet
+    FE-->>EMP: Tampilkan agregat + breakdown bulanan
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Pemilih tahun | Dropdown | Tahun pajak (2020–2100). |
+| Kartu agregat | Panel hasil | Total bruto, kepatuhan, severance, bersih untuk tahun tsb. |
+
+**Method/Algoritma Utama:**
+
+1. `GET /tax-cert/:year` mengagregasi `salary_claim` milik caller pada tahun tsb.
+2. Validasi tahun di sisi backend (400 jika di luar 2020–2100).
+
+##### 2.4.3.13 Surat Keterangan Kerja — Karyawan (`/employee/employment-letter`) `[BARU]`
+
+**Deskripsi:** Formulir pengajuan permohonan surat keterangan kerja dan pemantauan status, serta pengunduhan dokumen setelah disetujui.
+**Aktor:** Karyawan.
+**FR Terkait:** FR-PAYANA-1801.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor EMP as Karyawan
+    participant FE as Frontend /employee/employment-letter
+    participant BE as Backend /employment-letter
+    EMP->>FE: Pilih tujuan (KPR/Kredit/Visa/Umum/Lainnya)
+    FE->>BE: POST /employment-letter/request {hrAddress, purpose}
+    BE-->>FE: Status pending
+    Note over EMP,BE: (menunggu persetujuan HR)
+    EMP->>FE: Cek status
+    FE->>BE: GET status permohonan
+    alt approved
+        EMP->>FE: Unduh dokumen
+        FE->>BE: GET /employment-letter/:id/document
+        BE-->>FE: Dokumen
+    end
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Pemilih tujuan | Dropdown | `KPR`\|`Kredit`\|`Visa`\|`Umum`\|`Lainnya`. |
+| Badge status | Komponen status | `pending`/`approved`/`rejected`. |
+| Tombol Unduh | Tombol | Aktif hanya jika `approved`. |
+
+**Method/Algoritma Utama:**
+
+1. Validasi `purpose` terhadap whitelist di sisi backend (400 jika di luar daftar).
+2. Backend memverifikasi caller punya `employee_stream` `Active` di bawah `hrAddress` yang dituju (400 `NOT_EMPLOYEE` jika tidak).
+3. Dokumen hanya dapat diunduh setelah `status: approved` (400 `NOT_APPROVED` jika belum).
+
 #### 2.4.4 Portal Owner SaaS (`/owner`)
 
 **Deskripsi:** Dashboard agregat operator platform: TVL, jumlah tenant aktif, estimasi pendapatan platform fee, antrian registrasi HR, serta konfigurasi platform fee dan fungsi darurat.
@@ -2826,7 +3087,6 @@ sequenceDiagram
 | FR | Functional Requirement |
 | EWA | Earned Wage Access |
 | SBT | Soulbound Token |
-| FHE | Fully Homomorphic Encryption |
 | PHK | Pemutusan Hubungan Kerja |
 | CEI | Checks-Effects-Interactions |
 | BPS | Basis Points |
@@ -2908,27 +3168,58 @@ sequenceDiagram
 | FR-PAYANA-1006 | PayrollFactory.setPlatformFee | — | /owner |
 | FR-PAYANA-1007 | CompanyVault.claimSalary (platformCut) | — | — |
 | FR-PAYANA-1008 | (transfer ke protocolTreasury) | webhook → WS PLATFORM_FEE_PAID | /owner (ponder.getPlatformFees) |
-| FR-PAYANA-1101 | ConfidentialCompanyVault.encryptedSalaries | — | /hr (FHE) |
-| FR-PAYANA-1102 | ConfidentialCompanyVault.setEncryptedSalary | webhook → WS ENCRYPTED_SALARY_SET | /hr (FHE) |
-| FR-PAYANA-1103 | ConfidentialCompanyVault.getEncryptedSalary | — | /employee (FHE) |
-| FR-PAYANA-1104 | ConfidentialCompanyVault.aggregateTotalPayroll | — | /hr (FHE) |
-| FR-PAYANA-1105 | ConfidentialCompanyVault.grantViewingKey | — | /hr (FHE) |
 
 ### A.3 Alamat Kontrak Ter-Deploy
 
-Jaringan: **Base Sepolia**, Chain ID **84532**. Redeployment Gen8 (cutover Koperasi → Tax Engine + Kasbon).
+Jaringan: **Base Sepolia**, Chain ID **84532**. Redeployment Gen8.1 (`PayrollFactory` diganti
+setelah ditemukan stale — lihat catatan di bawah; `CompanyVault`/`EmploymentSBT`/IDRX tidak berubah).
 
 | Kontrak | Alamat |
 |---------|--------|
-| PayrollFactory | `0xF62dF08b38c6Fbde33E24208BA044907475ca815` |
+| PayrollFactory | `0x73926c8abdbd2ebcc09f5e6af7def1bb3af156de` |
 | EmploymentSBT | `0x8dA9B60814536364daF77a82cb56B31226De4B62` |
 | MockIDRX (ERC-20) | `0x0996e627cE22C4FE2D5c4788b159a83C065D6d09` |
-| ConfidentialCompanyVault (Demo) | `0x4560968670Dd852dACd73c7B8748695eC427e203` |
 | Admin/Treasury | `0x906B34db1a8DD333ff9a84255e4AEc13C054f120` |
 
-> `EmployeeLiquidityContract` tidak lagi dideploy sejak Gen8 — fungsinya digantikan oleh fitur kasbon terintegrasi di `CompanyVault`.
+> `EmployeeLiquidityContract` tidak lagi dideploy sejak Gen8 — fungsinya digantikan oleh fitur kasbon terintegrasi di `CompanyVault`. `ConfidentialCompanyVault` tidak lagi dideploy sejak Gen9 — lihat catatan di §2.2.2.5.
 
 Catatan: `CompanyVault` per tenant tidak memiliki alamat tetap karena di-deploy dinamis oleh `PayrollFactory.deployVault()`; alamatnya dapat diresolusi melalui `companyVaults(hrAuthority)`.
+
+> **[RESOLVED — redeploy Gen8.1]** `PayrollFactory` lama (`0xF62dF08b38c6Fbde33E24208BA044907475ca815`)
+> terkonfirmasi stale relatif terhadap `src/` (ukuran bytecode on-chain 24.535 byte vs. hasil
+> kompilasi source terkini 24.142 byte) — `deployVault()` selalu revert instan (~500 gas, tanpa
+> reason data) saat dipanggil terhadap alamat lama, dikonfirmasi lewat forked Foundry trace.
+> Factory baru di atas di-deploy langsung dari `src/PayrollFactory.sol` saat ini
+> (`testing-scripts/30-00-deploy-factory.mjs`, tx `0x3f1972d1671bf41c10ca9fe9a35766dfe48847caa3727d5740282043a68929b6`)
+> dan sudah diverifikasi `deployVault()` berhasil end-to-end (dipakai untuk simulasi 30 karyawan,
+> lihat PDHUPL_v2.md Bab 5). Seluruh konfigurasi (`backend/.env`, `ponder/.env`,
+> `frontend/.env.local`, `finley-payroll/.env`, default fallback di kode, `testing-scripts/`)
+> sudah diarahkan ke alamat baru ini. GitHub Actions secret
+> `NEXT_PUBLIC_PAYROLL_FACTORY_ADDRESS` perlu diupdate manual oleh pemilik repo (CI tidak bisa
+> diubah dari sini). **Dampak yang disengaja:** 2 `CompanyVault` yang terdaftar di factory lama
+> (`0xB08e4Da71Dd928099842292F02cb9F4eCc9d83Cf`, `0x7AB177BeF3E14614a8786c7CF5d15Ff5B4290Ca6`,
+> data dummy sesi testing sebelumnya, dikonfirmasi aman diorphan) tidak lagi bisa login sebagai
+> HR (`authz.ts` mengecek `companyVaults()` di factory yang dikonfigurasi) dan tidak lagi
+> diindeks Ponder — vault mereka sendiri tetap berfungsi normal on-chain bila diakses langsung
+> lewat alamatnya, hanya tidak lagi dapat ditemukan/diautentikasi lewat factory baru.
+
+> **[RESOLVED — vaultBalance drift di Ponder]** Ditemukan saat verifikasi manual AU-16-01
+> (PDHUPL_v2.md Bab 5): `company.vaultBalance` yang diindeks Ponder drift ~27,4 juta IDRX lebih
+> tinggi dari nilai on-chain asli. Root cause: dua event handler (`AdvanceApproved` — disbursement
+> kasbon, `TerminationExecuted` — top-up severance) tidak pernah mengurangi `vaultBalance` di
+> `ponder/src/PayrollContract.ts`, walau kontrak asli memang menguranginya di kedua kasus
+> tersebut. Diperbaiki secara menyeluruh: seluruh 8 titik yang menyentuh `vaultBalance` diganti
+> dari arithmetic manual (`+`/`-` berdasarkan `event.args`) menjadi resync langsung dari kontrak
+> (`context.client.readContract` ke fungsi `vaultBalance()` pada `event.log.address`, di
+> `event.block.number`) — pendekatan yang immun dari seluruh kelas bug "lupa update field
+> turunan" ini untuk perubahan kontrak apa pun di masa depan. Diverifikasi: nilai Ponder pasca
+> reindex cocok persis dengan pembacaan BaseScan langsung (`972494299743827160501553812` wei).
+>
+> Sebagai bagian dari verifikasi ini, kontrak `CompanyVault` yang di-deploy dinamis
+> (`0xEc2B154789C3E7B393f2c9E4bfa06b6cfd57F096`, dipakai simulasi 30 karyawan) juga
+> **diverifikasi di BaseScan** (sebelumnya tidak terverifikasi, sehingga tab "Read Contract"
+> tidak tersedia untuk siapa pun yang ingin membandingkan data indexer vs. on-chain secara
+> mandiri).
 
 ---
 
@@ -3044,7 +3335,6 @@ Tabel berikut memetakan event ke pemicu fungsi, konsumen indeksasi (Ponder), dan
 | `AdvanceRepaid` | CompanyVault | `_autoRepayAdvance` (dipanggil dari `claimSalary`) | Ponder `salary_advance` |
 | `TaxWithheld` | CompanyVault | `claimSalary` (PPh21 + BPJS) | Ponder, `/hr/compliance` |
 | `Locked` | EmploymentSBT | `mint` | `/verify` (ERC-5192) |
-| `EncryptedSalarySet` | ConfidentialCompanyVault | `setEncryptedSalary` | webhook → WS `ENCRYPTED_SALARY_SET` |
 
 ### A.7 Matriks Peran dan Otorisasi
 
@@ -3053,9 +3343,22 @@ Tabel berikut memetakan event ke pemicu fungsi, konsumen indeksasi (Ponder), dan
 | `SUPERADMIN_ROLE` | PayrollFactory | `deployVault`, `setPlatformFee`, `setProtocolTreasury`, `emergencyFreezeAll`. |
 | `DEFAULT_ADMIN_ROLE` | CompanyVault | Diberikan ke `hrAuthority`; mengelola peran lain; `freezeVault`. |
 | `HR_ROLE` | CompanyVault | Manajemen stream, vault, kepatuhan, vesting, proposal PHK. |
-| `LEGAL_ROLE` | CompanyVault | `approveTermination` (tanda tangan kedua PHK). |
+| `LEGAL_ROLE` | CompanyVault | `approveTermination` (tanda tangan kedua PHK); **[Diperbaiki]** juga berhak baca `GET /termination/reason/:employeeAddress` dan `GET /auth/profile/by-address/:address` di backend (lihat catatan di bawah — sebelumnya keliru selalu 403). |
 | `MINTER_ROLE` | EmploymentSBT | `mint`/`revoke` (dipegang `CompanyVault`). |
 | Owner SaaS | Backend/Frontend | `requireOwner` (registrasi); akses `/owner`. |
+
+> **[Temuan & Diperbaiki]** `canViewEmployeeData()` di `backend/src/services/authz.ts`
+> sebelumnya HANYA mengecek `caller === hrAuthority`, sehingga pemegang `LEGAL_ROLE` on-chain
+> selalu mendapat `403 Forbidden` saat mencoba membaca alasan PHK melalui
+> `GET /termination/reason/:employeeAddress` — padahal komentar kode endpoint tersebut sendiri
+> menyatakan seharusnya "HR-or-Legal", dan Legal memang butuh konteks alasan sebelum memberi
+> persetujuan independennya (`approveTermination()`) sesuai desain persetujuan dua pihak (lihat
+> A.4 Multi-Sig PHK). Diperbaiki dengan menambahkan pengecekan on-chain
+> `hasRole(LEGAL_ROLE, caller)` terhadap `CompanyVault` milik `hrAuthority` terkait — perbaikan
+> ini otomatis berlaku juga untuk `GET /auth/profile/by-address/:address` karena keduanya
+> memanggil fungsi otorisasi yang sama. Diverifikasi via `testing-scripts/ku-06-termination-reason.mjs`
+> (8 skenario: HR/employee sendiri/Legal berhasil baca, pihak tak berwenang & non-HR yang
+> mencoba tulis ditolak 403).
 
 ---
 
@@ -3483,20 +3786,27 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
 
 ### B.4 Grup Registrasi (`/registration`)
 
+> **[Diperbaiki]** Seluruh subbab ini sebelumnya hanya mendokumentasikan registrasi company
+> (tanpa NPWP/NIB/dst, tanpa jalur employee sama sekali). Diperbarui mengikuti implementasi
+> `backend/src/routes/registration.ts` saat ini — lihat SKPL UC-21 untuk spesifikasi use case
+> penuh, dan B.4a untuk grup endpoint `/invitations` yang menjadi prasyarat registrasi employee.
+
 **[POST /registration/request]**
 | | |
 |---|---|
-| Input | - |
-| Output | - |
-| Deskripsi | ; sesuai FR-PAYANA-107 |
+| Input | `address`, `email?`, `name?`, `type` (`"company"` \| `"employee"`, default `"employee"`); jika `type:"company"`: `npwp?`, `nib?`, `directorName?`, `directorNik?`, `deedUrl?`; jika `type:"employee"`: **`inviteToken` wajib**. |
+| Output | `{ ok: true }` |
+| Deskripsi | Company: simpan permohonan `pending`, tanpa `hrAddress`. Employee: `hrAddress` di-resolve dari `inviteToken` (bukan dari input client), token ditandai `used` setelah insert berhasil. Sesuai FR-PAYANA-107. |
 
-**Request Body:** `{ "address": "0xhr...", "email": "hr@co.com", "name": "PT Karya" }`
+**Request Body (company):** `{ "address": "0xhr...", "email": "hr@co.com", "name": "PT Karya", "type": "company", "npwp": "01.234.567.8-901.000", "nib": "1234567890123", "directorName": "Budi", "directorNik": "3201...", "deedUrl": "https://..." }`
+
+**Request Body (employee):** `{ "address": "0xemp...", "email": "emp@co.com", "name": "Andi", "type": "employee", "inviteToken": "<token dari HR>" }`
 
 **Response 200:** `{ "ok": true }`
 
-**Tabel Error:** 400 (`address` hilang); 500 (db error).
+**Tabel Error:** 400 (`address` hilang; NPWP bukan 15/16 digit; NIB bukan 13 digit; NIK Direktur bukan 16 digit; `type:"employee"` tanpa `inviteToken`); 404 (`inviteToken` tidak ditemukan); 409 (`inviteToken` sudah dipakai/kedaluwarsa/di-revoke); 500 (db error).
 
-**Algoritma:** Upsert (`onConflictDoUpdate` by `address`) ke `pending_registrations` dengan status default `pending`.
+**Algoritma:** Untuk `type:"employee"`, validasi token (`status="pending"`, `expiresAt` belum lewat) di tabel `employee_invitations` lebih dulu, resolve `hrAddress` dari baris token tsb. Upsert (`onConflictDoUpdate` by `address`) ke `pending_registrations` — **selalu me-reset ulang `status` ke `pending`** pada re-submit (mis. pakai ulang invite link), supaya address yang sebelumnya `approved`/`rejected` tidak tersangkut status lama. Untuk employee, tandai token `used` setelah insert sukses (bukan sebelumnya, agar kegagalan DB tidak membakar token percuma).
 
 **[GET /registration/status/:address]**
 | | |
@@ -3505,42 +3815,118 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
 | Output | - |
 | Deskripsi | ; sesuai FR-PAYANA-107 |
 
-**Response 200:** `{ "status": "pending", "requestedAt": "..." }` atau `{ "status": "none" }`.
+**Response 200:** `{ "status": "pending", "requestedAt": "...", "name": "..." }` atau `{ "status": "none" }`.
 
-**Algoritma:** Ambil baris by `address`; kembalikan status (`none` jika tidak ada).
+**Algoritma:** Ambil baris by `address`; kembalikan status (`none` jika tidak ada). `name` disertakan agar wizard deploy vault HR bisa pre-fill nama yang sudah pernah diisi saat registrasi.
 
-**[GET /registration/pending]**
+**[GET /registration/pending?type=company|employee]**
+| | |
+|---|---|
+| Input | Query opsional `type` |
+| Output | - |
+| Deskripsi | Khusus Owner SaaS; sesuai FR-PAYANA-108 |
+
+**Response 200:** Array baris `pending_registrations` terurut `requestedAt`, difilter `type` bila diberikan.
+
+**Algoritma:** `requireOwner` memverifikasi alamat JWT terhadap `OWNER_ADDRESS`; kembalikan antrian (dashboard Owner sekarang hanya perlu `type=company` — antrian employee ditangani HR sendiri via endpoint di bawah).
+
+**[GET /registration/pending/hr/:hrAddress]**
 | | |
 |---|---|
 | Input | - |
 | Output | - |
-| Deskripsi | ; sesuai FR-PAYANA-108 |
+| Deskripsi | HR melihat antrian karyawannya sendiri; caller harus `=== hrAddress`. |
 
-**Response 200:** Array baris `pending_registrations` terurut `requestedAt`.
+**Response 200:** Array baris `pending_registrations` bertipe `employee` milik `hrAddress` tsb, terurut `requestedAt`.
 
-**Algoritma:** `requireOwner` memverifikasi alamat JWT terhadap `OWNER_ADDRESS`; kembalikan seluruh antrian.
+**Tabel Error:** 403 jika caller bukan `hrAddress` yang diminta.
 
 **[PATCH /registration/:address/approve]**
 | | |
 |---|---|
 | Input | - |
 | Output | - |
-| Deskripsi | ; sesuai FR-PAYANA-109 |
+| Deskripsi | Owner (semua tipe) atau HR pemilik (khusus tipe `employee`, `row.hrAddress === caller`); sesuai FR-PAYANA-109 |
 
 **Response 200:** `{ "ok": true }`
 
-**Algoritma:** Set `status = "approved"`, `updatedAt = now` untuk `address`.
+**Tabel Error:** 403 (caller bukan Owner dan bukan HR pemilik registrasi tsb); 404 (registrasi tidak ditemukan).
+
+**Algoritma:** `authorizeReview()` — jika caller `=== OWNER_ADDRESS`, selalu boleh; jika bukan, cek `row.type === "employee" && row.hrAddress === caller`, selain itu `403 Forbidden`. Set `status = "approved"`, `updatedAt = now`.
 
 **[DELETE /registration/:address]**
 | | |
 |---|---|
 | Input | - |
 | Output | - |
-| Deskripsi | ; sesuai FR-PAYANA-109 |
+| Deskripsi | Otorisasi identik dengan approve; sesuai FR-PAYANA-109 |
 
 **Response 200:** `{ "ok": true }`
 
-**Algoritma:** Set `status = "rejected"` (soft reject, tidak menghapus baris).
+**Algoritma:** Set `status = "rejected"` (soft reject, tidak menghapus baris) via `authorizeReview()` yang sama.
+
+---
+
+### B.4a Grup Undangan Karyawan (`/invitations`) `[BARU — invitation-only registration]`
+
+**[POST /invitations]**
+| | |
+|---|---|
+| Input | `name?`, `email?` (HR, JWT) |
+| Output | `{ token, hrAddress, expiresAt }` |
+| Deskripsi | HR membuat token undangan baru; `hrAddress` selalu diisi dari caller JWT, tidak pernah dari input. Token berlaku 7 hari, sekali pakai. |
+
+**[GET /invitations/:token]**
+| | |
+|---|---|
+| Input | - (publik, tanpa auth) |
+| Output | `{ hrAddress, companyName }` bila valid |
+| Deskripsi | Dipanggil `/onboarding?invite=<token>` untuk menampilkan nama perusahaan pengundang sebelum karyawan mengisi form. |
+
+**Tabel Error:** 404 (token tidak ada); 409 (`status` bukan `pending`, atau `expiresAt` sudah lewat).
+
+**[GET /invitations/hr/:hrAddress]**
+| | |
+|---|---|
+| Input | - |
+| Output | - |
+| Deskripsi | Riwayat undangan yang dibuat HR tsb; caller harus `=== hrAddress`. |
+
+**[PATCH /invitations/:token/revoke]**
+| | |
+|---|---|
+| Input | - (HR, JWT, harus pemilik) |
+| Output | `{ ok: true }` |
+| Deskripsi | Set `status = "revoked"` — hanya berhasil bila token masih `pending` (belum dipakai). |
+
+---
+
+### B.4b Grup Alasan PHK (`/termination`) `[BARU — dokumentasi paruh backend AU-06-03]`
+
+> Melengkapi sisi on-chain `proposeTermination(employee, reasonHash)` (lihat A.3/2.4.2.x) — nilai
+> `reasonHash` on-chain hanya `keccak256(reason)`, tidak bisa dibaca ulang menjadi teks. Grup
+> endpoint ini menyimpan **alasan PHK dalam bentuk plaintext** secara off-chain agar pihak
+> berwenang (HR, karyawan yang bersangkutan, dan Legal) dapat membacanya kembali.
+
+**[POST /termination/reason]**
+| | |
+|---|---|
+| Input | `employeeAddress`, `reason` (HR, JWT) |
+| Output | `{ success: true }` |
+| Deskripsi | HR menyimpan alasan PHK plaintext, dipanggil bersamaan dengan `proposeTermination()` on-chain. |
+
+**Tabel Error:** 403 (caller bukan HR/bukan `hrAuthority` dari `employeeAddress` tsb).
+
+**[GET /termination/reason/:employeeAddress]**
+| | |
+|---|---|
+| Input | - |
+| Output | `{ reason }` |
+| Deskripsi | Dapat diakses HR yang bersangkutan, karyawan itu sendiri, **atau pemegang `LEGAL_ROLE` on-chain pada CompanyVault terkait** (lihat perbaikan otorisasi di A.7). |
+
+**Tabel Error:** 403 (pihak tidak berwenang, dicek via `canViewEmployeeData()`).
+
+**Algoritma:** `canViewEmployeeData(caller, hrAuthority)` — true bila `caller === hrAuthority` ATAU `caller === employeeAddress` ATAU `hasRole(LEGAL_ROLE, caller)` on-chain pada `CompanyVault` milik `hrAuthority`. Fungsi otorisasi ini dipakai bersama oleh `GET /auth/profile/by-address/:address`.
 
 ### B.5 Grup Webhook (`/webhook`)
 
@@ -3573,7 +3959,6 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
    - `LowVaultBalance` → audit `LOW_VAULT_BALANCE_ALERT` + broadcast `LOW_VAULT_BALANCE`.
    - `SalaryClaimed` → broadcast `SALARY_CLAIMED`.
    - `PlatformFeePaid` → audit `PLATFORM_FEE_PAID` + broadcast `PLATFORM_FEE_PAID`.
-   - `EncryptedSalarySet` → audit `ENCRYPTED_SALARY_SET` + broadcast `ENCRYPTED_SALARY_SET` (tanpa plaintext).
 4. Tandai event `processed = true`.
 
 ### B.6 Layanan Background
@@ -3602,7 +3987,6 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
 | `LOW_VAULT_BALANCE` | event `LowVaultBalance` | HR (`/hr/vault`) |
 | `SALARY_CLAIMED` | event `SalaryClaimed` | Karyawan (`/employee/ewa`) |
 | `PLATFORM_FEE_PAID` | event `PlatformFeePaid` | Owner (`/owner`) |
-| `ENCRYPTED_SALARY_SET` | event `EncryptedSalarySet` | HR (FHE) |
 
 **Algoritma `broadcast`:** Jika server belum dibuat, no-op + peringatan. Jika ada, serialisasi `{type, payload}` dan kirim ke setiap klien dengan `readyState == OPEN`.
 
@@ -3613,6 +3997,131 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
 
 ---
 
+### B.9 Grup Reimburse (`/reimburse`) `[BARU — lihat SKPL UC-22, FR-PAYANA-1301/1302]`
+
+**[POST /reimburse]**
+| | |
+|---|---|
+| Input | `hrAddress`, `category`, `amount`, `description`, `receiptUrl?` (Karyawan, JWT) |
+| Output | Baris `reimbursement_claims` yang baru dibuat (`status: "pending"`) |
+| Deskripsi | Karyawan mengajukan klaim reimbursement; sesuai FR-PAYANA-1301. |
+
+**Tabel Error:** 400 (field wajib hilang); 500 (db error).
+
+**[GET /reimburse/me]** — Karyawan (JWT). Mengembalikan seluruh klaim milik `employeeAddress` caller, terurut `requestedAt`.
+
+**[GET /reimburse/hr/:hrAddress]** — HR (JWT, harus `=== hrAddress`). Mengembalikan seluruh klaim milik perusahaan tsb.
+
+**[PATCH /reimburse/:id/approve]**
+| | |
+|---|---|
+| Input | `txHash` (HR, JWT) |
+| Output | Baris klaim ter-update (`status: "approved"`) |
+| Deskripsi | Sesuai FR-PAYANA-1302. |
+
+**Tabel Error:** 400 (`txHash` bukan transfer IDRX yang sesuai — `TRANSFER_NOT_VERIFIED`); 403 (bukan HR pemilik — `hrAddress` klaim `!== caller`); 404 (klaim tidak ditemukan); 409 (`status` sudah bukan `pending` — `ALREADY_REVIEWED`).
+
+**Algoritma:** `verifyIdrxTransfer(txHash, employeeAddress, amount)` membaca receipt transaksi on-chain dan memastikan benar-benar transfer IDRX sejumlah `amount` ke `employeeAddress`, sebelum status diubah. Begitu `approved`, `createNotification()` dipanggil untuk karyawan (`REIMBURSE_PAID`).
+
+**[PATCH /reimburse/:id/reject]** — HR (JWT, harus pemilik). Set `status: "rejected"`; error 403/404/409 identik dengan approve, tanpa perlu `txHash`. Memicu notifikasi `REIMBURSE_REJECTED`.
+
+---
+
+### B.10 Grup Bounty & Tip (`/bounty`) `[BARU — lihat SKPL UC-23, FR-PAYANA-1401/1402/1403]`
+
+**[POST /bounty]** — HR (JWT). Input `title`, `description`, `rewardIdrx`, `quota`. Membuat baris `bounties` (`status: "open"`). Sesuai FR-PAYANA-1401.
+
+**[POST /bounty/:id/claim]** — Karyawan (JWT). Input `proofUrl`. Membuat baris `bounty_claims` (`status: "pending"`).
+
+**Tabel Error:** 409 `BOUNTY_CLOSED` jika bounty sudah `status: "closed"` (kuota tercapai).
+
+**[PATCH /bounty/claim/:id/approve\|reject]** — HR (JWT, pemilik bounty). Approve set `status: "approved"`; reject set `status: "rejected"`.
+
+**[PATCH /bounty/claim/:id/paid]**
+| | |
+|---|---|
+| Input | `txHash` (HR, JWT) |
+| Output | Klaim `status: "paid"`, `paidTxHash` tersimpan |
+| Deskripsi | Sesuai FR-PAYANA-1402. |
+
+**Algoritma:** `verifyIdrxTransfer(txHash, employeeAddress, rewardIdrx)` sama seperti reimburse. Begitu `claimedCount` (dihitung dari jumlah klaim `paid`) mencapai `quota`, `bounties.status` di-set `closed` dalam transaksi DB yang sama — inilah sebabnya cabang error `QUOTA_REACHED` yang terpisah dari `BOUNTY_CLOSED` **tidak pernah tercapai** (lihat PDHUPL AU-22-02: dead code yang sudah dihapus dari kode, bukan hanya dari dokumentasi).
+
+**[POST /bounty/tip]** — Karyawan (JWT). Input `toAddress`, `amount`, `txHash` (transfer sudah dilakukan independen oleh pengirim, backend hanya mencatat). Sesuai FR-PAYANA-1403.
+
+**[GET /bounty/tips/:address]** — Mengembalikan seluruh tip di mana `address` adalah `fromAddress` ATAU `toAddress`.
+
+---
+
+### B.11 Grup Notifikasi (`/notifications`) `[BARU — lihat SKPL UC-24, FR-PAYANA-1501]`
+
+**[GET /notifications]** — Pengguna (JWT). Mengembalikan maksimum 50 baris `notifications` milik `recipientAddress = caller`, terurut `createdAt DESC`. Sesuai FR-PAYANA-1501.
+
+**[PATCH /notifications/:id/read]** — Set `read: true` untuk satu notifikasi.
+
+**Tabel Error:** 403 (`recipientAddress !== caller` — `FORBIDDEN`); 404 (id tidak ada).
+
+**[PATCH /notifications/read-all]** — Set `read: true` untuk seluruh notifikasi milik caller.
+
+**Algoritma:** `createNotification(recipient, type, title, body, meta?)` dipanggil dari route lain (reimburse, bounty, kasbon, dst) sebagai side-effect, menginsert baris baru dan (lihat B.7) mendorong broadcast WebSocket ke klien yang sedang terhubung.
+
+---
+
+### B.12 Grup Slip Gaji (`/payslip`) `[BARU — lihat SKPL UC-25, FR-PAYANA-1601]`
+
+**[GET /payslip/:claimId]**
+| | |
+|---|---|
+| Input | `claimId` = `${txHash}-${logIndex}` (format Ponder) |
+| Output | `{claimId, employee, employeeName, hrAuthority, companyName, period, claimedAt, breakdown: {grossAccrued, platformFee, kasbonRepaid, taxAndBpjs, severance, netToEmployee}}` |
+| Deskripsi | Sesuai FR-PAYANA-1601. |
+
+**Tabel Error:** 403 (caller bukan `employee` maupun `hr_authority` klaim tsb); 404 (claimId tidak ada di `salary_claim`).
+
+**Algoritma:** Baca satu baris `salary_claim` dari skema Ponder by `id`; `platformFee` dihitung sebagai sisa (`accrued - compliance - severance - kasbonRepaid - net`) karena tidak disimpan sebagai kolom terpisah. Nama karyawan & perusahaan didekripsi/di-lookup dari `employees`/`company_settings`.
+
+---
+
+### B.13 Grup Bukti Potong Pajak (`/tax-cert`) `[BARU — lihat SKPL UC-26, FR-PAYANA-1701]`
+
+**[GET /tax-cert/:year]** — Karyawan (JWT). Mengagregasi seluruh `salary_claim` milik caller pada tahun tsb: `totalGrossAccrued`, `totalCompliance`, `totalSeverance`, `totalNet`, plus breakdown bulanan. Sesuai FR-PAYANA-1701.
+
+**[GET /tax-cert/hr/:employee/:year]** — HR (JWT). Agregasi yang sama untuk satu karyawan di perusahaannya.
+
+**Tabel Error:** 400 (`year` di luar 2020–2100); 403 (caller bukan `hr_authority` dari `employee` tsb pada `salary_claim`).
+
+---
+
+### B.14 Grup Surat Keterangan Kerja (`/employment-letter`) `[BARU — lihat SKPL UC-27, FR-PAYANA-1801]`
+
+**[POST /employment-letter/request]** — Karyawan (JWT). Input `hrAddress`, `purpose` (whitelist `KPR|Kredit|Visa|Umum|Lainnya`). Membuat baris `employment_letters` (`status: "pending"`). Sesuai FR-PAYANA-1801.
+
+**Tabel Error:** 400 (`purpose` di luar whitelist); 400 `NOT_EMPLOYEE` (caller tidak punya `employee_stream` berstatus `Active` di bawah `hrAddress` tsb, dicek terhadap data Ponder).
+
+**[PATCH /employment-letter/:id/approve\|reject]** — HR (JWT, pemilik). Approve set `status: "approved"`; reject set `status: "rejected"` dengan `notes` opsional.
+
+**[GET /employment-letter/:id/document]** — Mengembalikan representasi dokumen (untuk dicetak/disimpan sebagai PDF di sisi klien).
+
+**Tabel Error:** 400 `NOT_APPROVED` (status masih `pending`); 403 (bukan pemohon maupun HR terkait).
+
+---
+
+### B.15 Grup Direktori Karyawan (`/directory`) `[BARU — lihat SKPL UC-28, FR-PAYANA-1901]`
+
+**[GET /directory/:hrAddress]** — HR (JWT, harus `=== hrAddress`). Mengembalikan seluruh karyawan perusahaan tsb (join data Ponder `employee_stream` dengan `employee_profiles` untuk `department`/`position`). Sesuai FR-PAYANA-1901.
+
+**Tabel Error:** 403 (caller bukan `hrAddress` yang diminta).
+
+**[PATCH /directory/:address]** — HR (JWT, harus HR dari karyawan tsb). Input `department?`, `position?`. Upsert ke `employee_profiles`.
+
+**[GET /directory/me]** — Karyawan (JWT). Mengembalikan baris `employee_profiles` miliknya sendiri, mencerminkan perubahan terbaru dari HR.
+
+---
+
+### B.16 Grup Pengaturan Perusahaan (`/company-settings`) `[BARU — lihat SKPL UC-29, FR-PAYANA-2001]`
+
+**[GET /company-settings]** — HR (JWT). Mengembalikan baris `company_settings` milik caller, atau `null` jika belum pernah disimpan. Sesuai FR-PAYANA-2001.
+
+**[PUT /company-settings]** — Input `name?`, `country?`, `logoUrl?`, `ewaLimitBps?`, `yieldRateBps?`, `legalAddress?`. Upsert (`onConflictDoUpdate` by `hrAddress`).
 
 ---
 
@@ -3755,9 +4264,8 @@ Catatan: untuk aksi HR/Owner/Legal (mis. `startStream`, `proposeTermination`, `f
 4. **Multi-Sig PHK:** PHK memerlukan dua tanda tangan berurutan (HR via `proposeTermination`, Legal via `approveTermination`) dengan kadaluarsa 7 hari, mencegah PHK sewenang-wenang.
 5. **SafeERC20:** seluruh transfer IDRX memakai `safeTransfer`/`safeTransferFrom`.
 6. **Pausable/Freeze:** `pauseVault`/`resumeVault` untuk jeda operasional; `freezeVault`/`emergencyFreezeAll` untuk pembekuan permanen (irreversible) sebagai respons eksploitasi.
-7. **Validasi Input:** `validateSplits` memastikan total split = 10.000 bps; cap pinjaman 80% gaji dan 8.000.000 IDRX; cap platform fee 100 bps; cliff harus di masa depan.
-8. **try/catch Defensif:** mint/revoke SBT dan inisialisasi pool dibungkus try/catch agar kegagalan dependensi tidak membatalkan operasi inti.
-9. **Privasi via FHE:** `ConfidentialCompanyVault` menyimpan gaji sebagai `euint256` dengan ACL Inco; tidak ada plaintext di calldata, storage, atau event.
+7. **Validasi Input:** `severanceBps` per stream ≤ 10.000 bps; cap kasbon 80% gaji bulanan (`MAX_ADVANCE_BPS`); cap platform fee 100 bps; cliff harus di masa depan.
+8. **try/catch Defensif:** mint/revoke SBT dibungkus try/catch agar kegagalan dependensi tidak membatalkan operasi inti.
 
 ### D.2 Keamanan Backend
 
