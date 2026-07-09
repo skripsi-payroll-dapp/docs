@@ -190,7 +190,7 @@ flowchart TB
     WALLET -->|kirim UserOp / transaksi| ENTRYPOINT
 
     BE -->|query data terindeks| PG
-    BE -->|baca/tulis data off-chain<br/>(profil, notifikasi, dokumen)| PG
+    BE -->|"baca/tulis data off-chain<br/>(profil, notifikasi, dokumen)"| PG
     PONDER -->|tulis event terindeks| PG
     PONDER -->|subscribe event via RPC| RPC
 
@@ -198,7 +198,7 @@ flowchart TB
     RPC -->|JSON-RPC| VAULT1
     RPC -->|JSON-RPC| VAULT2
 
-    ENTRYPOINT -->|validasi &amp; eksekusi UserOp<br/>(Paymaster: vault membayar gas)| VAULT1
+    ENTRYPOINT -->|"validasi &amp; eksekusi UserOp<br/>(Paymaster: vault membayar gas)"| VAULT1
 
     FACTORY -->|deployVault· event VaultDeployed| VAULT1
     FACTORY -->|deployVault· event VaultDeployed| VAULT2
