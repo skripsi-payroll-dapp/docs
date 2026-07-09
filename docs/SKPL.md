@@ -185,6 +185,11 @@ Lapisan keempat dan yang langsung berinteraksi dengan pengguna adalah **lapisan 
 
 ### 2.2 Fungsi Produk
 
+<!-- FLAG-BARU-VS-DOCX: docx lama masih punya 12 fungsi produk termasuk "9. Kerahasiaan Data
+Gaji (Salary Privacy, Inco FHE)" — dihapus total di sini (bukan sekadar direnumber), fitur belum
+pernah diimplementasi. Fungsi #6 "Koperasi Karyawan" di docx lama sudah diganti isinya jadi
+"Mesin Pajak & Kasbon" di bawah (nomor sama, konten beda total). -->
+
 **1. Manajemen Vault Perusahaan**
 
 Deskripsi  : Sistem menyediakan fungsi bagi HR Admin untuk men-deploy vault perusahaan yang terisolasi on-chain melalui `PayrollFactory.deployVault()`, mengisi saldo IDRX ke dalam vault (`fundVault()`), memantau saldo vault secara real-time, dan menarik saldo yang tidak terpakai (`withdrawVault()`). Setiap vault bersifat independen per perusahaan (Factory Pattern), sehingga aset satu perusahaan tidak bercampur dengan perusahaan lain. SaaS Admin (Owner) terlebih dahulu harus menyetujui registrasi HR sebelum vault dapat di-deploy.
@@ -669,6 +674,11 @@ Deskripsi      : Sistem harus mendukung pembuatan lebih dari satu cliff vest akt
 
 ---
 
+<!-- FLAG-BARU-VS-DOCX: FR-PAYANA-701 s.d. 706 di docx lama seluruhnya tentang
+EmployeeLiquidityContract (depositToPool/withdrawDeposit/borrowFromPool/getPoolLiquidity — pool
+lender pihak ketiga). Nomor FR sama persis di bawah ini tapi isinya sudah diganti total jadi
+kasbon company-funded (requestAdvance/approveAdvance/rejectAdvance di CompanyVault). -->
+
 ### Kelompok G: Mesin Pajak & Kasbon
 
 Kelompok ini mendefinisikan kebutuhan fungsional untuk pemotongan otomatis PPh21 (skema Tarif Efektif Rata-rata/TER sesuai PMK 168/2023) dan BPJS pada setiap klaim gaji, serta fasilitas kasbon (uang muka gaji) yang memampukan karyawan menarik sebagian gaji yang belum accrued sebagai talangan, dengan pelunasan otomatis saat klaim gaji berikutnya.
@@ -893,6 +903,9 @@ Deskripsi      : Sistem harus memampukan Owner SaaS untuk melihat dan menarik to
 > sudah diimplementasikan penuh (backend/frontend berfungsi, diuji nyata — lihat PDHUPL_v2.md
 > KU-21 s.d. KU-27, KU-29). Nomor FR dimulai dari 1301.
 
+<!-- FLAG-BARU-VS-DOCX: Kelompok M s.d. T (FR-PAYANA-1301 s.d. 2001), 8 kelompok, seluruhnya BARU
+— tidak ada padanan sama sekali di docx lama. Pasangan dari UC-22 s.d. UC-29. -->
+
 ### Kelompok M: Reimburse Karyawan & HR
 
 Kelompok ini mendefinisikan kebutuhan fungsional untuk penggantian biaya operasional (reimbursement) yang diajukan karyawan dan ditinjau HR. Modul ini murni off-chain (backend/database), dengan pembayaran aktual berupa transfer IDRX manual dari wallet HR yang diverifikasi backend terhadap transaksi on-chain nyata — bukan fungsi smart contract khusus.
@@ -1022,6 +1035,14 @@ Deskripsi      : Sistem harus memampukan HR untuk menyimpan dan memperbarui peng
 > **Catatan untuk Pembaca:** Sistem Payana adalah sistem hybrid tiga lapisan (smart contract on-chain, REST API backend, antarmuka web frontend). Use case di bawah ini menggambarkan interaksi pengguna dengan sistem secara end-to-end tanpa memisahkan lapisan teknis.
 
 **Daftar Use Case:**
+
+<!-- FLAG-BARU-VS-DOCX: UC-11/UC-12 di bawah nomornya sama dengan docx lama tapi isinya beda
+total (docx lama: UC-11 "Karyawan Bergabung ke Koperasi dan Menyimpan Dana", UC-12 "Karyawan
+Mengajukan Pinjaman Koperasi"). UC-17/18/19 (dulu fitur FHE: set gaji terenkripsi, viewing key,
+homomorphic aggregation) sengaja tidak dipakai lagi di tabel ini — TIDAK ADA catatan eksplisit
+"tidak digunakan" untuk gap ini di SKPL.md (beda dari PDHUPL_v2.md yang sudah punya catatan
+serupa untuk KU-17/18/19) — pertimbangkan menambah catatan serupa di sini kalau mau konsisten.
+UC-21 s.d. UC-29 di bawah seluruhnya BARU, tidak ada di docx lama sama sekali. -->
 
 | ID | Nama Use Case | Aktor | FR Terkait |
 |----|---------------|-------|------------|
@@ -2479,6 +2500,9 @@ Keterangan kolom kunci:
 | WaaS | Wallet as a Service |
 | MRC | Monthly Recurring Cost |
 | ESOP | Employee Stock Ownership Plan |
+
+<!-- FLAG-BARU-VS-DOCX: subbab A.2 ini seluruhnya BARU — docx lama cuma punya A.1 Singkatan
+Tambahan dan A.2 Catatan Teknis (jadi A.3 di sini), tidak ada tabel alamat kontrak sama sekali. -->
 
 ### A.2 Alamat Kontrak Ter-Deploy
 
