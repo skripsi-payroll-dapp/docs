@@ -607,10 +607,10 @@ Algoritma: Disetel oleh `PayrollFactory`. Set `IDRX`, `factory=msg.sender`, `hrA
 - `resumeVault`: tolak jika `status == Frozen`; set `status = Active`; emit `VaultResumed`.
 - `freezeVault`: hanya `factory` atau pemegang `DEFAULT_ADMIN_ROLE` (`Unauthorized`); set `status = Frozen` (irreversible); emit `VaultFreeze`.
 
-**[startStream(employee, flowRate, employeeSplitBps, complianceSplitBps, severanceSplitBps)]**
+**[startStream(employee, flowRate, severanceSplitBps)]**
 | | |
 |---|---|
-| Input | employee: address, flowRate: uint256, employeeSplitBps: uint16, complianceSplitBps: uint16, severanceSplitBps: uint16 |
+| Input | employee: address, flowRate: uint256, severanceSplitBps: uint16 |
 | Output | - |
 | Deskripsi | external override; modifier `onlyHR vaultActive`; sesuai FR-PAYANA-301, FR-PAYANA-901 |
 
@@ -621,8 +621,9 @@ sequenceDiagram
     actor HR
     participant V as CompanyVault
     participant SBT as EmploymentSBT
-    HR->>V: startStream(employee, flowRate, splits)
-    V->>V: validateSplits == 10000 (SplitInvalid)
+    HR->>V: startStream(employee, flowRate, severanceSplitBps)
+    V->>V: cek flowRate > 0 (ZeroFlowRate)
+    V->>V: cek severanceSplitBps <= 10000 (InvalidSeveranceBps)
     V->>V: cek stream belum Active (StreamAlreadyActive)
     V->>V: simpan employeeStreams + severanceVaults(Locked)
     V->>V: totalFlowRate += flowRate
@@ -633,8 +634,8 @@ sequenceDiagram
 
 **Algoritma:**
 
-1. **Check:** `PayrollMath.validateSplits(...)` harus total 10.000 bps (`SplitInvalid`); stream belum `Active` (`StreamAlreadyActive`).
-2. **Effect:** buat `EmployeeStream` (status `Active`, `startTs/lastWithdrawnTs = now`, `settledBalance=0`, splits); buat `SeveranceVault` (`Locked`); `totalFlowRate += flowRate`.
+1. **Check:** `flowRate > 0` (`ZeroFlowRate`); `severanceSplitBps <= 10_000` (`InvalidSeveranceBps`); stream belum `Active` (`StreamAlreadyActive`).
+2. **Effect:** buat `EmployeeStream` (status `Active`, `startTs/lastWithdrawnTs = now`, `settledBalance=0`, `severanceBps=severanceSplitBps`); buat `SeveranceVault` (`Locked`); `totalFlowRate += flowRate`.
 3. **Effect:** emit `StreamCreated`.
 4. **Interaction:** `sbtContract.mint(employee, companyName, msg.sender)` (try/catch); emit `EmploymentCertified` jika berhasil.
 
@@ -840,7 +841,7 @@ sequenceDiagram
 
 ##### 2.2.2.3 Mesin Pajak & Kasbon (terintegrasi di CompanyVault)
 
-Sejak Gen8, `EmployeeLiquidityContract` (pool koperasi closed-loop) dihapus total dari kodebase. Fungsinya digantikan oleh dua kapabilitas baru yang terintegrasi langsung di `CompanyVault`: (1) perhitungan PPh21/BPJS otomatis saat `claimSalary()` (lihat 2.2.2.2), dan (2) fasilitas kasbon (`SalaryAdvance`) yang dananya bersumber langsung dari `vaultBalance` perusahaan — bukan pool lender pihak ketiga.
+`EmployeeLiquidityContract` (pool koperasi closed-loop) dihapus total dari kodebase. Fungsinya digantikan oleh dua kapabilitas baru yang terintegrasi langsung di `CompanyVault`: (1) perhitungan PPh21/BPJS otomatis saat `claimSalary()` (lihat 2.2.2.2), dan (2) fasilitas kasbon (`SalaryAdvance`) yang dananya bersumber langsung dari `vaultBalance` perusahaan — bukan pool lender pihak ketiga.
 
 **Konstanta terkait:** `MAX_ADVANCE_BPS = 8000` (80% dari gaji bulanan), `ADVANCE_REPAY_BPS = 2000` (20% dari net setiap klaim).
 
@@ -967,10 +968,6 @@ Algoritma: Deklarasi dukungan `IERC5192`.
 | Deskripsi | internal override; sesuai FR-905 |
 
 Algoritma: Blokir transfer P2P (`SoulboundTransferNotAllowed`); hanya mint (from=0) dan burn (to=0) diizinkan.
-
-> **Catatan:** Subbab IDRXPriceOracle (sebelumnya 2.2.2.5, FR-PAYANA-1201–1203/SKPL Kelompok L) telah dihapus pada Revisi G — kontrak dihapus total dari kodebase karena IDRX dirancang 1:1 terhadap Rupiah, sehingga price oracle tidak punya kasus penggunaan nyata.
-
-> **Catatan:** Subbab ConfidentialCompanyVault (sebelumnya 2.2.2.5, FR-PAYANA-1101–1105/SKPL Kelompok K) telah dihapus pada Revisi Gen9. `ConfidentialCompanyVault.sol` dihapus total dari kodebase — verifikasi langsung terhadap kontrak yang di-deploy (`0x4560968670Dd852dACd73c7B8748695eC427e203`) dan co-processor Inco Lightning live di Base Sepolia menunjukkan `setEncryptedSalary()` gagal (revert) secara konsisten, kemungkinan besar akibat ketidakcocokan versi antara SDK JS sisi klien (`@inco/lightning-js@1.0.1`) dan library Solidity sisi kontrak (`@inco/lightning@0.7.12`). Fitur ini sebelumnya sudah diposisikan sebagai demonstratif/proof-of-concept, single-tenant demo, bukan jaminan privasi produksi. Detail lengkap ada di catatan yang sama di `SKPL.md` Kelompok K.
 
 ### 2.3 Perancangan Data
 
@@ -2014,7 +2011,7 @@ Seluruh halaman portal HR dibungkus oleh layout `hr/layout.tsx` yang menyediakan
 ##### 2.4.2.1 Dashboard HR Onboarding (`/hr/onboarding`)
 
 > **[Diperbaiki]** Diagram dan tabel di bawah sebelumnya menyertakan parameter `liquidity` pada
-> `deployVault(...)` — parameter ini sudah tidak ada sejak Gen8 (`EmployeeLiquidityContract`
+> `deployVault(...)` — parameter ini sudah tidak ada (`EmployeeLiquidityContract`
 > dihapus, lihat SKPL A.1). Signature saat ini: `deployVault(hrAuthority, companyName,
 > sbtContract)`, 3 parameter. Langkah 1 (registrasi company) juga sebelumnya hanya menyebut
 > nama/NPWP/email — field NIB, nama & NIK direktur, dan dokumen akta pendirian (semuanya
@@ -3171,8 +3168,8 @@ sequenceDiagram
 
 ### A.3 Alamat Kontrak Ter-Deploy
 
-Jaringan: **Base Sepolia**, Chain ID **84532**. Redeployment Gen8.1 (`PayrollFactory` diganti
-setelah ditemukan stale — lihat catatan di bawah; `CompanyVault`/`EmploymentSBT`/IDRX tidak berubah).
+Jaringan: **Base Sepolia**, Chain ID **84532**. `PayrollFactory` sudah diganti (redeploy) setelah
+ditemukan stale — lihat catatan di bawah; `CompanyVault`/`EmploymentSBT`/IDRX tidak berubah.
 
 | Kontrak | Alamat |
 |---------|--------|
@@ -3181,11 +3178,9 @@ setelah ditemukan stale — lihat catatan di bawah; `CompanyVault`/`EmploymentSB
 | MockIDRX (ERC-20) | `0x0996e627cE22C4FE2D5c4788b159a83C065D6d09` |
 | Admin/Treasury | `0x906B34db1a8DD333ff9a84255e4AEc13C054f120` |
 
-> `EmployeeLiquidityContract` tidak lagi dideploy sejak Gen8 — fungsinya digantikan oleh fitur kasbon terintegrasi di `CompanyVault`. `ConfidentialCompanyVault` tidak lagi dideploy sejak Gen9 — lihat catatan di §2.2.2.5.
-
 Catatan: `CompanyVault` per tenant tidak memiliki alamat tetap karena di-deploy dinamis oleh `PayrollFactory.deployVault()`; alamatnya dapat diresolusi melalui `companyVaults(hrAuthority)`.
 
-> **[RESOLVED — redeploy Gen8.1]** `PayrollFactory` lama (`0xF62dF08b38c6Fbde33E24208BA044907475ca815`)
+> **[RESOLVED — sudah di-redeploy]** `PayrollFactory` lama (`0xF62dF08b38c6Fbde33E24208BA044907475ca815`)
 > terkonfirmasi stale relatif terhadap `src/` (ukuran bytecode on-chain 24.535 byte vs. hasil
 > kompilasi source terkini 24.142 byte) — `deployVault()` selalu revert instan (~500 gas, tanpa
 > reason data) saat dipanggil terhadap alamat lama, dikonfirmasi lewat forked Foundry trace.
@@ -3257,7 +3252,7 @@ Bagian ini merinci seluruh struct, enum, dan mapping yang menjadi state on-chain
 
 **Mapping CompanyVault:** `employeeStreams[address]`, `severanceVaults[address]`, `terminations[address]`, `cliffVests[address][vestId]`, `employeeComplianceAccumulated[address]`, `salaryAdvances[address]`.
 
-#### A.4.2 Struct SalaryAdvance (CompanyVault, Gen8)
+#### A.4.2 Struct SalaryAdvance (CompanyVault)
 
 | Struct | Field | Tipe | Keterangan |
 |--------|-------|------|------------|
@@ -3266,7 +3261,7 @@ Bagian ini merinci seluruh struct, enum, dan mapping yang menjadi state on-chain
 | | `requestedAt` | uint256 | Timestamp pengajuan. |
 | | `status` | AdvanceStatus | None/Pending/Active (lihat catatan `AdvanceStatus`, §2.3.1). |
 
-> `EmployeeLiquidityContract` dan struct `Pool`/`LenderDeposit`/`LoanRecord` sudah tidak ada sejak Gen8, digantikan oleh `SalaryAdvance` di atas.
+> `EmployeeLiquidityContract` dan struct `Pool`/`LenderDeposit`/`LoanRecord` sudah tidak ada, digantikan oleh `SalaryAdvance` di atas.
 
 #### A.4.3 Enum Lengkap
 
@@ -3963,7 +3958,7 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
 
 ### B.6 Layanan Background
 
-> `liquidation.ts` (Liquidation Cron) dihapus sejak Gen8 bersamaan dengan `EmployeeLiquidityContract` — kasbon tidak memiliki mekanisme likuidasi paksa; sisa kasbon yang belum lunas dihapus sebagai bad debt saat `resignEmployee()`/`executeTermination()` (lihat FR-PAYANA-706).
+> `liquidation.ts` (Liquidation Cron) dihapus bersamaan dengan `EmployeeLiquidityContract` — kasbon tidak memiliki mekanisme likuidasi paksa; sisa kasbon yang belum lunas dihapus sebagai bad debt saat `resignEmployee()`/`executeTermination()` (lihat FR-PAYANA-706).
 
 **[Paymaster Monitor (`paymasterMonitor.ts`)]**
 | | |

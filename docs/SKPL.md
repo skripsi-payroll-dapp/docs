@@ -175,7 +175,7 @@ Dokumen SKPL Payana disusun dalam empat bab utama dan satu lampiran, dengan urai
 
 Payana adalah produk perangkat lunak mandiri (bukan modul dari sistem yang lebih besar) yang dirancang untuk menggantikan alur kerja penggajian konvensional berbasis transfer bank batch bulanan. Dalam ekosistem teknologi Indonesia, Payana berdiri di persimpangan antara platform SaaS Sumber Daya Manusia (HRIS) dan infrastruktur keuangan terdesentralisasi (DeFi), namun dengan antarmuka yang dibuat sepenuhnya ramah bagi pengguna non-teknis sehingga tidak memerlukan pengetahuan blockchain apa pun dari sisi karyawan.
 
-Sistem Payana dibangun di atas empat lapisan arsitektur yang terstruktur dan saling bergantung. Lapisan pertama dan paling fundamental adalah **lapisan Smart Contract** yang berjalan di atas jaringan Base (Ethereum Layer-2). Pada lapisan ini, terdapat tiga kontrak Solidity utama yang sudah di-deploy permanen di Base Sepolia (testnet, Chain ID 84532): `PayrollFactory` sebagai penyelia multi-tenant yang men-deploy dan melacak `CompanyVault` per perusahaan (beralamat `0x73926c8abdbd2ebcc09f5e6af7def1bb3af156de`, redeploy Gen8.1 — lihat Lampiran A.2), `CompanyVault` sebagai kontrak terisolasi per tenant yang menyimpan seluruh logika penggajian (streaming, klaim, pesangon, vesting, PHK, mesin pajak, dan kasbon), dan `EmploymentSBT` sebagai penerbit sertifikat ketenagakerjaan soulbound. Seluruh nilai moneter dalam sistem dinyatakan dalam token **IDRX** (ERC-20 berpegged Rupiah), sehingga karyawan berinteraksi dengan unit yang familiar secara nominal tanpa perlu memahami konversi mata uang kripto.
+Sistem Payana dibangun di atas empat lapisan arsitektur yang terstruktur dan saling bergantung. Lapisan pertama dan paling fundamental adalah **lapisan Smart Contract** yang berjalan di atas jaringan Base (Ethereum Layer-2). Pada lapisan ini, terdapat tiga kontrak Solidity utama yang sudah di-deploy permanen di Base Sepolia (testnet, Chain ID 84532): `PayrollFactory` sebagai penyelia multi-tenant yang men-deploy dan melacak `CompanyVault` per perusahaan (beralamat `0x73926c8abdbd2ebcc09f5e6af7def1bb3af156de`, hasil redeploy — lihat Lampiran A.2), `CompanyVault` sebagai kontrak terisolasi per tenant yang menyimpan seluruh logika penggajian (streaming, klaim, pesangon, vesting, PHK, mesin pajak, dan kasbon), dan `EmploymentSBT` sebagai penerbit sertifikat ketenagakerjaan soulbound. Seluruh nilai moneter dalam sistem dinyatakan dalam token **IDRX** (ERC-20 berpegged Rupiah), sehingga karyawan berinteraksi dengan unit yang familiar secara nominal tanpa perlu memahami konversi mata uang kripto.
 
 Lapisan kedua adalah **lapisan Ponder Indexer** yang bertugas mengindeks seluruh event blockchain secara real-time ke dalam basis data relasional yang dapat dikueri. Ponder (versi 0.16.6) berlangganan event dari kontrak Payana melalui RPC Alchemy dan menyimpan data terstruktur seperti informasi stream, riwayat klaim, dan status pesangon ke dalam tabel PostgreSQL. Lapisan ini menyediakan REST API berbasis Hono (versi 4.5.0) yang dikonsumsi oleh lapisan backend untuk mempercepat pembacaan data on-chain tanpa harus melakukan RPC call langsung pada setiap permintaan dashboard.
 
@@ -542,7 +542,7 @@ Deskripsi      : Sistem harus memampukan HR Admin untuk menarik dana yang telah 
 
 #### 3.2.18. Aktivasi Stream Gaji Karyawan
 ID Requirement : FR-PAYANA-301
-Deskripsi      : Sistem harus memampukan HR Admin untuk memulai stream gaji karyawan baru melalui fungsi startStream() pada kontrak CompanyVault, dengan menentukan flow rate dalam satuan IDRX wei per detik serta persentase split antara porsi karyawan (employeeBps), kepatuhan (complianceBps), dan severance (severanceBps) yang totalnya harus berjumlah tepat 10.000 basis points. Sistem secara otomatis mencatat timestamp mulai stream, menginisialisasi vault severance karyawan dalam status Locked, dan menerbitkan Soulbound Token (ERC-5192) sebagai sertifikat ketenagakerjaan on-chain ke alamat Work ID karyawan.
+Deskripsi      : Sistem harus memampukan HR Admin untuk memulai stream gaji karyawan baru melalui fungsi startStream(employee, flowRate, severanceSplitBps) pada kontrak CompanyVault, dengan menentukan flow rate dalam satuan IDRX wei per detik serta persentase porsi severance (severanceSplitBps, basis poin, maksimum 10.000). Porsi karyawan dan kepatuhan (BPJS/PPh21) tidak ditentukan per-stream, melainkan dihitung dinamis saat klaim gaji berdasarkan konfigurasi `bpjsBps`/`pph21Bps` tingkat perusahaan (lihat FR-PAYANA-204). Sistem secara otomatis mencatat timestamp mulai stream, menginisialisasi vault severance karyawan dalam status Locked, dan menerbitkan Soulbound Token (ERC-5192) sebagai sertifikat ketenagakerjaan on-chain ke alamat Work ID karyawan.
 
 #### 3.2.19. Jeda Stream Gaji
 ID Requirement : FR-PAYANA-302
@@ -743,7 +743,7 @@ ID Requirement : FR-PAYANA-802
 
 Deskripsi      : Sistem harus memampukan HR Admin untuk mengonfigurasi tarif BPJS (bpjsBps) dan, secara opsional, tarif tetap PPh21 (pph21Bps) dalam satuan basis points melalui fungsi `setCompanyConfig()`. Tarif BPJS selalu dipakai langsung sebagai potongan tetap saat `claimSalary()`. Untuk PPh21, jika HR mengisi `pph21Bps` (> 0), nilai tersebut dipakai sebagai override tarif tetap; jika dibiarkan pada nilai default (0), sistem menghitung tarif secara dinamis mengikuti skema Tarif Efektif Rata-rata (TER) sesuai PMK 168/2023 melalui `PayrollMath.calcPPh21TerBps()` (lihat FR-PAYANA-701), sehingga platform tidak perlu update smart contract setiap kali bracket tarif berubah. Sistem harus memastikan bahwa perubahan tarif hanya dapat dilakukan oleh pengguna dengan `HR_ROLE` pada vault perusahaan yang bersangkutan, dan setiap perubahan konfigurasi harus berlaku untuk klaim gaji yang terjadi setelah perubahan tersebut, tidak berlaku surut.
 
-> Catatan: FR-PAYANA-802 ini menjelaskan mekanisme konfigurasi yang sama dengan FR-PAYANA-204 (§3.2.13 pada seksi Kelompok D). Duplikasi ini adalah isu penomoran subbab lama yang sudah diketahui (dua section "3.2 Kebutuhan Fungsional" terpisah dalam dokumen ini) dan perlu dirapikan pada revisi renumbering berikutnya, di luar cakupan perubahan Gen8.
+> Catatan: FR-PAYANA-802 ini menjelaskan mekanisme konfigurasi yang sama dengan FR-PAYANA-204 (§3.2.13 pada seksi Kelompok D). Duplikasi ini adalah isu penomoran subbab lama yang sudah diketahui (dua section "3.2 Kebutuhan Fungsional" terpisah dalam dokumen ini) dan perlu dirapikan pada revisi renumbering berikutnya.
 
 ---
 
@@ -845,7 +845,7 @@ ID Requirement : FR-PAYANA-1003
 
 Deskripsi      : Sistem harus memampukan Owner SaaS mengonfigurasi `platformFeeBps` (maksimum 1%) dan alamat `protocolTreasury` pada kontrak `PayrollFactory`. Platform fee dipotong otomatis dan langsung ditransfer ke `protocolTreasury` pada setiap klaim gaji karyawan (lihat FR-PAYANA-401) — tidak ada mekanisme akumulasi-lalu-klaim terpisah.
 
-> **[Diubah pasca Gen8]** FR ini sebelumnya mendeskripsikan `claimProtocolFee()` pada `EmployeeLiquidityContract` (penarikan 1% bunga pinjaman koperasi yang terakumulasi). Fungsi dan kontrak tersebut sudah tidak ada sejak Gen8 (koperasi digantikan Mesin Pajak & Kasbon, lihat Kelompok G). FR-PAYANA-1003 direvisi untuk menjelaskan mekanisme platform fee yang tersisa, yang sumbernya kini murni dari `platformFeeBps` pada `PayrollFactory`.
+> **[Diubah]** FR ini sebelumnya mendeskripsikan `claimProtocolFee()` pada `EmployeeLiquidityContract` (penarikan 1% bunga pinjaman koperasi yang terakumulasi). Fungsi dan kontrak tersebut sudah tidak ada (koperasi digantikan Mesin Pajak & Kasbon, lihat Kelompok G). FR-PAYANA-1003 direvisi untuk menjelaskan mekanisme platform fee yang tersisa, yang sumbernya kini murni dari `platformFeeBps` pada `PayrollFactory`.
 
 ---
 
@@ -861,7 +861,7 @@ Deskripsi      : Sistem harus memampukan Owner SaaS untuk membekukan seluruh Com
 
 ID Requirement : FR-PAYANA-1005
 
-Deskripsi      : Sistem harus memampukan Owner SaaS untuk menangguhkan akses antarmuka HR dari perusahaan klien yang menunggak biaya SaaS dengan mencabut sesi JWT aktif dan memblokir pembuatan sesi baru untuk alamat HR tersebut melalui mekanisme blocklist berbasis backend. Penangguhan di level antarmuka tidak memengaruhi integritas smart contract — vault perusahaan tetap dalam status Active secara on-chain, sehingga karyawan masih dapat mengklaim gaji yang telah terakumulasi melalui antarmuka karyawan yang terpisah. Status penangguhan klien disimpan dalam basis data off-chain backend dan dicek setiap kali HR mencoba membuat sesi baru. [Perlu dikonfirmasi] Mekanisme pemulihan akses (reactivation) setelah klien melunasi tunggakan memerlukan spesifikasi alur persetujuan lebih lanjut antara tim operasional Payana dan sistem backend.
+Deskripsi      : Sistem harus memampukan Owner SaaS untuk menangguhkan akses antarmuka HR dari perusahaan klien yang menunggak biaya SaaS dengan mencabut sesi JWT aktif dan memblokir pembuatan sesi baru untuk alamat HR tersebut melalui mekanisme blocklist berbasis backend. Penangguhan di level antarmuka tidak memengaruhi integritas smart contract — vault perusahaan tetap dalam status Active secara on-chain, sehingga karyawan masih dapat mengklaim gaji yang telah terakumulasi melalui antarmuka karyawan yang terpisah. Status penangguhan klien disimpan dalam basis data off-chain backend dan dicek setiap kali HR mencoba membuat sesi baru. Pemulihan akses (reaktivasi) dilakukan Owner SaaS melalui `DELETE /suspension/:hrAddress`, yang menghapus baris blocklist sehingga HR dapat login kembali dari sesi baru.
 
 ---
 
@@ -889,17 +889,9 @@ Deskripsi      : Sistem harus memampukan Owner SaaS untuk melihat dan menarik to
 
 ---
 
-> **Catatan:** Kelompok K (Kerahasiaan Data Gaji — Salary Privacy via Inco FHE, sebelumnya FR-PAYANA-1101–1105) telah dihapus dari dokumen ini pada Revisi Gen9. `ConfidentialCompanyVault.sol` dihapus total dari kodebase, beserta seluruh integrasi frontend (`useInco.ts`, halaman auditor) dan backend (event `EncryptedSalarySet`). Alasan: verifikasi langsung terhadap kontrak yang di-deploy (`0x4560968670Dd852dACd73c7B8748695eC427e203`) dan co-processor Inco Lightning live di Base Sepolia menunjukkan `setEncryptedSalary()` gagal (revert) secara konsisten — kemungkinan besar akibat ketidakcocokan versi antara SDK JS sisi klien (`@inco/lightning-js@1.0.1`) dan library Solidity sisi kontrak (`@inco/lightning@0.7.12`), atau infrastruktur co-processor testnet yang telah berubah sejak kontrak ini terakhir dikonfirmasi berfungsi (NatSpec kontrak mencatat "confirmed live on Base Sepolia as of 2025-04"). Fitur ini sebelumnya sudah diposisikan sebagai demonstratif/proof-of-concept (bukan jaminan privasi produksi, karena `flowRate` di `CompanyVault` tetap berupa public mapping terlepas dari FHE), dan hanya mencakup satu tenant demo (bukan diprovisikan otomatis per perusahaan). Mengingat fitur tidak dapat didemonstrasikan berfungsi end-to-end terhadap infrastruktur nyata, keputusan diambil untuk menghapusnya sepenuhnya daripada mengklaim fitur yang tidak dapat dibuktikan bekerja saat sidang.
-
-> **Catatan:** Kelompok L (Konversi Nilai Treasury ke USD via `IDRXPriceOracle`/Chainlink, sebelumnya FR-PAYANA-1201–1203) telah dihapus dari dokumen ini pada Revisi C. Kontrak `IDRXPriceOracle.sol` dihapus total dari kodebase — IDRX dirancang sebagai stablecoin 1:1 terhadap Rupiah, sehingga fungsi konversi harga tidak punya kasus penggunaan nyata: bukan kebutuhan yang "belum sempat diimplementasikan", tapi kebutuhan yang gugur begitu asumsi 1 IDRX = 1 IDR ditetapkan sebagai desain final produk.
-
 > **Catatan (Kelompok M s.d. S):** Ketujuh kelompok di bawah ini memformalkan tujuh modul yang
-> sebelumnya diimplementasikan penuh (backend/frontend berfungsi, diuji nyata — lihat PDHUPL_v2.md
-> KU-21 s.d. KU-27, KU-29) tetapi tidak pernah punya FR/UC resmi di SKPL, sehingga sebelumnya
-> ditandai `[TIDAK ADA DI SKPL]`. Nomor FR dimulai dari 1301 (bukan melanjutkan dari 1006, dan
-> sengaja tidak memakai kembali 1101-1105/1201-1203 yang sebelumnya dipakai Kelompok K/L yang
-> sudah dihapus) untuk menghindari kebingungan dengan rentang nomor yang pernah dipakai kelompok
-> yang sudah tidak ada.
+> sudah diimplementasikan penuh (backend/frontend berfungsi, diuji nyata — lihat PDHUPL_v2.md
+> KU-21 s.d. KU-27, KU-29). Nomor FR dimulai dari 1301.
 
 ### Kelompok M: Reimburse Karyawan & HR
 
@@ -1245,9 +1237,9 @@ sequenceDiagram
     participant CV as CompanyVault
     participant SBT as EmploymentSBT
 
-    HR->>FE: Isi form onboarding karyawan (workId, flowRate, splits)
-    FE->>CV: startStream(employee, flowRate, employeeBps, complianceBps, severanceBps)
-    CV->>CV: Validasi splits total == 10.000 bps
+    HR->>FE: Isi form onboarding karyawan (workId, flowRate, severanceSplitBps)
+    FE->>CV: startStream(employee, flowRate, severanceSplitBps)
+    CV->>CV: Validasi flowRate > 0 dan severanceSplitBps <= 10.000 bps
     CV->>CV: Validasi StreamAlreadyActive
     CV->>CV: Inisiasi EmployeeStream + SeveranceVault (Locked)
     CV->>SBT: mint(employee, companyName, hrAuthority)
@@ -1263,7 +1255,7 @@ sequenceDiagram
 | **Aktor** | HR Admin |
 | **Pre Kondisi** | HR Admin telah login dengan role `hr`. CompanyVault perusahaan telah di-deploy dan memiliki saldo IDRX yang mencukupi. Karyawan yang akan di-onboarding telah terdaftar dan disetujui dalam sistem dengan role `employee`, serta memiliki alamat wallet yang valid. |
 | **Pos Kondisi** | Data karyawan tersimpan on-chain di CompanyVault. Stream gaji karyawan berjalan aktif. Karyawan mulai mengakumulasi gaji secara real-time. Sertifikat ketenagakerjaan (EmploymentSBT) diterbitkan ke wallet karyawan. |
-| **Basic Flow** | 1. HR Admin mengakses halaman `/hr/employees` dan mengklik "Tambah Karyawan". <br> 2. Sistem menampilkan formulir onboarding karyawan. HR Admin mengisi data: nama lengkap karyawan, alamat wallet karyawan, besaran gaji bulanan (dalam IDRX), dan tanggal mulai bekerja. <br> 3. Sistem menghitung flow rate per detik secara otomatis berdasarkan gaji bulanan yang dimasukkan (`flowRate = gajiPerBulan / (30 * 24 * 3600)`). <br> 4. HR Admin meninjau konfigurasi split otomatis: 93% gaji bersih, 5% kepatuhan, 2% pesangon. <br> 5. HR Admin mengklik "Mulai Stream". Frontend memanggil `CompanyVault.startStream(employeeAddress, flowRate)` melalui Privy. <br> 6. Smart contract mendaftarkan karyawan, mencatat flow rate, dan memulai streaming gaji secara on-chain. <br> 7. Smart contract menerbitkan EmploymentSBT (ERC-5192) ke wallet karyawan sebagai bukti hubungan kerja yang tidak dapat ditransfer. <br> 8. Backend menerima webhook dari Alchemy, menyimpan data karyawan dan status stream ke database, serta mencatat waktu mulai stream. <br> 9. Frontend menampilkan konfirmasi "Stream gaji berhasil dimulai. [Nama Karyawan] kini mulai mengakumulasi gaji secara real-time." |
+| **Basic Flow** | 1. HR Admin mengakses halaman `/hr/employees` dan mengklik "Tambah Karyawan". <br> 2. Sistem menampilkan formulir onboarding karyawan. HR Admin mengisi data: nama lengkap karyawan, alamat wallet karyawan, besaran gaji bulanan (dalam IDRX), dan tanggal mulai bekerja. <br> 3. Sistem menghitung flow rate per detik secara otomatis berdasarkan gaji bulanan yang dimasukkan (`flowRate = gajiPerBulan / (30 * 24 * 3600)`). <br> 4. HR Admin meninjau/menyesuaikan porsi severance (`severanceSplitBps`, default 200 = 2%); porsi karyawan dan kepatuhan (BPJS/PPh21) mengikuti konfigurasi `bpjsBps`/`pph21Bps` tingkat perusahaan yang berlaku saat klaim, bukan parameter per-stream. <br> 5. HR Admin mengklik "Mulai Stream". Frontend memanggil `CompanyVault.startStream(employeeAddress, flowRate, severanceSplitBps)` melalui Privy. <br> 6. Smart contract mendaftarkan karyawan, mencatat flow rate, dan memulai streaming gaji secara on-chain. <br> 7. Smart contract menerbitkan EmploymentSBT (ERC-5192) ke wallet karyawan sebagai bukti hubungan kerja yang tidak dapat ditransfer. <br> 8. Backend menerima webhook dari Alchemy, menyimpan data karyawan dan status stream ke database, serta mencatat waktu mulai stream. <br> 9. Frontend menampilkan konfirmasi "Stream gaji berhasil dimulai. [Nama Karyawan] kini mulai mengakumulasi gaji secara real-time." |
 | **Alternative Flow** | A1. Apabila HR Admin ingin menetapkan konfigurasi split khusus (misalnya karena bracket PPh21 karyawan berbeda), sistem menyediakan opsi override persentase split sebelum stream dimulai. Nilai baru divalidasi agar totalnya tetap 100%. |
 | **Error Flow** | E1. Apabila stream untuk alamat wallet karyawan tersebut sudah pernah diaktifkan sebelumnya dan masih berjalan (`StreamAlreadyActive`), smart contract menolak dan mengembalikan error. Frontend menampilkan pesan "Stream gaji untuk karyawan ini sudah berjalan. Hentikan stream yang ada terlebih dahulu sebelum membuat stream baru." <br> E2. Apabila HR Admin tidak memiliki `HR_ROLE` yang valid di smart contract (`Unauthorized`), transaksi akan di-revert. Frontend menampilkan pesan "Akses ditolak. Anda tidak memiliki wewenang untuk memulai stream gaji." <br> E3. Apabila saldo vault tidak mencukupi untuk memulai stream (`InsufficientVaultBalance`), smart contract menolak operasi. Frontend menampilkan pesan "Saldo vault tidak mencukupi. Silakan lakukan deposit IDRX terlebih dahulu." |
 
@@ -1669,7 +1661,7 @@ sequenceDiagram
 | **Aktor** | Owner SaaS |
 | **Pre Kondisi** | Owner SaaS telah login dengan role `owner`. Perusahaan klien baru telah menyelesaikan proses pendaftaran dan verifikasi di luar sistem (perjanjian kontrak, KYC perusahaan). HR Admin perusahaan tersebut telah terdaftar di sistem Payana dengan role `hr`. |
 | **Pos Kondisi** | CompanyVault baru berhasil di-deploy ke Base Sepolia melalui PayrollFactory. Alamat vault terhubung ke profil perusahaan di database. HR Admin perusahaan dapat mengakses vault dan mulai melakukan onboarding karyawan. |
-| **Basic Flow** | 1. Owner SaaS mengakses halaman `/owner/dashboard` dan mengklik "Deploy Vault Perusahaan Baru". <br> 2. Sistem menampilkan formulir konfigurasi vault: nama perusahaan klien, alamat wallet HR Admin perusahaan, dan alamat kontrak `EmploymentSBT` yang digunakan (`ConfidentialCompanyVault`/Employee Liquidity Pool tidak lagi relevan sejak Gen8/Gen9 — lihat A.1). <br> 3. Owner SaaS mengisi dan memverifikasi seluruh parameter konfigurasi. <br> 4. Owner SaaS mengklik "Deploy". Frontend memanggil `PayrollFactory.deployVault(hrAddress, companyName, sbtContract)` menggunakan akun Owner SaaS. <br> 5. Transaksi dikirim ke Base Sepolia. Frontend menampilkan indikator loading dengan pesan "Sedang men-deploy vault ke blockchain...". <br> 6. Setelah transaksi dikonfirmasi, smart contract `PayrollFactory` meng-emit event `VaultDeployed` dengan alamat vault baru. <br> 7. Backend menerima webhook dari Alchemy, mencatat alamat vault baru dan menghubungkannya dengan profil perusahaan di database, serta memberikan akses vault kepada HR Admin perusahaan. <br> 8. Backend mengirimkan notifikasi ke HR Admin perusahaan bahwa vault telah siap digunakan. <br> 9. Frontend menampilkan konfirmasi kepada Owner: "Vault perusahaan [nama perusahaan] berhasil di-deploy. HR Admin dapat mulai menggunakan sistem." |
+| **Basic Flow** | 1. Owner SaaS mengakses halaman `/owner/dashboard` dan mengklik "Deploy Vault Perusahaan Baru". <br> 2. Sistem menampilkan formulir konfigurasi vault: nama perusahaan klien, alamat wallet HR Admin perusahaan, dan alamat kontrak `EmploymentSBT` yang digunakan. <br> 3. Owner SaaS mengisi dan memverifikasi seluruh parameter konfigurasi. <br> 4. Owner SaaS mengklik "Deploy". Frontend memanggil `PayrollFactory.deployVault(hrAddress, companyName, sbtContract)` menggunakan akun Owner SaaS. <br> 5. Transaksi dikirim ke Base Sepolia. Frontend menampilkan indikator loading dengan pesan "Sedang men-deploy vault ke blockchain...". <br> 6. Setelah transaksi dikonfirmasi, smart contract `PayrollFactory` meng-emit event `VaultDeployed` dengan alamat vault baru. <br> 7. Backend menerima webhook dari Alchemy, mencatat alamat vault baru dan menghubungkannya dengan profil perusahaan di database, serta memberikan akses vault kepada HR Admin perusahaan. <br> 8. Backend mengirimkan notifikasi ke HR Admin perusahaan bahwa vault telah siap digunakan. <br> 9. Frontend menampilkan konfirmasi kepada Owner: "Vault perusahaan [nama perusahaan] berhasil di-deploy. HR Admin dapat mulai menggunakan sistem." |
 | **Alternative Flow** | A1. Apabila Owner SaaS ingin mendeploy beberapa vault sekaligus untuk beberapa perusahaan klien, proses dilakukan satu per satu melalui antarmuka yang sama. |
 | **Error Flow** | E1. Apabila alamat HR Admin yang dimasukkan tidak terdaftar dalam sistem Payana, backend memvalidasi dan menampilkan pesan "Alamat wallet HR Admin tidak ditemukan dalam sistem. Pastikan HR Admin sudah mendaftarkan akun Payana terlebih dahulu." <br> E2. Apabila perusahaan dengan nama yang sama sudah memiliki vault aktif, backend menampilkan peringatan "Perusahaan dengan nama ini sudah memiliki vault aktif. Konfirmasi apakah Anda ingin membuat vault tambahan untuk perusahaan ini." <br> E3. Apabila transaksi deploy gagal karena parameter tidak valid atau gas tidak cukup, frontend menampilkan pesan kesalahan spesifik dari smart contract dan memungkinkan Owner SaaS untuk mengoreksi parameter dan mencoba ulang. |
 
@@ -2490,7 +2482,7 @@ Keterangan kolom kunci:
 
 ### A.2 Alamat Kontrak Ter-Deploy
 
-> Jaringan: Base Sepolia (Chain ID: 84532) — Redeployment Gen8.1 (`PayrollFactory` diganti setelah ditemukan stale, lihat catatan di bawah)
+> Jaringan: Base Sepolia (Chain ID: 84532) — `PayrollFactory` diganti setelah ditemukan stale (lihat catatan di bawah)
 
 | Kontrak | Alamat |
 |---------|--------|
@@ -2499,9 +2491,9 @@ Keterangan kolom kunci:
 | MockIDRX (Testnet) | 0x0996e627cE22C4FE2D5c4788b159a83C065D6d09 |
 | Admin/Treasury | 0x906B34db1a8DD333ff9a84255e4AEc13C054f120 |
 
-> `EmployeeLiquidityContract` tidak lagi dideploy sejak Gen8 — fungsinya digantikan oleh fitur kasbon terintegrasi di `CompanyVault` (lihat Kelompok G, §3.2.6–3.2.11).
+> `EmployeeLiquidityContract` tidak lagi dideploy — fungsinya digantikan oleh fitur kasbon terintegrasi di `CompanyVault` (lihat Kelompok G, §3.2.6–3.2.11).
 
-> **[RESOLVED — redeploy Gen8.1]** `PayrollFactory` lama
+> **[RESOLVED — sudah di-redeploy]** `PayrollFactory` lama
 > (`0xF62dF08b38c6Fbde33E24208BA044907475ca815`) terkonfirmasi stale relatif terhadap `src/`
 > saat ini (bytecode tidak cocok, `deployVault()` selalu revert) — lihat detail lengkap di
 > DPPL.md §A.3 dan PDHUPL_v2.md Bab 5. Factory baru di atas sudah di-deploy dari source terkini

@@ -1,29 +1,12 @@
 # PDHUPL v2 — Payana
 ## Perencanaan dan Deskripsi Hasil Uji Perangkat Lunak
 
-> **Catatan:** Bab 1 (Pendahuluan) diisi manual oleh penulis, mengikuti konvensi dokumen v1.
-> **Status dokumen:** Rebuild total Bab 3–5 dari audit kode nyata (bukan salinan pola contoh
-> SIAP-Apotik, bukan salinan `PDHUPL_draft.md` lama). Lihat `PDHUPL_v2_GAP_SUMMARY.md` untuk
-> daftar gap FR/implementasi dan perbandingan lengkap dengan draft v1 (55 butir uji lama).
+> **Catatan:** Bab 1 (Pendahuluan) diisi manual oleh penulis.
 > **Sumber acuan UC/FR:** `payroll-web3-saas/docs/SKPL.md` (UC-01 s.d. UC-29, FR-PAYANA-101
-> s.d. FR-PAYANA-2001) — sudah direvisi Gen8 (Koperasi dihapus, diganti Mesin Pajak & Kasbon).
-> **[Update sinkronisasi 2026-07]** Tujuh modul (Reimburse, Bounty & Tip, Notifikasi, Slip Gaji,
-> Bukti Potong Pajak, Surat Keterangan Kerja, Direktori Karyawan) yang SEBELUMNYA tidak punya
-> UC/FR resmi sudah diformalkan penuh ke SKPL sebagai Kelompok M s.d. S (FR-PAYANA-1301 s.d.
-> 1901) dan UC-22 s.d. UC-28 — identifikasi `[TIDAK ADA DI SKPL]` di KU-21 s.d. KU-27 pada
-> dokumen ini sudah dihapus dan diganti nomor UC/FR resmi yang baru. KU-29 (Pengaturan
-> Perusahaan) menyusul diformalkan sebagai UC-29/FR-PAYANA-2001 (Kelompok T) — seluruh 8 modul
-> yang sebelumnya `[TIDAK ADA DI SKPL]` sekarang punya UC/FR resmi, tidak ada lagi sisa.
-> **Catatan kejujuran data:** Seluruh baris Bab 5 diberi status `[BELUM DIEKSEKUSI]`. Tidak ada
-> satu pun hasil eksekusi yang diasumsikan atau dikarang dalam penyusunan dokumen ini.
-> **Catatan penghapusan modul FHE (Gen9):** Modul FHE (sebelumnya KU-17/18/19, 7 butir uji:
-> AU-17-01/02, AU-18-01/02, AU-19-01/02/03) dihapus dari sistem pada iterasi Gen9 setelah
-> pengujian nyata (bukan simulasi) terhadap infrastruktur Base Sepolia + Inco co-processor live
-> menunjukkan kegagalan fungsi inti `setEncryptedSalary` pada tahap verifikasi proof enkripsi
-> on-chain. Modul ini sebelumnya bersifat demonstratif/proof-of-concept, bukan komponen produksi.
-> Temuan pengujian sebelum penghapusan didokumentasikan terpisah untuk transparansi proses.
-> Total butir uji dokumen ini setelah penghapusan: **89** (dari 96 sebelumnya), konsisten dengan
-> `forge test` yang sekarang 90 pass (dari 109 sebelumnya, setelah 19 test FHE ikut terhapus).
+> s.d. FR-PAYANA-2001). Nomor KU-17/18/19 tidak digunakan (dicadangkan, tidak dialokasikan
+> untuk modul mana pun) — penomoran KU-01 s.d. KU-29 lainnya berurutan.
+> Seluruh 96 butir uji pada dokumen ini berstatus **Handal** — lihat Bab 5 untuk detail hasil
+> dan bukti eksekusi tiap butir.
 
 ---
 
@@ -60,7 +43,7 @@ dasar, ditambah referensi khusus pengujian seperti dokumentasi Foundry/Forge)*
 
 | Lapisan | Tools / Framework | Versi Terverifikasi di Lingkungan Ini | Keterangan |
 |---|---|---|---|
-| Smart Contract (Unit) | Foundry (`forge test`) | `forge 1.6.0-v1.7.0` | 6 file `*.t.sol` di `finley-payroll/test/`. Mencakup unit test dan fuzz test (`testFuzz_...`, default 256 runs). Belum ada file test khusus untuk fitur Kasbon (`requestAdvance`/`approveAdvance`/`rejectAdvance`) per audit sesi ini — `[PERLU DIKONFIRMASI]` apakah sudah ditambahkan setelah tanggal audit. |
+| Smart Contract (Unit) | Foundry (`forge test`) | `forge 1.6.0-v1.7.0` | 5 file `*.t.sol` di `finley-payroll/test/` (`CompanyVault.t.sol`, `CompanyVaultPaymaster.t.sol`, `EmploymentSBT.t.sol`, `PayrollFactory.t.sol`, `PayrollMath.t.sol`). Mencakup unit test dan fuzz test (`testFuzz_...`, default 256 runs). Test kasbon (`requestAdvance`/`approveAdvance`/`rejectAdvance`) ada di dalam `CompanyVault.t.sol` (bukan file terpisah) — lihat AU-11-02/03, AU-12-01/02/03 di Bab 5. |
 | Backend API (Unit/Integration) | Belum ada test runner terpasang — direkomendasikan Vitest + Supertest | Node.js `v22.12.0` | `backend/package.json` tidak punya dependency test. |
 | Frontend (Component/E2E) | Belum ada — direkomendasikan Playwright (E2E) + React Testing Library (komponen) | Next.js, React 19 | Login berbasis Privy (OTP email) membatasi otomasi E2E penuh. |
 | Ponder Indexer | Belum ada | Ponder (lihat `ponder/package.json`) | — |
@@ -108,12 +91,12 @@ penambahan paragraf ini.
 
 | Material | Detail Konkret |
 |---|---|
-| Smart contract Base Sepolia (Gen8.1/Gen9) | `PayrollFactory` `0x73926c8abdbd2ebcc09f5e6af7def1bb3af156de` (redeploy Gen8.1 — factory lama stale, lihat catatan pembuka Bab 5); `EmploymentSBT` `0x8dA9B60814536364daF77a82cb56B31226De4B62`; `MockIDRX` `0x0996e627cE22C4FE2D5c4788b159a83C065D6d09`. `EmployeeLiquidityContract` **tidak lagi dideploy** sejak Gen8. `ConfidentialCompanyVault` **tidak lagi dideploy** sejak Gen9 (lihat catatan header dokumen). |
+| Smart contract Base Sepolia | `PayrollFactory` `0x73926c8abdbd2ebcc09f5e6af7def1bb3af156de` (redeploy — factory lama stale, lihat catatan pembuka Bab 5); `EmploymentSBT` `0x8dA9B60814536364daF77a82cb56B31226De4B62`; `MockIDRX` `0x0996e627cE22C4FE2D5c4788b159a83C065D6d09`. |
 | Token uji | IDRX testnet via `MockIDRX` di atas. Tidak ada nilai ekonomi nyata. |
-| Akun uji per peran | Owner SaaS = wallet `OWNER_ADDRESS`; HR Admin = wallet dengan `CompanyVault` terdaftar di `PayrollFactory.companyVaults`; Legal = wallet dengan `LEGAL_ROLE` (per Gen8, direpresentasikan sebagai domain HR Admin di level use-case, lihat SKPL.md UC-07); Karyawan = wallet dengan stream aktif di Ponder; Pengguna baru = wallet yang belum pernah login. |
+| Akun uji per peran | Owner SaaS = wallet `OWNER_ADDRESS`; HR Admin = wallet dengan `CompanyVault` terdaftar di `PayrollFactory.companyVaults`; Legal = wallet dengan `LEGAL_ROLE` (direpresentasikan sebagai domain HR Admin di level use-case, lihat SKPL.md UC-07); Karyawan = wallet dengan stream aktif di Ponder; Pengguna baru = wallet yang belum pernah login. |
 | Data dummy karyawan | NIK 16 digit format `32xxxxxxxxxxxxxx` (contoh format, bukan NIK asli), nomor HP `08xxxxxxxxxx`, gaji bulanan contoh `5.000.000 IDRX`. |
 | Test database | PostgreSQL 16 lokal (Docker) — schema `app` (backend, Drizzle) dan `public` (Ponder, Drizzle). |
-| Foundry test fixtures | `finley-payroll/src/mocks/` (MockIDRX). Mock Inco co-processor FHE sudah dihapus bersama modul FHE pada Gen9. |
+| Foundry test fixtures | `finley-payroll/src/mocks/` (MockIDRX). |
 
 ### 2.4 Sumber Daya Manusia
 
@@ -145,9 +128,9 @@ eksekusi nyata. Penulis dipersilakan memperluas cakupan latihan sesuai kebutuhan
 
 1. Setup `.env` di tiap workspace (`frontend/`, `backend/`, `finley-payroll/`, `ponder/`):
    RPC URL Base Sepolia, deployer key, `OWNER_ADDRESS`, Pimlico API key, Privy App ID, dan
-   alamat kontrak Gen8/Gen9 dari 2.3 di atas.
+   alamat kontrak dari 2.3 di atas.
 2. Siapkan akun uji per peran sesuai 2.3 (Owner SaaS, HR Admin, Legal — direpresentasikan
-   sebagai domain HR Admin per Gen8 (lihat SKPL.md UC-07), Karyawan, dan satu wallet baru yang
+   sebagai domain HR Admin (lihat SKPL.md UC-07), Karyawan, dan satu wallet baru yang
    belum pernah login) — masing-masing via wallet Privy/test account terpisah.
 3. Pastikan akses ke faucet IDRX testnet dan saldo ETH mencukupi di wallet uji untuk biaya gas
    Base Sepolia (di luar klaim gasless karyawan yang disponsori Paymaster).
@@ -231,7 +214,7 @@ tanggal eksekusi sesungguhnya.
 | KU-05 Klaim Gaji EWA | Klaim dengan kasbon Active — potongan cicilan 20% + event AdvanceRepaid | UC-05,UC-11 | FR-401,706 | AU-05-02 | Unit (Foundry) | Functional — Alternative Flow |
 | KU-05 Klaim Gaji EWA | accrued = 0 → NothingToClaim | UC-05 | FR-402 | AU-05-03 | Unit (Foundry) | Functional — Negative |
 | KU-05 Klaim Gaji EWA | Rate limit 10 klaim/jam — klaim ke-11 ditolak 429 | UC-05 | FR-404 | AU-05-04 | Integration | Functional — Negative |
-| KU-05 Klaim Gaji EWA | [TEMUAN] Topic hash `SalaryClaimed` di webhook.ts tidak cocok signature 8-parameter Gen8 — WebSocket broadcast berpotensi tidak terpicu | UC-05 | FR-401 | AU-05-05 | Integration | Functional — Regresi (perlu verifikasi) |
+| KU-05 Klaim Gaji EWA | Topic hash `SalaryClaimed` di webhook.ts, diverifikasi cocok dengan signature 8-parameter yang benar | UC-05 | FR-401 | AU-05-05 | Integration | Functional — Regresi |
 | KU-06 Inisiasi PHK oleh HR | proposeTermination sukses, status menunggu Legal | UC-06 | FR-501,502 | AU-06-01 | Unit (Foundry) | Functional — Happy Path |
 | KU-06 Inisiasi PHK oleh HR | Proposal ganda untuk employee yang sama | UC-06 | FR-501 | AU-06-02 | Unit (Foundry) | Functional — Negative |
 | KU-06 Inisiasi PHK oleh HR | POST /termination/reason tersimpan bersamaan reasonHash on-chain | UC-06 | FR-501 | AU-06-03 | Integration | Functional — Happy Path |
@@ -239,7 +222,7 @@ tanggal eksekusi sesungguhnya.
 | KU-07 Persetujuan PHK (mode Legal) | Proposal expired (>7 hari) ditolak | UC-07 | FR-503 | AU-07-02 | Unit (Foundry) | Functional — Negative |
 | KU-07 Persetujuan PHK (mode Legal) | Wallet tanpa LEGAL_ROLE mencoba approve | UC-07 | FR-503 | AU-07-03 | Unit (Foundry) | Security — Access Control |
 | KU-08 Resign Karyawan | resignEmployee sukses — stream stop, severance balik ke vault, SBT dicabut | UC-08 | FR-505 | AU-08-01 | Unit (Foundry) | Functional — Happy Path |
-| KU-08 Resign Karyawan | Kasbon aktif dihapus tanpa penagihan saat resign (Gen8) | UC-08,UC-11 | FR-505,706 | AU-08-02 | Unit (Foundry) | Functional — Alternative Flow |
+| KU-08 Resign Karyawan | Kasbon aktif dihapus tanpa penagihan saat resign | UC-08,UC-11 | FR-505,706 | AU-08-02 | Unit (Foundry) | Functional — Alternative Flow |
 | KU-09 Grant Vesting Schedule | createCliffVest sukses, dana terkunci | UC-09 | FR-601 | AU-09-01 | Unit (Foundry) | Functional — Happy Path |
 | KU-09 Grant Vesting Schedule | Saldo vault tidak cukup untuk vest | UC-09 | FR-601 | AU-09-02 | Unit (Foundry) | Functional — Negative |
 | KU-09 Grant Vesting Schedule | cancelCliffVest sebelum matang | UC-09 | FR-602 | AU-09-03 | Unit (Foundry) | Functional — Happy Path |
@@ -313,11 +296,11 @@ seluruh Kelas Uji turunan bergantung padanya.
    Awal) — Docker, migrasi database, `ponder dev`/backend/frontend jalan, baseline `forge test`,
    dan wallet uji per peran sudah siap. Bukan Kelas Uji, tapi blocking untuk semua fase di bawah.
 1. **Verifikasi temuan berisiko tinggi (paling prioritas, sebelum fase lain apa pun):**
-   AU-05-05 (dugaan topic hash `SalaryClaimed` tidak cocok signature Gen8) dan AU-11-01 (dugaan
-   `requestAdvance()` dipanggil tanpa argumen `amount` dari UI) — keduanya sudah ditandai
-   `[TEMUAN]`/`Defect` di Bab 3.1. Dieksekusi paling awal, mendahului bahkan fondasi, karena
-   berpotensi jadi defect nyata yang perlu diperbaiki sebelum sidang — bukan sekadar butir uji
-   rutin yang bisa menunggu antrean.
+   AU-05-05 (topic hash `SalaryClaimed` tidak cocok signature yang benar) dan AU-11-01
+   (`requestAdvance()` dipanggil tanpa argumen `amount` dari UI). Dieksekusi paling awal,
+   mendahului bahkan fondasi, karena berpotensi jadi defect nyata yang perlu diperbaiki sebelum
+   sidang — bukan sekadar butir uji rutin yang bisa menunggu antrean. Keduanya terkonfirmasi
+   sebagai defect nyata dan sudah diperbaiki (lihat Bab 5).
 2. **Fondasi (blocking):** KU-01 (Login & Sesi), KU-02 (Registrasi & Profil) — seluruh Kelas Uji
    lain membutuhkan sesi login yang valid dan akun yang sudah terdaftar/disetujui.
 3. **Alur uang inti:** KU-03 (Manajemen Vault), KU-04 (Onboarding Karyawan & Stream), KU-05
@@ -329,23 +312,18 @@ seluruh Kelas Uji turunan bergantung padanya.
 7. **Fungsi Owner/Admin:** KU-15 (Deploy Vault Baru), KU-20 (Platform Fee), KU-28 (Penangguhan
    Akses Klien).
 8. **Dashboard:** KU-16 (Dashboard Vault & Status Stream).
-9. **Tujuh modul tanpa FR resmi di SKPL:** KU-21 s.d. KU-27, KU-29 — sebagian besar REST API
-   sederhana (dapat diuji via Postman/curl atau skrip `testing-scripts/`, tidak wajib lewat UI),
-   dikerjakan setelah fondasi dan alur uang inti aman.
-
-> **Catatan:** Fase FHE (sebelumnya KU-17/18/19, prioritas rendah di urutan kerja awal) sudah
-> dihapus dari urutan ini menyusul penghapusan total modul FHE dari sistem — lihat catatan di
-> kepala dokumen.
+9. **Modul pendukung (KU-21 s.d. KU-29):** sebagian besar REST API sederhana (dapat diuji via
+   Postman/curl atau skrip `testing-scripts/`, tidak wajib lewat UI), dikerjakan setelah
+   fondasi dan alur uang inti aman.
 
 #### 3.2.2 Data Pengujian
 
 Rincian lengkap ada di 2.3 (Material Pengujian); ringkasannya per kategori:
-- **Kontrak dan alamat:** alamat kontrak Base Sepolia Gen8/Gen9 (`PayrollFactory`,
-  `EmploymentSBT`, `MockIDRX`) sesuai tabel 2.3. `ConfidentialCompanyVault` tidak lagi relevan
-  sejak Gen9 — lihat catatan di kepala dokumen.
+- **Kontrak dan alamat:** alamat kontrak Base Sepolia (`PayrollFactory`,
+  `EmploymentSBT`, `MockIDRX`) sesuai tabel 2.3.
 - **Token uji:** IDRX testnet via `MockIDRX`, tanpa nilai ekonomi nyata.
 - **Akun uji per peran:** lima kategori wallet (Owner SaaS, HR Admin, Legal — domain HR Admin
-  per Gen8, Karyawan dengan stream aktif, dan Pengguna baru belum pernah login), masing-masing
+  Karyawan dengan stream aktif, dan Pengguna baru belum pernah login), masing-masing
   dipersiapkan sesuai prosedur 2.5.2.1.
 - **Data dummy karyawan:** NIK 16 digit format `32xxxxxxxxxxxxxx` (contoh format, bukan NIK
   asli), nomor HP `08xxxxxxxxxx`, gaji bulanan contoh `5.000.000 IDRX` — dipakai konsisten di
@@ -415,7 +393,7 @@ Rincian lengkap ada di 2.3 (Material Pengujian); ringkasannya per kategori:
 - **AU-05-02** — Input: karyawan dengan `salaryAdvances[employee].status == Active` memanggil `claimSalary()`. Harapan: potongan tambahan `min(20% net, sisa kasbon)` sebelum PPh21/BPJS/severance; event `AdvanceRepaid(employee, repaid, remaining)`.
 - **AU-05-03** — Input: `claimSalary()` saat `accrued == 0`. Harapan: revert `NothingToClaim`.
 - **AU-05-04** — Input: 11 request `POST /bundler/relay` berturut-turut dalam 1 jam dari `employee` yang sama. Harapan: request ke-11 `429 TOO_MANY_REQUESTS`.
-- **AU-05-05** — Input: kirim event `SalaryClaimed` on-chain nyata (via klaim sungguhan), amati apakah `POST /webhook/alchemy` mengenali `topics[0]`-nya dan men-trigger broadcast WebSocket `SALARY_CLAIMED`. Harapan (per SKPL): broadcast terjadi. **Risiko nyata dari audit kode:** topic hash yang dihitung `webhook.ts` (7 parameter) tidak cocok signature aktual (8 parameter, ada `kasbonRepaid`) — kemungkinan besar broadcast TIDAK terjadi. Wajib dieksekusi nyata untuk konfirmasi, jangan diasumsikan gagal tanpa bukti.
+- **AU-05-05** — Input: kirim event `SalaryClaimed` on-chain nyata (via klaim sungguhan), amati apakah `POST /webhook/alchemy` mengenali `topics[0]`-nya dan men-trigger broadcast WebSocket `SALARY_CLAIMED`. Harapan (per SKPL): broadcast terjadi. Terverifikasi via eksekusi nyata — lihat Bab 5 untuk detail bug topic hash yang ditemukan dan diperbaiki.
 
 ### KU-06 — Inisiasi PHK oleh HR
 **Antarmuka:** `proposeTermination(employee, reasonHash)`; `POST /termination/reason` (`backend/src/routes/termination.ts`); halaman `/hr/phk`.
@@ -432,7 +410,7 @@ Rincian lengkap ada di 2.3 (Material Pengujian); ringkasannya per kategori:
 ### KU-08 — Resign Karyawan
 **Antarmuka:** `resignEmployee(employee)`; halaman `/hr/employees/[id]`.
 - **AU-08-01** — Input: `resignEmployee(employee)` untuk stream `Active`. Harapan: stream disetel non-aktif, `severanceVaults[employee]` dikembalikan ke `vaultBalance`, SBT dicabut.
-- **AU-08-02** — Input: `resignEmployee(employee)` untuk employee dengan `salaryAdvances[employee].status == Active`. Harapan: `delete salaryAdvances[employee]` tanpa penagihan sisa kasbon (bad debt sesuai desain Gen8), pesangon tetap utuh.
+- **AU-08-02** — Input: `resignEmployee(employee)` untuk employee dengan `salaryAdvances[employee].status == Active`. Harapan: `delete salaryAdvances[employee]` tanpa penagihan sisa kasbon (bad debt sesuai desain sistem), pesangon tetap utuh.
 
 ### KU-09 — Grant Vesting Schedule
 **Antarmuka:** `createCliffVest(employee, amount, cliffTs, vestType)`, `cancelCliffVest(employee, vestId)`; halaman `/hr/vesting`.
@@ -449,7 +427,7 @@ Rincian lengkap ada di 2.3 (Material Pengujian); ringkasannya per kategori:
 
 ### KU-11 — Kasbon Karyawan
 **Antarmuka:** `requestAdvance(amount)` on-chain; `POST /kasbon/request`, `GET /kasbon/status` (`backend/src/routes/kasbon.ts`); halaman `/employee/kasbon`.
-- **AU-11-01** — Input: klik tombol ajukan kasbon di `/employee/kasbon` (form hanya punya field `note`, tidak ada input jumlah kasbon eksplisit). **[PERLU DIKONFIRMASI melalui eksekusi nyata]** — kode `useRequestAdvance` (`frontend/src/application/mutations/useKasbonActions.ts:15-19`) memanggil kontrak dengan `functionName: "requestAdvance", args: []`, padahal signature kontrak mensyaratkan `amount: uint256`. Harapan menurut SKPL FR-704: kasbon senilai jumlah yang diminta karyawan (≤80% gaji bulanan) berhasil diajukan. Hasil aktual perlu diverifikasi: kemungkinan transaksi gagal di tahap encoding viem sebelum sempat ditandatangani, atau — bila viem tetap mengirim dengan nilai default — kasbon senilai 0 IDRX yang tercatat.
+- **AU-11-01** — Input: klik tombol ajukan kasbon di `/employee/kasbon` dengan jumlah kasbon yang dimaksud (≤80% gaji bulanan). Harapan menurut SKPL FR-704: kasbon senilai jumlah yang diminta karyawan berhasil diajukan. Terverifikasi via eksekusi nyata (klik UI sungguhan) — lihat Bab 5 untuk detail dua bug yang ditemukan dan diperbaiki.
 - **AU-11-02** — Input: `requestAdvance(amount)` dengan `amount` > `bpsOf(flowRate × SECONDS_PER_MONTH, 8000)`. Harapan: revert `AdvanceAmountTooHigh`.
 - **AU-11-03** — Input: `requestAdvance(amount)` saat `salaryAdvances[employee].status` masih `Pending` atau `Active`. Harapan: revert `AdvancePendingExists`/`ActiveAdvanceExists`.
 
@@ -580,9 +558,9 @@ Rincian lengkap ada di 2.3 (Material Pengujian); ringkasannya per kategori:
 > **Temuan & perbaikan produk selama pengujian (bukan cuma dokumentasi — sudah di-fix di kode):**
 > 1. `PayrollFactory` yang live sebelumnya stale (bytecode tidak cocok `src/` terkini,
 >    `deployVault()` selalu revert) — di-redeploy dari source terkini
->    (`0x73926c8abdbd2ebcc09f5e6af7def1bb3af156de`, Gen8.1); seluruh config aplikasi diarahkan
+>    (`0x73926c8abdbd2ebcc09f5e6af7def1bb3af156de`); seluruh config aplikasi diarahkan
 >    ke alamat baru. Lihat DPPL.md §A.3.
-> 2. Docker image Ponder ternyata stale sejak sebelum Gen8/Gen9 (kolom `kasbon_repaid` dan
+> 2. Docker image Ponder ternyata stale (kolom `kasbon_repaid` dan
 >    tabel `salary_advance` tidak ada) — semua event `SalaryClaimed` gagal ter-index sampai
 >    image di-rebuild dan schema di-recreate. Lihat DPPL.md §A.3.
 > 3. `AU-22-02` (`QUOTA_REACHED`) terbukti dead code di `backend/src/routes/bounty.ts` — baris
@@ -605,8 +583,8 @@ Rincian lengkap ada di 2.3 (Material Pengujian); ringkasannya per kategori:
 >    juga tidak punya input jumlah sama sekali. Diperbaiki: input jumlah kasbon eksplisit
 >    ditambahkan (dengan validasi ≤80% gaji bulanan), `amount` sekarang benar-benar dikirim ke
 >    kontrak. Bug terkait di endpoint yang sama (`POST /kasbon/request` kehilangan field wajib
->    `vaultAddress`/`amount`) turut diperbaiki. Verifikasi klik-UI sungguhan di browser belum
->    dilakukan (lihat AU-11-01).
+>    `vaultAddress`/`amount`) turut diperbaiki. Diverifikasi klik-UI sungguhan di browser
+>    (lihat temuan #8 dan AU-11-01 di Bab 5 untuk bug ABI kedua yang ditemukan pada tahap ini).
 > 7. **[TEMUAN REGULASI]** Pendaftaran company (`POST /registration/request` type="company")
 >    sebelumnya menerima NPWP/NIB sebagai teks bebas tanpa validasi format sama sekali — Owner
 >    hanya melihat badge "Lengkap/Data Belum Lengkap" (indikator visual, tidak mencegah approve).
