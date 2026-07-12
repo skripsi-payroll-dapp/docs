@@ -185,11 +185,6 @@ Lapisan keempat dan yang langsung berinteraksi dengan pengguna adalah **lapisan 
 
 ### 2.2 Fungsi Produk
 
-> **[FLAG-BARU-VS-DOCX]** docx lama masih punya 12 fungsi produk termasuk "9. Kerahasiaan Data
-> Gaji (Salary Privacy, Inco FHE)" — dihapus total di sini (bukan sekadar direnumber), fitur belum
-> pernah diimplementasi. Fungsi #6 "Koperasi Karyawan" di docx lama sudah diganti isinya jadi
-> "Mesin Pajak & Kasbon" di bawah (nomor sama, konten beda total).
-
 **1. Manajemen Vault Perusahaan**
 
 Deskripsi  : Sistem menyediakan fungsi bagi HR Admin untuk men-deploy vault perusahaan yang terisolasi on-chain melalui `PayrollFactory.deployVault()`, mengisi saldo IDRX ke dalam vault (`fundVault()`), memantau saldo vault secara real-time, dan menarik saldo yang tidak terpakai (`withdrawVault()`). Setiap vault bersifat independen per perusahaan (Factory Pattern), sehingga aset satu perusahaan tidak bercampur dengan perusahaan lain. SaaS Admin (Owner) terlebih dahulu harus menyetujui registrasi HR sebelum vault dapat di-deploy.
@@ -224,7 +219,7 @@ Rasional   : Mekanisme cliff vesting on-chain memberikan kepastian hukum kepada 
 
 Deskripsi  : Sistem menghitung dan memotong PPh21 (Tarif Efektif Rata-rata/TER sesuai PMK 168/2023, dengan opsi override tarif tetap oleh HR) dan BPJS secara otomatis on-chain pada setiap klaim gaji. Sistem juga menyediakan fasilitas kasbon (uang muka gaji): karyawan dapat mengajukan kasbon hingga 80% gaji bulanan (`requestAdvance()`), HR menyetujui atau menolak pengajuan (`approveAdvance()`/`rejectAdvance()`), dan pelunasan terjadi otomatis melalui pemotongan sebagian dari setiap klaim gaji berikutnya.
 
-Rasional   : Perhitungan pajak on-chain menjamin konsistensi dan auditability penuh, menggantikan perhitungan off-chain yang rawan drift dari nilai riil. Kasbon menggantikan skema koperasi peer-to-peer sebelumnya dengan model yang lebih sederhana: dana talangan berasal langsung dari `vaultBalance` perusahaan (bukan pool lender pihak ketiga), sehingga menghindari kompleksitas regulasi peer-to-peer lending (POJK No. 77/2016) yang sebelumnya menjadi rasional utama desain koperasi closed-loop.
+Rasional   : Perhitungan pajak on-chain menjamin konsistensi dan auditability penuh, menggantikan perhitungan off-chain yang rawan drift dari nilai riil. Dana kasbon berasal langsung dari `vaultBalance` perusahaan pemberi kerja (bukan pool lender/investor pihak ketiga), sehingga fasilitas ini berada di luar cakupan regulasi peer-to-peer lending (POJK No. 77/2016) sekaligus menjaga proses talangan tetap sederhana dan sepenuhnya berada dalam kendali perusahaan.
 
 **7. Sertifikasi Ketenagakerjaan Berbasis SBT**
 
@@ -674,11 +669,6 @@ Deskripsi      : Sistem harus mendukung pembuatan lebih dari satu cliff vest akt
 
 ---
 
-> **[FLAG-BARU-VS-DOCX]** FR-PAYANA-701 s.d. 706 di docx lama seluruhnya tentang
-> EmployeeLiquidityContract (depositToPool/withdrawDeposit/borrowFromPool/getPoolLiquidity — pool
-> lender pihak ketiga). Nomor FR sama persis di bawah ini tapi isinya sudah diganti total jadi
-> kasbon company-funded (requestAdvance/approveAdvance/rejectAdvance di CompanyVault).
-
 ### Kelompok G: Mesin Pajak & Kasbon
 
 Kelompok ini mendefinisikan kebutuhan fungsional untuk pemotongan otomatis PPh21 (skema Tarif Efektif Rata-rata/TER sesuai PMK 168/2023) dan BPJS pada setiap klaim gaji, serta fasilitas kasbon (uang muka gaji) yang memampukan karyawan menarik sebagian gaji yang belum accrued sebagai talangan, dengan pelunasan otomatis saat klaim gaji berikutnya.
@@ -854,8 +844,6 @@ Deskripsi      : Sistem harus memampukan Owner SaaS untuk memantau kondisi kesel
 ID Requirement : FR-PAYANA-1003
 
 Deskripsi      : Sistem harus memampukan Owner SaaS mengonfigurasi `platformFeeBps` (maksimum 1%) dan alamat `protocolTreasury` pada kontrak `PayrollFactory`. Platform fee dipotong otomatis dan langsung ditransfer ke `protocolTreasury` pada setiap klaim gaji karyawan (lihat FR-PAYANA-401) — tidak ada mekanisme akumulasi-lalu-klaim terpisah.
-
-> **[Diubah]** FR ini sebelumnya mendeskripsikan `claimProtocolFee()` pada `EmployeeLiquidityContract` (penarikan 1% bunga pinjaman koperasi yang terakumulasi). Fungsi dan kontrak tersebut sudah tidak ada (koperasi digantikan Mesin Pajak & Kasbon, lihat Kelompok G). FR-PAYANA-1003 direvisi untuk menjelaskan mekanisme platform fee yang tersisa, yang sumbernya kini murni dari `platformFeeBps` pada `PayrollFactory`.
 
 ---
 
@@ -1033,16 +1021,6 @@ Deskripsi      : Sistem harus memampukan HR untuk menyimpan dan memperbarui peng
 ### 3.3 Diagram Use Case
 
 > **Catatan untuk Pembaca:** Sistem Payana adalah sistem hybrid tiga lapisan (smart contract on-chain, REST API backend, antarmuka web frontend). Use case di bawah ini menggambarkan interaksi pengguna dengan sistem secara end-to-end tanpa memisahkan lapisan teknis.
-
-**Daftar Use Case:**
-
-> **[FLAG-BARU-VS-DOCX]** UC-11/UC-12 di bawah nomornya sama dengan docx lama tapi isinya beda
-> total (docx lama: UC-11 "Karyawan Bergabung ke Koperasi dan Menyimpan Dana", UC-12 "Karyawan
-> Mengajukan Pinjaman Koperasi"). UC-17/18/19 (dulu fitur FHE: set gaji terenkripsi, viewing key,
-> homomorphic aggregation) sengaja tidak dipakai lagi di tabel ini — TIDAK ADA catatan eksplisit
-> "tidak digunakan" untuk gap ini di SKPL.md (beda dari PDHUPL_v2.md yang sudah punya catatan
-> serupa untuk KU-17/18/19) — pertimbangkan menambah catatan serupa di sini kalau mau konsisten.
-> UC-21 s.d. UC-29 di bawah seluruhnya BARU, tidak ada di docx lama sama sekali.
 
 | ID | Nama Use Case | Aktor | FR Terkait |
 |----|---------------|-------|------------|
@@ -2217,35 +2195,19 @@ erDiagram
         uint256 startTs
     }
 
-    Pool {
-        uint256 totalDeposited
-        uint256 totalLoansOutstanding
-        uint256 yieldPerShareX18
-        uint256 interestRateBps
-        bool initialized
-    }
-
-    LenderDeposit {
-        uint256 principal
-        uint256 yieldDebtX18
-        uint256 depositedAt
-    }
-
-    LoanRecord {
-        uint256 principal
-        uint256 interest
-        uint256 dueDate
-        uint256 repaidAmount
-        LoanStatus status
+    SalaryAdvance {
+        uint256 amount
+        uint256 repaid
+        uint256 requestedAt
+        AdvanceStatus status
     }
 
     CompanyVault ||--o{ EmployeeStream : "employeeStreams[address]"
     CompanyVault ||--o{ SeveranceVault : "severanceVaults[address]"
     CompanyVault ||--o{ TerminationProposal : "terminationProposals[address]"
     CompanyVault ||--o{ CliffVest : "cliffVests[address][vestId]"
+    CompanyVault ||--o{ SalaryAdvance : "salaryAdvances[address]"
     EmploymentSBT ||--|| EmploymentRecord : "employmentRecords[tokenId]"
-    Pool ||--o{ LenderDeposit : "lenderDeposits[address]"
-    Pool ||--o{ LoanRecord : "loanRecords[address]"
 ```
 
 ---
@@ -2386,31 +2348,14 @@ erDiagram
         bigint last_updated
     }
 
-    liquidity_pool {
+    salary_advance {
         hex id PK
-        integer interest_rate_bps
-        bigint total_deposited
-        bigint total_loans_outstanding
-        bigint created_at
-    }
-
-    lender_deposit {
-        hex id PK
-        hex company_address
-        bigint principal
-        bigint yield_earned
-        bigint last_updated
-    }
-
-    loan_record {
-        hex id PK
-        hex company_address
-        bigint principal
-        bigint interest
-        bigint repaid_amount
-        bigint due_ts
+        hex hr_authority
+        bigint amount
+        bigint repaid
         text status
-        bigint created_at
+        bigint requested_at
+        bigint updated_at
     }
 
     employment_certificate {
@@ -2437,9 +2382,7 @@ erDiagram
     company ||--o{ termination_proposal : "hr_authority"
     company ||--o{ cliff_vest : "hr_authority"
     company ||--|| compliance_vault : "hr_authority"
-    company ||--|| liquidity_pool : "id"
-    liquidity_pool ||--o{ lender_deposit : "company_address"
-    liquidity_pool ||--o{ loan_record : "company_address"
+    company ||--o{ salary_advance : "hr_authority"
     company ||--o{ employment_certificate : "hr_authority"
     company ||--o{ low_balance_alert : "hr_authority"
     employee_stream ||--o{ salary_claim : "employee"
@@ -2514,8 +2457,6 @@ Keterangan kolom kunci:
 | EmploymentSBT | 0x8dA9B60814536364daF77a82cb56B31226De4B62 |
 | MockIDRX (Testnet) | 0x0996e627cE22C4FE2D5c4788b159a83C065D6d09 |
 | Admin/Treasury | 0x906B34db1a8DD333ff9a84255e4AEc13C054f120 |
-
-> `EmployeeLiquidityContract` tidak lagi dideploy — fungsinya digantikan oleh fitur kasbon terintegrasi di `CompanyVault` (lihat Kelompok G, §3.2.6–3.2.11).
 
 > **[RESOLVED — sudah di-redeploy]** `PayrollFactory` lama
 > (`0xF62dF08b38c6Fbde33E24208BA044907475ca815`) terkonfirmasi stale relatif terhadap `src/`

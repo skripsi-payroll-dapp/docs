@@ -841,7 +841,7 @@ sequenceDiagram
 
 ##### 2.2.2.3 Mesin Pajak & Kasbon (terintegrasi di CompanyVault)
 
-`EmployeeLiquidityContract` (pool koperasi closed-loop) dihapus total dari kodebase. Fungsinya digantikan oleh dua kapabilitas baru yang terintegrasi langsung di `CompanyVault`: (1) perhitungan PPh21/BPJS otomatis saat `claimSalary()` (lihat 2.2.2.2), dan (2) fasilitas kasbon (`SalaryAdvance`) yang dananya bersumber langsung dari `vaultBalance` perusahaan — bukan pool lender pihak ketiga.
+Modul ini menyediakan dua kapabilitas yang terintegrasi langsung di `CompanyVault`: (1) perhitungan PPh21/BPJS otomatis saat `claimSalary()` (lihat 2.2.2.2), dan (2) fasilitas kasbon (`SalaryAdvance`) yang dananya bersumber langsung dari `vaultBalance` perusahaan — bukan pool lender pihak ketiga.
 
 **Konstanta terkait:** `MAX_ADVANCE_BPS = 8000` (80% dari gaji bulanan), `ADVANCE_REPAY_BPS = 2000` (20% dari net setiap klaim).
 
@@ -2010,13 +2010,8 @@ Seluruh halaman portal HR dibungkus oleh layout `hr/layout.tsx` yang menyediakan
 
 ##### 2.4.2.1 Dashboard HR Onboarding (`/hr/onboarding`)
 
-> **[Diperbaiki]** Diagram dan tabel di bawah sebelumnya menyertakan parameter `liquidity` pada
-> `deployVault(...)` — parameter ini sudah tidak ada (`EmployeeLiquidityContract`
-> dihapus, lihat SKPL A.1). Signature saat ini: `deployVault(hrAuthority, companyName,
-> sbtContract)`, 3 parameter. Langkah 1 (registrasi company) juga sebelumnya hanya menyebut
-> nama/NPWP/email — field NIB, nama & NIK direktur, dan dokumen akta pendirian (semuanya
-> divalidasi format server-side) belum tercantum. Lihat SKPL UC-21 untuk spesifikasi penuh alur
-> registrasi company yang mendahului wizard ini.
+> Signature saat ini: `deployVault(hrAuthority, companyName, sbtContract)`, 3 parameter. Lihat
+> SKPL UC-21 untuk spesifikasi penuh alur registrasi company yang mendahului wizard ini.
 
 **Deskripsi:** Wizard yang mencakup registrasi profil company (ditinjau Owner SaaS, lihat UC-21) diikuti deploy `CompanyVault`, konfigurasi parameter potongan (BPS), dan deposit awal IDRX.
 **Aktor:** HR Admin.
@@ -3261,8 +3256,6 @@ Bagian ini merinci seluruh struct, enum, dan mapping yang menjadi state on-chain
 | | `requestedAt` | uint256 | Timestamp pengajuan. |
 | | `status` | AdvanceStatus | None/Pending/Active (lihat catatan `AdvanceStatus`, §2.3.1). |
 
-> `EmployeeLiquidityContract` dan struct `Pool`/`LenderDeposit`/`LoanRecord` sudah tidak ada, digantikan oleh `SalaryAdvance` di atas.
-
 #### A.4.3 Enum Lengkap
 
 | Enum | Nilai | Kontrak |
@@ -3958,7 +3951,7 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
 
 ### B.6 Layanan Background
 
-> `liquidation.ts` (Liquidation Cron) dihapus bersamaan dengan `EmployeeLiquidityContract` — kasbon tidak memiliki mekanisme likuidasi paksa; sisa kasbon yang belum lunas dihapus sebagai bad debt saat `resignEmployee()`/`executeTermination()` (lihat FR-PAYANA-706).
+> Kasbon tidak memiliki mekanisme likuidasi paksa; sisa kasbon yang belum lunas dihapus sebagai bad debt saat `resignEmployee()`/`executeTermination()` (lihat FR-PAYANA-706).
 
 **[Paymaster Monitor (`paymasterMonitor.ts`)]**
 | | |
@@ -4131,7 +4124,7 @@ Frontend dibangun dengan Next.js 16 (App Router), React 19, Tailwind CSS 4, Shad
 
 | Klien | Method Utama | Sumber | Dipakai di |
 |-------|--------------|--------|-----------|
-| `ponder` | `getCompany`, `getCompanies`, `getStream`, `getStreams`, `getClaims`, `getVests`, `getPool`, `getDeposit`, `getLoan`, `getPlatformFees`, `getEncryptedSalaries`, `getAuditorGrants` | Ponder GraphQL/REST | seluruh portal |
+| `ponder` | `getCompany`, `getCompanies`, `getStream`, `getStreams`, `getClaims`, `getVests`, `getAdvance`, `getPlatformFees` | Ponder GraphQL/REST | seluruh portal |
 | `backend` | `getComplianceSummary`, `getProfile`, `updateProfile` | Backend REST + JWT | `/hr/compliance`, `/employee/settings` |
 | `registration` | `submit`, `getStatus`, `getPending`, `approve`, `reject` | Backend `/registration` | `/onboarding`, `/owner` |
 
@@ -4253,7 +4246,7 @@ Catatan: untuk aksi HR/Owner/Legal (mis. `startStream`, `proposeTermination`, `f
 
 ### D.1 Keamanan Smart Contract
 
-1. **Pola CEI (Checks-Effects-Interactions):** `claimSalary()`, `withdrawDeposit()`, `executeTermination()`, dan `withdrawVault()` melakukan seluruh perubahan state sebelum transfer eksternal untuk mencegah reentrancy.
+1. **Pola CEI (Checks-Effects-Interactions):** `claimSalary()`, `approveAdvance()`, `executeTermination()`, dan `withdrawVault()` melakukan seluruh perubahan state sebelum transfer eksternal untuk mencegah reentrancy.
 2. **ReentrancyGuard:** modifier `nonReentrant` pada fungsi yang melakukan transfer IDRX (`claimSalary`, `withdrawVault`, `executeTermination`, `resignEmployee`, `withdrawCompliance`, `claimCliffVest`, `approveAdvance`).
 3. **AccessControl Berbasis Peran:** `SUPERADMIN_ROLE` (Factory), `HR_ROLE` & `LEGAL_ROLE` (Vault), `MINTER_ROLE` (SBT), `OPS_ROLE` & `PAYROLL_ROLE` (Liquidity). Setiap fungsi sensitif dilindungi modifier peran.
 4. **Multi-Sig PHK:** PHK memerlukan dua tanda tangan berurutan (HR via `proposeTermination`, Legal via `approveTermination`) dengan kadaluarsa 7 hari, mencegah PHK sewenang-wenang.

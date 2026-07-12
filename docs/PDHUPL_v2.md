@@ -230,7 +230,7 @@ tanggal eksekusi sesungguhnya.
 | KU-10 Claim Vested Bonus | claimCliffVest sebelum cliffTs → CliffNotReached | UC-10 | FR-603 | AU-10-02 | Unit (Foundry) | Functional — Negative |
 | KU-10 Claim Vested Bonus | claimCliffVest dua kali → VestAlreadySettled | UC-10 | FR-603 | AU-10-03 | Unit (Foundry) | Functional — Negative |
 | KU-10 Claim Vested Bonus | vestId tidak ada → VestNotFound | UC-10 | FR-603 | AU-10-04 | Unit (Foundry) | Functional — Negative |
-| KU-11 Kasbon Karyawan | [TEMUAN] Ajukan kasbon dari `/employee/kasbon` — `requestAdvance()` dipanggil tanpa argumen `amount` | UC-11 | FR-704 | AU-11-01 | System (manual) | Functional — Defect (perlu verifikasi) |
+| KU-11 Kasbon Karyawan | Ajukan kasbon dari `/employee/kasbon` dengan jumlah eksplisit — `requestAdvance(amount)` berhasil | UC-11 | FR-704 | AU-11-01 | System (manual) | Functional — Happy Path (diperbaiki & diverifikasi, lihat Bab 5 temuan #6 & #8) |
 | KU-11 Kasbon Karyawan | Ajukan kasbon > 80% gaji bulanan → AdvanceAmountTooHigh | UC-11 | FR-704 | AU-11-02 | Unit (Foundry) | Functional — Negative |
 | KU-11 Kasbon Karyawan | Ajukan kasbon saat masih ada Pending/Active | UC-11 | FR-704 | AU-11-03 | Unit (Foundry) | Functional — Negative |
 | KU-12 Kasbon HR | approveAdvance sukses — dana masuk wallet karyawan | UC-12 | FR-705 | AU-12-01 | Unit (Foundry) | Functional — Happy Path |
