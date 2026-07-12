@@ -27,6 +27,88 @@ Universitas Atma Jaya Yogyakarta
 
 ---
 
+> ## [FLAG-BANDING-DOCX-LAMA] Perbandingan dengan `DESKRIPSI PENGEMBANGAN PERANGKAT LUNAK.docx`
+>
+> **Dibuat 2026-07-13** untuk membantu menyinkronkan `docs/DESKRIPSI PENGEMBANGAN PERANGKAT LUNAK.docx`
+> (docx lama, ~58K karakter teks, ekstrak dari `word/document.xml`) dengan isi `DPPL.md` ini
+> (~209K karakter, sumber kebenaran saat ini). **Docx lama tertinggal minimal 7 revisi**
+> (bahkan masih memuat `IDRXPriceOracle` secara penuh di §2.2.2.5, padahal Daftar Revisi di
+> docx lama sendiri — butir F & G — sudah bilang kontrak itu dihapus; docx-nya sendiri tidak
+> konsisten dengan log revisinya).
+>
+> **Ringkasan temuan (prioritas dari besar ke kecil):**
+>
+> 1. **§2.4 "Perancangan Antar Muka" pada docx lama BELUM DIISI SAMA SEKALI** — isinya masih
+>    contoh boilerplate template UAJY ("Antar muka Kelola Data Pengguna", field "Role pengguna,
+>    nama pengguna, username, password, No telepon"). Seluruh isi §2.4 `DPPL.md` ini (baris
+>    1795–3055, ~30 halaman: setiap halaman per portal HR/Karyawan/Owner lengkap dengan sequence
+>    diagram, tabel komponen, dan algoritma) **belum pernah dipindahkan ke docx sama sekali.**
+>    Ini bagian terbesar yang perlu disalin manual.
+> 2. **Lampiran A–D pada docx lama TIDAK ADA.** Dokumen docx berhenti tepat setelah §2.4 (boilerplate
+>    kosong di atas) — padahal §1.5 "Ikhtisar Dokumen" docx lama sendiri menjanjikan Bab 3
+>    (Antarmuka), Bab 4 (Data), Bab 5 (Komponen: smart contract/backend/frontend), Bab 6
+>    (Keamanan), dan Lampiran. Isi yang setara sudah ada di `DPPL.md` sebagai:
+>    - **Lampiran A** (baris 3056): daftar singkatan, pemetaan FR→komponen, alamat kontrak
+>      ter-deploy, katalog struct on-chain, spesifikasi `PayrollMath`, katalog event, matriks
+>      peran/otorisasi, detail implementasi halaman frontend.
+>    - **Lampiran B** (baris 3500): spesifikasi lengkap 16 grup route Backend API (`/auth`,
+>      `/bundler`, `/compliance`, `/registration`, `/invitations`, `/termination`, `/webhook`,
+>      layanan background, `/reimburse`, `/bounty`, `/notifications`, `/payslip`, `/tax-cert`,
+>      `/employment-letter`, `/directory`, `/company-settings`) — **sama sekali tidak ada di
+>      docx lama** (bahkan modul lama seperti `/auth`, `/bundler`, `/webhook` yang sudah eksis
+>      sejak versi awal tidak pernah didokumentasikan detail endpoint-nya di docx).
+>    - **Lampiran C** (baris 4101): perancangan frontend (klien data, custom hook Web3, komponen
+>      bersama, integrasi Privy/ERC-4337) — tidak ada di docx lama.
+>    - **Lampiran D** (baris 4230): perancangan keamanan smart contract/backend/frontend — tidak
+>      ada di docx lama.
+> 3. **§2.2.2 Deskripsi Kelas — 3 dari 6 kontrak di docx lama sudah tidak ada di kodebase:**
+>    - `2.2.2.3 EmployeeLiquidityContract` (pool koperasi closed-loop) — **hapus seluruh subbab
+>      ini.** Kontrak dan filenya sudah dihapus total; digantikan fitur kasbon terintegrasi di
+>      `CompanyVault` (lihat §2.2.2.3 versi `DPPL.md` saat ini, "Mesin Pajak & Kasbon").
+>    - `2.2.2.5 IDRXPriceOracle` — **hapus seluruh subbab ini** (docx lama sendiri sudah bilang
+>      ini seharusnya dihapus di Revisi G, tapi isinya masih ada — kemungkinan versi yang
+>      disalin/di-export salah/lupa disinkron).
+>    - `2.2.2.6 ConfidentialCompanyVault (Ekstensi FHE)` — **hapus seluruh subbab ini.** File
+>      source `ConfidentialCompanyVault.sol` sudah tidak ada di `finley-payroll/src/` (hanya
+>      sisa artifact build lama).
+>    - `2.2.2.1 PayrollFactory` dan `2.2.2.2 CompanyVault` — **kontrak masih ada, tapi detail
+>      perlu diperbarui:** `deployVault(...)` di docx lama masih punya parameter `liquidityContract`
+>      yang sudah tidak ada (signature sekarang `deployVault(hrAuthority, companyName,
+>      sbtContract)`, 3 parameter — lihat `DPPL.md` §2.4.2.1); konstanta/custom error `CompanyVault`
+>      di docx lama masih mencantumkan galat terkait koperasi tanpa kasbon (`MAX_ADVANCE_BPS`,
+>      `ADVANCE_REPAY_BPS`, `AdvancePendingExists`, `ActiveAdvanceExists`, `NoAdvancePending`,
+>      `AdvanceAmountTooHigh` belum ada di docx lama; error/konstanta koperasi lama seperti pool
+>      rate perlu dihapus).
+>    - `2.2.2.4 EmploymentSBT` — kemungkinan besar masih relevan strukturnya, tapi belum
+>      diverifikasi detail terhadap kode terkini pada perbandingan ini — cek ulang saat mengedit.
+> 4. **§1.2 Ruang Lingkup** docx lama masih menyebut "Lima smart contract inti beserta satu
+>    ekstensi: PayrollFactory, CompanyVault, EmployeeLiquidityContract, EmploymentSBT,
+>    IDRXPriceOracle, dan ConfidentialCompanyVault (ekstensi FHE)" — **perlu direvisi menjadi
+>    tiga kontrak** (PayrollFactory, CompanyVault, EmploymentSBT) sesuai `DPPL.md` §1.2 saat ini.
+>    Juga masih menyebut backend menangani "likuidasi" (liquidation cron, sudah dihapus
+>    bersamaan `EmployeeLiquidityContract`) sebagai salah satu layanan background.
+> 5. **§2.3 Perancangan Data (ERD)** docx lama masih memuat tabel/entitas yang sudah tidak ada:
+>    `pools`, `lenderDeposits`, `loanRecords` (on-chain, storage koperasi), dan
+>    `liquidity_pool`, `lender_deposit`, `loan_record`, `encrypted_salary`, `auditor_grant`
+>    (Ponder indexed) — **hapus semua**, ganti dengan `salary_advance`/`salaryAdvances` (kasbon).
+>    Docx lama juga belum punya tabel-tabel off-chain baru yang sudah ada di `DPPL.md` §2.3 saat
+>    ini: `reimbursement_claims`, `bounties`, `bounty_claims`, `company_settings`, `tips`,
+>    `suspended_clients`, `compliance_reconciliations`, `salary_advances`, `phk_reasons`,
+>    `notifications`, `employee_profiles`, `employment_letters` — semuanya perlu ditambahkan.
+> 6. **Bagian yang aman/relatif tidak berubah** (bisa dipakai sebagai basis, tinggal cek detail
+>    kecil): §1.1 Tujuan Penulisan, §1.3 Definisi/Akronim (tambahkan istilah baru seperti
+>    "Kasbon" bila belum ada), §1.4 Referensi (masih relevan, tambahkan referensi POJK 77/2016
+>    bila docx SKPL terbaru menambahkannya), §2.1 Perancangan Arsitektur narasi umum (perlu
+>    disesuaikan kalimat yang menyebut "auto-repay koperasi" → "auto-repay kasbon").
+>
+> **Saran urutan pengerjaan saat mengedit docx:** (1) hapus 3 subbab kontrak yang sudah tidak
+> ada + perbaiki §1.2 ruang lingkup — ini cepat dan langsung menghilangkan sebagian besar
+> kontradiksi; (2) tempel ulang §2.3 ERD dari `DPPL.md`; (3) tempel seluruh §2.4 dari `DPPL.md`
+> (paling panjang, tapi mekanis — copy-paste per halaman); (4) tempel Lampiran A–D dari
+> `DPPL.md` (juga panjang tapi mekanis). Setelah itu docx akan align penuh dengan `DPPL.md`.
+
+---
+
 ## 1. Pendahuluan
 
 ### 1.1 Tujuan Penulisan Dokumen
@@ -188,6 +270,11 @@ graph TD
 **Narasi Alur EWA Gasless End-to-End.** Ketika seorang karyawan menekan tombol "Tarik Gaji", frontend memanggil hook `useAuth` untuk memastikan sesi JWT aktif (atau melakukan tanda tangan EIP-191 baru melalui embedded wallet Privy). Karyawan kemudian menandatangani sebuah `UserOperation` ERC-4337 yang berisi calldata `claimSalary()`. UserOperation tersebut dikirim ke endpoint `POST /bundler/relay`. Backend memeriksa batas laju klaim (maksimum 10 per jam per karyawan) lalu meneruskan UserOperation ke Pimlico Bundler tanpa decode calldata tambahan — enforcement otoritatif (kecocokan JWT/sender, selektor, dan target) berada di `CompanyVault._validatePaymasterUserOp()` on-chain yang dipanggil EntryPoint saat validasi (lihat KI-004 di `KNOWN_ISSUES.md`). Pimlico melampirkan sponsor Paymaster dan mengirimkannya ke `EntryPoint` contract di Base. Kontrak `CompanyVault.claimSalary()` mengeksekusi distribusi atomik (platform fee → cicilan kasbon jika ada → PPh21/BPJS → severance → sisa ke karyawan), memancarkan event `SalaryClaimed` dan `PlatformFeePaid`. Alchemy mendeteksi event tersebut dan mengirimkannya ke `POST /webhook/alchemy`; backend memverifikasi tanda tangan HMAC, mencatat audit log, dan mem-broadcast pesan `SALARY_CLAIMED` melalui WebSocket ke dashboard karyawan, yang langsung menampilkan konfirmasi real-time. Secara paralel, Ponder mengindeks event tersebut ke tabel `salary_claim` untuk keperluan historis dan pelaporan kepatuhan.
 
 ### 2.2 Perancangan Rinci
+
+> **[FLAG-BANDING-DOCX-LAMA]** Di docx lama, subbab kontrak ada 6: PayrollFactory, CompanyVault,
+> `EmployeeLiquidityContract`, EmploymentSBT, `IDRXPriceOracle`, `ConfidentialCompanyVault`.
+> Hapus 3 yang di-italic — sudah tidak ada di kodebase. Lihat ringkasan lengkap di flag atas
+> dokumen (setelah Daftar Revisi).
 
 #### 2.2.1 Kelas Diagram
 
@@ -970,6 +1057,13 @@ Algoritma: Deklarasi dukungan `IERC5192`.
 Algoritma: Blokir transfer P2P (`SoulboundTransferNotAllowed`); hanya mint (from=0) dan burn (to=0) diizinkan.
 
 ### 2.3 Perancangan Data
+
+> **[FLAG-BANDING-DOCX-LAMA]** ERD di docx lama masih punya tabel koperasi (`pools`,
+> `lenderDeposits`, `loanRecords`, `liquidity_pool`, `lender_deposit`, `loan_record`) dan FHE
+> (`encrypted_salary`, `auditor_grant`) — ganti dengan `salary_advance`/`salaryAdvances`, dan
+> tambahkan tabel off-chain baru yang belum ada di docx lama (reimburse, bounty, company
+> settings, tips, suspended clients, compliance reconciliation, phk reasons, notifications,
+> employee profiles, employment letters). Detail lengkap di flag atas dokumen.
 
 #### 2.3.1 Dekomposisi Data
 
@@ -1794,6 +1888,10 @@ erDiagram
 
 ### 2.4 Perancangan Antarmuka
 
+> **[FLAG-BANDING-DOCX-LAMA]** Bagian §2.4 di docx lama **belum diisi sama sekali** — masih
+> boilerplate contoh template UAJY ("Antar muka Kelola Data Pengguna"). Seluruh isi §2.4 di
+> bawah ini (sampai Lampiran A) perlu disalin manual ke docx — bagian terpanjang dari proses
+> sinkronisasi ini. Detail di flag atas dokumen (setelah Daftar Revisi).
 
 Frontend Payana menyajikan tiga portal yang dipisahkan berdasarkan hasil resolusi peran (hook `useRole`, tipe `Role = "owner" | "hr" | "employee" | "terminated" | null`). Routing dilakukan dengan App Router Next.js, dan setiap portal dilindungi oleh role guard (`useRoleGuard`) berbasis peran on-chain.
 
@@ -3054,6 +3152,10 @@ sequenceDiagram
 ---
 
 ## A. Lampiran A — Informasi Tambahan
+
+> **[FLAG-BANDING-DOCX-LAMA]** Lampiran A–D (sampai akhir dokumen ini) **tidak ada sama sekali**
+> di docx lama — dokumen docx berhenti tepat setelah §2.4 yang masih kosong. Semua isi
+> Lampiran A/B/C/D perlu ditambahkan baru ke docx. Detail di flag atas dokumen.
 
 ### A.1 Daftar Singkatan
 
