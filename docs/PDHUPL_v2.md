@@ -93,7 +93,7 @@ penambahan paragraf ini.
 |---|---|
 | Smart contract Base Sepolia | `PayrollFactory` `0x73926c8abdbd2ebcc09f5e6af7def1bb3af156de` (redeploy — factory lama stale, lihat catatan pembuka Bab 5); `EmploymentSBT` `0x8dA9B60814536364daF77a82cb56B31226De4B62`; `MockIDRX` `0x0996e627cE22C4FE2D5c4788b159a83C065D6d09`. |
 | Token uji | IDRX testnet via `MockIDRX` di atas. Tidak ada nilai ekonomi nyata. |
-| Akun uji per peran | Owner SaaS = wallet `OWNER_ADDRESS`; HR Admin = wallet dengan `CompanyVault` terdaftar di `PayrollFactory.companyVaults`; Legal = wallet dengan `LEGAL_ROLE` (direpresentasikan sebagai domain HR Admin di level use-case, lihat SKPL.md UC-07); Karyawan = wallet dengan stream aktif di Ponder; Pengguna baru = wallet yang belum pernah login. |
+| Akun uji per peran | Owner SaaS = wallet `OWNER_ADDRESS`; HR Admin = wallet dengan `CompanyVault` terdaftar di `PayrollFactory.companyVaults`; "Legal" = wallet dengan `LEGAL_ROLE` on-chain, diuji **hanya lewat panggilan kontrak/API langsung** (Foundry, `testing-scripts/`, atau backend endpoint) — tidak ada dashboard/rute frontend terpisah untuk peran ini (`useRole.ts` tidak mendeteksi `LEGAL_ROLE`, lihat SKPL.md §3.1 dan DPPL.md §2.4.5), sehingga pengujian navigasi UI untuk "Legal" tidak pernah dan tidak bisa dilakukan; Karyawan = wallet dengan stream aktif di Ponder; Pengguna baru = wallet yang belum pernah login. |
 | Data dummy karyawan | NIK 16 digit format `32xxxxxxxxxxxxxx` (contoh format, bukan NIK asli), nomor HP `08xxxxxxxxxx`, gaji bulanan contoh `5.000.000 IDRX`. |
 | Test database | PostgreSQL 16 lokal (Docker) — schema `app` (backend, Drizzle) dan `public` (Ponder, Drizzle). |
 | Foundry test fixtures | `finley-payroll/src/mocks/` (MockIDRX). |
@@ -101,8 +101,10 @@ penambahan paragraf ini.
 ### 2.4 Sumber Daya Manusia
 
 Pengujian dilakukan oleh satu orang (penulis Tugas Akhir), berperan rangkap Developer, Tester,
-dan pemegang seluruh akun peran uji (Owner, HR, Legal, Karyawan) via beberapa wallet Privy/test
-account berbeda. Pengujian akses-ganda/concurrent disimulasikan berurutan oleh satu orang.
+dan pemegang seluruh akun peran uji (Owner, HR, Karyawan) via beberapa wallet Privy/test account
+berbeda, ditambah satu wallet dengan `LEGAL_ROLE` on-chain yang diuji khusus lewat kontrak/API
+langsung (tidak ada login/dashboard Privy tersendiri untuk peran ini — lihat 2.3). Pengujian
+akses-ganda/concurrent disimulasikan berurutan oleh satu orang.
 
 ### 2.5 Prosedur Umum Pengujian
 
@@ -129,9 +131,10 @@ eksekusi nyata. Penulis dipersilakan memperluas cakupan latihan sesuai kebutuhan
 1. Setup `.env` di tiap workspace (`frontend/`, `backend/`, `finley-payroll/`, `ponder/`):
    RPC URL Base Sepolia, deployer key, `OWNER_ADDRESS`, Pimlico API key, Privy App ID, dan
    alamat kontrak dari 2.3 di atas.
-2. Siapkan akun uji per peran sesuai 2.3 (Owner SaaS, HR Admin, Legal — direpresentasikan
-   sebagai domain HR Admin (lihat SKPL.md UC-07), Karyawan, dan satu wallet baru yang
-   belum pernah login) — masing-masing via wallet Privy/test account terpisah.
+2. Siapkan akun uji per peran sesuai 2.3 (Owner SaaS, HR Admin, Karyawan, dan satu wallet baru
+   yang belum pernah login) — masing-masing via wallet Privy/test account terpisah — ditambah
+   satu wallet terpisah yang diberi `LEGAL_ROLE` on-chain via `/hr/settings` untuk pengujian
+   kontrak/API langsung (bukan lewat login Privy, lihat 2.3).
 3. Pastikan akses ke faucet IDRX testnet dan saldo ETH mencukupi di wallet uji untuk biaya gas
    Base Sepolia (di luar klaim gasless karyawan yang disponsori Paymaster).
 
@@ -218,9 +221,9 @@ tanggal eksekusi sesungguhnya.
 | KU-06 Inisiasi PHK oleh HR | proposeTermination sukses, status menunggu Legal | UC-06 | FR-501,502 | AU-06-01 | Unit (Foundry) | Functional — Happy Path |
 | KU-06 Inisiasi PHK oleh HR | Proposal ganda untuk employee yang sama | UC-06 | FR-501 | AU-06-02 | Unit (Foundry) | Functional — Negative |
 | KU-06 Inisiasi PHK oleh HR | POST /termination/reason tersimpan bersamaan reasonHash on-chain | UC-06 | FR-501 | AU-06-03 | Integration | Functional — Happy Path |
-| KU-07 Persetujuan PHK (mode Legal) | approveTermination → executeTermination sukses, severance cair, SBT dicabut | UC-07 | FR-503,504 | AU-07-01 | Unit (Foundry) | Functional — Happy Path |
-| KU-07 Persetujuan PHK (mode Legal) | Proposal expired (>7 hari) ditolak | UC-07 | FR-503 | AU-07-02 | Unit (Foundry) | Functional — Negative |
-| KU-07 Persetujuan PHK (mode Legal) | Wallet tanpa LEGAL_ROLE mencoba approve | UC-07 | FR-503 | AU-07-03 | Unit (Foundry) | Security — Access Control |
+| KU-07 Persetujuan PHK (langkah LEGAL_ROLE) | approveTermination → executeTermination sukses, severance cair, SBT dicabut | UC-07 | FR-503,504 | AU-07-01 | Unit (Foundry) | Functional — Happy Path |
+| KU-07 Persetujuan PHK (langkah LEGAL_ROLE) | Proposal expired (>7 hari) ditolak | UC-07 | FR-503 | AU-07-02 | Unit (Foundry) | Functional — Negative |
+| KU-07 Persetujuan PHK (langkah LEGAL_ROLE) | Wallet tanpa LEGAL_ROLE mencoba approve | UC-07 | FR-503 | AU-07-03 | Unit (Foundry) | Security — Access Control |
 | KU-08 Resign Karyawan | resignEmployee sukses — stream stop, severance balik ke vault, SBT dicabut | UC-08 | FR-505 | AU-08-01 | Unit (Foundry) | Functional — Happy Path |
 | KU-08 Resign Karyawan | Kasbon aktif dihapus tanpa penagihan saat resign | UC-08,UC-11 | FR-505,706 | AU-08-02 | Unit (Foundry) | Functional — Alternative Flow |
 | KU-09 Grant Vesting Schedule | createCliffVest sukses, dana terkunci | UC-09 | FR-601 | AU-09-01 | Unit (Foundry) | Functional — Happy Path |
@@ -322,9 +325,10 @@ Rincian lengkap ada di 2.3 (Material Pengujian); ringkasannya per kategori:
 - **Kontrak dan alamat:** alamat kontrak Base Sepolia (`PayrollFactory`,
   `EmploymentSBT`, `MockIDRX`) sesuai tabel 2.3.
 - **Token uji:** IDRX testnet via `MockIDRX`, tanpa nilai ekonomi nyata.
-- **Akun uji per peran:** lima kategori wallet (Owner SaaS, HR Admin, Legal — domain HR Admin
-  Karyawan dengan stream aktif, dan Pengguna baru belum pernah login), masing-masing
-  dipersiapkan sesuai prosedur 2.5.2.1.
+- **Akun uji per peran:** empat kategori wallet dengan login/dashboard UI (Owner SaaS, HR Admin,
+  Karyawan dengan stream aktif, Pengguna baru belum pernah login), ditambah satu wallet dengan
+  `LEGAL_ROLE` on-chain yang diuji khusus lewat kontrak/API langsung (tidak ada dashboard UI-nya,
+  lihat 2.3), masing-masing dipersiapkan sesuai prosedur 2.5.2.1.
 - **Data dummy karyawan:** NIK 16 digit format `32xxxxxxxxxxxxxx` (contoh format, bukan NIK
   asli), nomor HP `08xxxxxxxxxx`, gaji bulanan contoh `5.000.000 IDRX` — dipakai konsisten di
   seluruh butir uji Bab 4 yang membutuhkan data profil karyawan.
@@ -401,8 +405,8 @@ Rincian lengkap ada di 2.3 (Material Pengujian); ringkasannya per kategori:
 - **AU-06-02** — Input: `proposeTermination` untuk employee yang sudah punya proposal aktif. Harapan: revert `TerminationAlreadyProposed`.
 - **AU-06-03** — Input: `POST /termination/reason {employeeAddress, reason}` oleh HR, bersamaan dengan `proposeTermination` on-chain. Harapan: `GET /termination/reason/:employeeAddress` mengembalikan `reason` plaintext ke HR/Legal yang berwenang.
 
-### KU-07 — Persetujuan PHK (mode Legal)
-**Antarmuka:** `approveTermination(employee)`, `executeTermination(employee)`; halaman `/hr/phk` (mode Legal, per pemegang `LEGAL_ROLE`).
+### KU-07 — Persetujuan PHK (langkah LEGAL_ROLE)
+**Antarmuka:** `approveTermination(employee)`, `executeTermination(employee)`; halaman `/hr/phk`, dijalankan dari sesi HR Admin (LEGAL_ROLE di-auto-grant ke alamat HR sendiri — tidak ada mode/dashboard terpisah, lihat SKPL.md §3.1 dan DPPL.md §2.4.5). AU-07-03 (wallet tanpa LEGAL_ROLE) diuji lewat kontrak langsung (Foundry), bukan lewat UI.
 - **AU-07-01** — Input: `approveTermination(employee)` oleh pemegang `LEGAL_ROLE`, lalu `executeTermination(employee)`. Harapan: `legalApproved=true`; eksekusi menghitung pesangon statutori (`PayrollMath.severanceMultiplier`), transfer ke employee, SBT dicabut, event `TerminationExecuted`.
 - **AU-07-02** — Input: `approveTermination`/`executeTermination` setelah `block.timestamp >= expiresAt`. Harapan: revert `ProposalExpired`.
 - **AU-07-03** — Input: `approveTermination` oleh wallet tanpa `LEGAL_ROLE`. Harapan: revert `Unauthorized`.
@@ -638,7 +642,7 @@ Rincian lengkap ada di 2.3 (Material Pengujian); ringkasannya per kategori:
 
 | Identifikasi | Deskripsi Singkat | Prosedur Pengujian | Masukan | Keluaran yang Diharapkan | Kriteria Evaluasi Hasil | Hasil yang Didapat | Kesimpulan |
 |---|---|---|---|---|---|---|---|
-| AU-01-01 | Login sukses | Kirim POST /auth/login dengan signature valid | address, message, signature | 200 + tokens, redirect sesuai role | Status 200 dan redirect benar | PASS (eksekusi nyata, `testing-scripts/ku-01-login.mjs`) — 4 role (Owner/HR/Legal/Employee) login sukses, 200 + accessToken | Handal |
+| AU-01-01 | Login sukses | Kirim POST /auth/login dengan signature valid | address, message, signature | 200 + tokens | Status 200 dan accessToken diterbitkan | PASS (eksekusi nyata, `testing-scripts/ku-01-login.mjs`) — 4 wallet (Owner/HR/"Legal"/Employee) berhasil login, masing-masing 200 + accessToken. **Catatan cakupan:** `/auth/login` sendiri role-agnostic (siapa pun dengan signature valid dapat token) — resolusi peran dan redirect ke dashboard terjadi client-side via `useRole.ts` setelahnya, TIDAK diverifikasi skrip ini (lihat komentar pembuka `ku-01-login.mjs`). Untuk wallet "Legal" (LEGAL_ROLE tanpa HR_ROLE), redirect nyata di UI akan ke `/onboarding` (role null), bukan dashboard PHK — lihat SKPL.md §3.1 dan DPPL.md §2.4.5. | Handal |
 | AU-01-02 | Signature invalid | Kirim POST /auth/login dengan signature rusak | signature acak | 401 UNAUTHORIZED | Status 401 | PASS (eksekusi nyata) — signature mismatch → 401 UNAUTHORIZED | Handal |
 | AU-01-03 | Timestamp expired | Kirim message dengan Timestamp lampau | message dengan Timestamp -10 menit | 401, pesan kedaluwarsa | Status 401 | PASS (eksekusi nyata) — timestamp 400 detik lampau → 401 UNAUTHORIZED, pesan kedaluwarsa | Handal |
 | AU-01-04 | Refresh token revoked | Logout lalu pakai refreshToken lama | refreshToken pasca logout | 401 session revoked | Status 401 | PASS (eksekusi nyata) — logout sukses, refresh dengan refreshToken lama → 401 | Handal |

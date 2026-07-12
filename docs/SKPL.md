@@ -42,7 +42,7 @@ Pembaca yang dituju adalah:
 - **Pengembang sistem** yang akan merancang dan mengimplementasikan Payana.
 - **Tim penguji** yang akan memverifikasi pemenuhan kebutuhan.
 - **Dosen pembimbing dan penguji** yang akan mengevaluasi produk penelitian.
-- **HR Admin, Karyawan, dan Legal Officer** sebagai pengguna akhir yang perlu memahami ruang lingkup sistem.
+- **HR Admin dan Karyawan** sebagai pengguna akhir yang perlu memahami ruang lingkup sistem. (Peran Legal Officer eksis sebagai konsep AccessControl on-chain — lihat §3.1 — namun dalam pengoperasian nyata dijalankan oleh HR Admin yang sama, bukan pengguna berbeda.)
 
 ### 1.2 Ruang Lingkup
 
@@ -54,13 +54,13 @@ Ruang lingkup sistem Payana mencakup sebelas fungsi utama yang dikelompokkan ke 
 
 2. **Modul Work ID (B):** Autentikasi berbasis tanda tangan kriptografi EIP-191 melalui embedded wallet Privy, pemrosesan transaksi tanpa biaya gas bagi karyawan (gasless) menggunakan ERC-4337 Paymaster, dan penerbitan Sertifikat Ketenagakerjaan berbasis Soulbound Token (SBT) ERC-5192.
 
-3. **Modul Compliance (C):** Escrow pesangon otomatis yang terkunci on-chain, perlindungan Pemutusan Hubungan Kerja (PHK) dengan mekanisme multi-tanda tangan dua pihak (HR + Legal Officer), dan routing dana kepatuhan ke ComplianceVault untuk BPJS dan PPh21.
+3. **Modul Compliance (C):** Escrow pesangon otomatis yang terkunci on-chain, perlindungan Pemutusan Hubungan Kerja (PHK) dengan mekanisme multi-tanda tangan dua peran on-chain (`HR_ROLE` dan `LEGAL_ROLE`, lihat §3.1 untuk penjelasan kenapa kedua peran ini dalam praktiknya digenggam oleh alamat HR Admin yang sama), dan routing dana kepatuhan ke ComplianceVault untuk BPJS dan PPh21.
 
 4. **Modul Cliff Vesting (D):** Pengaturan bonus retensi dengan periode cliff, penanganan masa percobaan karyawan, dan skema ESOP.
 
 5. **Modul Mesin Pajak & Kasbon (G):** Pemotongan PPh21 TER dan BPJS otomatis on-chain saat klaim gaji berdasarkan konfigurasi HR, serta fasilitas kasbon (uang muka gaji) hingga 80% gaji bulanan dengan pelunasan otomatis saat klaim gaji berikutnya.
 
-6. **Modul Dashboard (F):** Antarmuka HR untuk manajemen vault, stream, dan laporan kepatuhan; antarmuka karyawan untuk pemantauan EWA secara langsung; antarmuka Legal Officer untuk persetujuan PHK.
+6. **Modul Dashboard (F):** Antarmuka HR untuk manajemen vault, stream, laporan kepatuhan, dan persetujuan PHK (termasuk langkah persetujuan `LEGAL_ROLE` yang secara default digenggam HR sendiri, lihat §3.1); antarmuka karyawan untuk pemantauan EWA secara langsung.
 
 7. **Modul Audit dan Notifikasi (K):** Jejak audit aktivitas HR yang immutable dan sistem notifikasi in-app.
 
@@ -84,7 +84,7 @@ Sistem yang berada **di luar ruang lingkup** MVP ini antara lain: integrasi HRIS
 | flowRate | Laju akrual gaji karyawan dalam satuan IDRX per detik yang dikonfigurasi oleh HR saat mendaftarkan karyawan; dari flowRate ini total gaji yang sudah diperoleh pada waktu tertentu dihitung sebagai `flowRate × (block.timestamp − lastWithdrawnTs)`. |
 | Severance Vault | Bagian dari `CompanyVault` yang menyimpan akumulasi dana pesangon karyawan (2% dari setiap klaim gaji) dalam status terkunci (LOCKED) hingga kondisi PHK atau resign yang sah terpenuhi; dirancang agar tidak dapat dicairkan secara unilateral oleh HR. |
 | Compliance Vault | Bagian dari `CompanyVault` yang menampung 5% dari setiap klaim gaji untuk kebutuhan pembayaran iuran BPJS Kesehatan, BPJS Ketenagakerjaan, dan PPh21; dana ditransfer secara manual oleh HR ke institusi terkait pada akhir periode. |
-| Multi-sig (Multi-Tanda Tangan) | Mekanisme yang mensyaratkan persetujuan dari lebih dari satu pihak yang berwenang sebelum suatu tindakan dapat dilaksanakan; dalam Payana, PHK mensyaratkan persetujuan HR Admin dan Legal Officer secara berurutan. |
+| Multi-sig (Multi-Tanda Tangan) | Mekanisme yang mensyaratkan persetujuan dari lebih dari satu peran berwenang sebelum suatu tindakan dapat dilaksanakan; dalam Payana, PHK mensyaratkan persetujuan dua peran on-chain berurutan (`HR_ROLE` lalu `LEGAL_ROLE`) — lihat §3.1 untuk penjelasan bahwa kedua peran ini saat ini digenggam alamat yang sama (HR Admin). |
 | Gasless Transaction | Mekanisme di mana biaya gas (ongkos komputasi blockchain) dibayar oleh pihak ketiga (Paymaster) sehingga pengguna akhir (karyawan) dapat mengirimkan transaksi tanpa memiliki ETH; diimplementasikan menggunakan standar ERC-4337 Account Abstraction. |
 | Factory Pattern | Pola desain kontrak di mana satu kontrak induk (`PayrollFactory`) bertanggung jawab men-deploy dan melacak kontrak-kontrak anak (`CompanyVault`) secara terisolasi per tenant, memungkinkan arsitektur multi-tenant on-chain. |
 | Cliff Vesting | Mekanisme di mana sejumlah dana (bonus, ESOP) dikunci untuk jangka waktu tertentu (periode cliff) dan baru dapat dicairkan sekaligus setelah periode tersebut berakhir. |
@@ -205,7 +205,7 @@ Rasional   : EWA mengatasi kebutuhan mendesak karyawan akan akses dana sebelum j
 
 **4. Pemberhentian Karyawan Multi-Tanda Tangan (PHK)**
 
-Deskripsi  : Sistem menyediakan alur PHK dua tahap yang memerlukan persetujuan dua pihak berbeda secara on-chain. HR Admin mengajukan proposal PHK (`proposeTermination()`), kemudian Legal Officer yang memegang `LEGAL_ROLE` menyetujuinya (`approveTermination()`), setelah itu eksekusi final dapat dilakukan (`executeTermination()`). Saat eksekusi, stream karyawan dihentikan, dan dana SeveranceVault karyawan dilepas sesuai formula pesangon berdasarkan masa kerja (UU Cipta Kerja Pasal 156). Karyawan juga dapat mengajukan resign secara mandiri (`resignEmployee()`).
+Deskripsi  : Sistem menyediakan alur PHK dua tahap yang memerlukan persetujuan dua peran berbeda secara on-chain: `HR_ROLE` mengajukan proposal PHK (`proposeTermination()`), kemudian pemegang `LEGAL_ROLE` menyetujuinya (`approveTermination()`), setelah itu eksekusi final dapat dilakukan (`executeTermination()`). Saat eksekusi, stream karyawan dihentikan, dan dana SeveranceVault karyawan dilepas sesuai formula pesangon berdasarkan masa kerja (UU Cipta Kerja Pasal 156). Karyawan juga dapat mengajukan resign secara mandiri (`resignEmployee()`). Dalam pengoperasian saat ini, `LEGAL_ROLE` di-auto-grant ke alamat HR Admin sendiri saat onboarding vault (lihat §3.1) — HR Admin yang sama menjalankan kedua langkah persetujuan.
 
 Rasional   : Mekanisme multi-tanda tangan mencegah PHK sewenang-wenang oleh satu pihak dan memastikan pesangon dibayarkan sesuai regulasi. Dengan pesangon tersimpan on-chain sejak hari pertama karyawan bekerja (akumulasi 2% per klaim), risiko perusahaan tidak mampu membayar pesangon saat pailit dapat dieliminasi.
 
@@ -261,9 +261,13 @@ HR Admin adalah pengguna utama platform Payana dari sisi perusahaan. Persona ini
 
 Karyawan adalah pengguna utama platform dari sisi individu. Persona ini adalah pekerja tetap atau kontrak pada perusahaan yang menggunakan Payana. Karyawan sama sekali tidak diasumsikan memiliki pengetahuan tentang blockchain, wallet, atau DeFi — antarmuka yang mereka hadapi menggunakan terminologi sehari-hari ("Tarik Gaji", "Akun Gaji", "Saldo Tersedia"). Karyawan menggunakan platform secara insidental — kapan saja mereka ingin mengakses gaji yang sudah diperoleh, memantau saldo pesangon, mengajukan kasbon, atau melihat status bonus mereka. Hak akses karyawan mencakup: klaim EWA dari stream mereka sendiri, pembacaan saldo stream dan pesangon milik sendiri, pengajuan kasbon (uang muka gaji), dan pembacaan informasi cliff vesting milik sendiri. Karyawan tidak dapat membaca atau mengakses data stream, gaji, atau pesangon karyawan lain.
 
-**Legal Officer**
+**Legal Officer (peran on-chain, saat ini digenggam HR Admin)**
 
-Legal Officer adalah pengguna khusus yang bertugas menjadi pihak kedua dalam mekanisme persetujuan PHK multi-tanda tangan. Persona ini biasanya adalah pejabat hukum internal perusahaan, direktur, atau pihak yang ditunjuk oleh perusahaan sebagai pemegang `LEGAL_ROLE` on-chain. Legal Officer menggunakan platform dengan frekuensi rendah — hanya pada saat ada proposal PHK yang memerlukan persetujuannya. Hak akses Legal Officer terbatas pada: membaca daftar proposal PHK yang menunggu persetujuan, menyetujui atau menolak proposal PHK, dan membaca informasi stream karyawan yang terkait dengan proposal tersebut. Legal Officer diasumsikan memiliki pemahaman dasar tentang antarmuka web modern dan familiar dengan proses persetujuan digital, namun tidak perlu memahami detail teknis blockchain.
+`LEGAL_ROLE` adalah peran `AccessControl` kedua pada kontrak `CompanyVault`, terpisah dari `HR_ROLE`, yang secara desain dimaksudkan sebagai pihak kedua independen dalam mekanisme persetujuan PHK multi-tanda tangan (mis. pejabat hukum internal atau direktur perusahaan). Kontrak itu sendiri tidak peduli siapa pemegang `LEGAL_ROLE` — `approveTermination()` hanya memvalidasi `hasRole(LEGAL_ROLE, msg.sender)`, sehingga secara on-chain alamat mana pun bisa diberi peran ini.
+
+Namun, dalam implementasi produk saat ini, `LEGAL_ROLE` **secara default di-auto-grant ke alamat HR Admin itu sendiri** saat wizard onboarding vault berjalan (`hr/onboarding`, "Auto-grant LEGAL_ROLE to HR's own address so HR can run the full PHK flow solo") — sehingga HR Admin dapat menjalankan seluruh alur PHK sendirian tanpa menunggu pihak lain. HR Admin memang dapat secara opsional menetapkan alamat legal terpisah melalui halaman `/hr/settings` (field `legalAddress`, yang memanggil `grantRole(LEGAL_ROLE, legalAddress)` on-chain) — tetapi hook deteksi peran frontend (`useRole.ts`, lihat DPPL §2.4.5) tidak memiliki cabang pemeriksaan `LEGAL_ROLE` sama sekali, dan `useRoleGuard` pada layout `/hr/*` hanya meloloskan `role === "hr"`. Akibatnya, sebuah alamat yang benar-benar terpisah dan hanya memegang `LEGAL_ROLE` (bukan `HR_ROLE`) akan mendapat `role: null` dari sistem dan diarahkan kembali ke halaman onboarding — **tidak ada jalur produk (UI) bagi Legal Officer yang benar-benar terpisah untuk mengakses dashboard PHK saat ini**, meski secara teori kontrak tetap mengizinkan alamat tersebut memanggil `approveTermination()` langsung (mis. lewat Etherscan atau interaksi wallet manual di luar aplikasi).
+
+**Kesimpulan persona:** Legal Officer bukan persona pengguna terpisah dalam produk saat ini — perannya digambarkan sebagai bagian dari domain HR Admin (lihat catatan pada diagram use case §3.3). Deskripsi "pihak kedua independen" tetap valid sebagai desain arsitektur AccessControl on-chain (dan menjadi dasar untuk pengembangan lanjutan bila dashboard Legal terpisah suatu saat diimplementasikan), tetapi bukan mencerminkan siapa yang benar-benar mengoperasikan sistem hari ini.
 
 **Owner / SaaS Admin**
 
@@ -347,7 +351,7 @@ Payana memiliki antarmuka pengguna berikut:
 | 5 | Manajemen Karyawan HR | Daftar seluruh karyawan aktif beserta status stream, flow rate masing-masing, dan saldo gaji yang telah terakumulasi secara real-time. Menyediakan navigasi ke detail per karyawan. |
 | 6 | Detail Karyawan HR | Detail stream individual karyawan: flow rate aktif, saldo severance yang terakumulasi, riwayat klaim, serta tombol untuk menjeda, melanjutkan, memperbarui, atau membatalkan stream gaji karyawan tersebut. |
 | 7 | Onboarding Karyawan HR | Formulir penambahan karyawan baru ke dalam sistem: input Work ID (alamat dompet karyawan), pengaturan flow rate IDRX per detik, dan konfigurasi persentase split (karyawan, kepatuhan, severance). |
-| 8 | Manajemen PHK HR | Antrian proposal Pemutusan Hubungan Kerja: daftar proposal aktif beserta status persetujuan HR dan Legal Officer, formulir pengajuan proposal PHK baru, dan tombol eksekusi setelah kedua pihak menyetujui. |
+| 8 | Manajemen PHK HR | Antrian proposal Pemutusan Hubungan Kerja: daftar proposal aktif beserta status persetujuan `HR_ROLE` dan `LEGAL_ROLE` (keduanya dijalankan HR Admin yang sama, lihat §3.1), formulir pengajuan proposal PHK baru, dan tombol eksekusi setelah kedua langkah persetujuan terpenuhi. |
 | 9 | Manajemen Vesting HR | Daftar cliff vest aktif per karyawan: tombol pembuatan vest baru (dengan pilihan tipe Retention, Probation, atau ESOP, jumlah IDRX, dan tanggal cliff), serta tombol pembatalan vest yang belum matang. |
 | 10 | Kasbon HR | Daftar pengajuan kasbon karyawan (Pending/Active/Rejected/Repaid), tombol setujui/tolak, dan riwayat pemotongan pajak (PPh21 + BPJS) per klaim gaji. |
 | 11 | Laporan Kepatuhan HR | Pratinjau ringkasan kepatuhan bulanan (jumlah karyawan, total gaji diklaim, total compliance, total severance) dan tombol unduh laporan CSV BPJS/PPh21 per periode bulan. |
@@ -486,7 +490,7 @@ Deskripsi      : Sistem harus memampukan pengguna yang telah terautentikasi untu
 
 #### 3.2.6. Resolusi Peran Pengguna
 ID Requirement : FR-PAYANA-106
-Deskripsi      : Sistem harus secara otomatis menentukan peran yang dimiliki pengguna setelah autentikasi berhasil, dengan memeriksa kondisi on-chain dan konfigurasi backend. Urutan prioritas pemeriksaan adalah: Owner SaaS (dicocokkan terhadap OWNER_ADDRESS dalam konfigurasi sistem), kemudian HR Admin (diperiksa berdasarkan kepemilikan CompanyVault melalui PayrollFactory), kemudian Legal Officer (diperiksa berdasarkan LEGAL_ROLE pada CompanyVault yang terdaftar), dan terakhir Karyawan (diperiksa berdasarkan keberadaan stream aktif). Pengguna yang tidak memenuhi kriteria peran manapun diarahkan ke halaman onboarding untuk mengajukan permohonan akses.
+Deskripsi      : Sistem harus secara otomatis menentukan peran yang dimiliki pengguna setelah autentikasi berhasil, dengan memeriksa kondisi on-chain. Urutan prioritas pemeriksaan adalah: Owner SaaS (dicocokkan terhadap OWNER_ADDRESS dalam konfigurasi sistem), kemudian HR Admin (diperiksa berdasarkan kepemilikan CompanyVault melalui PayrollFactory), kemudian Karyawan (diperiksa berdasarkan keberadaan stream aktif atau riwayat PHK yang sah). Pengguna yang tidak memenuhi kriteria peran manapun diarahkan ke halaman onboarding untuk mengajukan permohonan akses. **Catatan implementasi:** hook deteksi peran (`useRole.ts`) tidak memiliki cabang pemeriksaan `LEGAL_ROLE` — pemegang `LEGAL_ROLE` yang bukan juga `HR_ROLE` akan mendapat `role: null` dan diarahkan ke onboarding, bukan ke dashboard khusus Legal (lihat §3.1 dan DPPL §2.4.5 untuk penjelasan lengkap).
 
 #### 3.2.7. Pengajuan Permohonan Pendaftaran HR Admin
 ID Requirement : FR-PAYANA-107
@@ -594,11 +598,11 @@ Deskripsi      : Sistem harus memampukan pengguna memeriksa status transaksi yan
 
 #### 3.2.29. Pengajuan Proposal Pemutusan Hubungan Kerja
 ID Requirement : FR-PAYANA-501
-Deskripsi      : Sistem harus memampukan HR Admin untuk mengajukan proposal Pemutusan Hubungan Kerja (PHK) terhadap karyawan melalui fungsi proposeTermination() pada kontrak CompanyVault. Proposal menyimpan hash dari alasan PHK on-chain (alasan lengkap disimpan off-chain untuk menjaga privasi), snapshot flow rate karyawan saat pengajuan untuk keperluan kalkulasi pesangon, serta timestamp kadaluarsa yang ditetapkan 7 hari sejak pengajuan. HR Admin secara otomatis memberikan persetujuan pertama dengan mengajukan proposal; persetujuan Legal Officer masih diperlukan sebelum eksekusi dapat dilakukan.
+Deskripsi      : Sistem harus memampukan HR Admin untuk mengajukan proposal Pemutusan Hubungan Kerja (PHK) terhadap karyawan melalui fungsi proposeTermination() pada kontrak CompanyVault. Proposal menyimpan hash dari alasan PHK on-chain (alasan lengkap disimpan off-chain untuk menjaga privasi), snapshot flow rate karyawan saat pengajuan untuk keperluan kalkulasi pesangon, serta timestamp kadaluarsa yang ditetapkan 7 hari sejak pengajuan. HR Admin secara otomatis memberikan persetujuan pertama (`hrApproved`) dengan mengajukan proposal; persetujuan `LEGAL_ROLE` (`legalApproved`) masih diperlukan sebagai langkah kedua sebelum eksekusi dapat dilakukan — lihat §3.1 untuk siapa yang menjalankan langkah kedua ini dalam praktik.
 
-#### 3.2.30. Persetujuan Proposal PHK oleh Legal Officer
+#### 3.2.30. Persetujuan Proposal PHK oleh Pemegang LEGAL_ROLE
 ID Requirement : FR-PAYANA-502
-Deskripsi      : Sistem harus memampukan Legal Officer untuk memberikan persetujuan atas proposal PHK yang aktif melalui fungsi approveTermination() pada kontrak CompanyVault. Sistem memvalidasi bahwa proposal belum kadaluarsa, bahwa pemanggil memiliki LEGAL_ROLE pada vault yang bersangkutan, dan bahwa persetujuan dari pihak yang sama belum pernah diberikan sebelumnya. Proposal yang mendapat persetujuan kedua (HR dan Legal Officer) dapat segera dieksekusi oleh pihak manapun yang berwenang sebelum masa kadaluarsa berakhir.
+Deskripsi      : Sistem harus memampukan pemegang `LEGAL_ROLE` untuk memberikan persetujuan atas proposal PHK yang aktif melalui fungsi approveTermination() pada kontrak CompanyVault. Sistem memvalidasi bahwa proposal belum kadaluarsa, bahwa pemanggil memiliki `LEGAL_ROLE` pada vault yang bersangkutan, dan bahwa persetujuan dari alamat yang sama belum pernah diberikan sebelumnya. Proposal yang mendapat kedua persetujuan (`hrApproved` dan `legalApproved`) dapat segera dieksekusi oleh HR Admin (`executeTermination()` hanya dapat dipanggil oleh `HR_ROLE`) sebelum masa kadaluarsa berakhir. Dalam operasional saat ini, `LEGAL_ROLE` di-auto-grant ke alamat HR Admin sendiri (lihat §3.1), sehingga langkah persetujuan kedua ini secara de facto juga dijalankan oleh HR Admin — sistem tidak menyediakan dashboard atau alur login terpisah bagi pemegang `LEGAL_ROLE` yang berbeda dari HR Admin.
 
 #### 3.2.31. Eksekusi Pemutusan Hubungan Kerja
 ID Requirement : FR-PAYANA-503
@@ -1104,7 +1108,7 @@ graph LR
     style OWNER fill:#fce7f3,stroke:#db2777
 ```
 
-> **Catatan:** Diagram disederhanakan menjadi tiga aktor persona utama (HR Admin, Karyawan, Owner SaaS) sesuai arahan pembimbing. Persetujuan PHK (UC-07) dan verifikasi SBT (UC-14), yang secara teknis dijalankan oleh pemegang `LEGAL_ROLE` on-chain atau pihak eksternal, digambarkan sebagai bagian dari domain HR Admin pada level diagram use case — detail teknis peran `LEGAL_ROLE` tetap didokumentasikan pada spesifikasi UC-07 dan pada DPPL (access control on-chain).
+> **Catatan:** Diagram disederhanakan menjadi tiga aktor persona utama (HR Admin, Karyawan, Owner SaaS). Persetujuan PHK (UC-07) digambarkan sebagai bagian dari domain HR Admin bukan sekadar penyederhanaan diagram, melainkan mencerminkan implementasi nyata: `LEGAL_ROLE` di-auto-grant ke alamat HR Admin sendiri saat onboarding, dan tidak ada dashboard/alur login terpisah di frontend bagi pemegang `LEGAL_ROLE` yang berbeda dari HR Admin (lihat §3.1 untuk detail lengkap serta keterbatasannya). Verifikasi SBT (UC-14) tetap murni domain HR Admin.
 >
 > **Catatan (UC-21):** Nomor UC-21 sengaja ditempatkan setelah UC-20 (bukan disisipkan di antara
 > UC-01/UC-02) agar tidak menggeser nomor UC yang sudah dirujuk di tempat lain pada dokumen ini
@@ -1145,12 +1149,12 @@ sequenceDiagram
 | | |
 |-|-|
 | **Nama Use Case** | Login dan Autentikasi |
-| **Deskripsi Singkat** | Pengguna (HR Admin, Karyawan, atau Legal Officer) melakukan autentikasi ke sistem Payana menggunakan tanda tangan kriptografis dari dompet digital mereka. |
-| **Aktor** | HR Admin / Karyawan / Legal Officer |
+| **Deskripsi Singkat** | Pengguna (HR Admin atau Karyawan) melakukan autentikasi ke sistem Payana menggunakan tanda tangan kriptografis dari dompet digital mereka. |
+| **Aktor** | HR Admin / Karyawan |
 | **Pre Kondisi** | Pengguna memiliki dompet Ethereum (MetaMask atau embedded wallet via Privy) dan telah terdaftar di sistem dengan role yang valid. |
-| **Pos Kondisi** | Sistem menerbitkan JWT token; pengguna diarahkan ke dashboard sesuai perannya (HR, Employee, atau Legal). |
-| **Basic Flow** | 1. Pengguna membuka halaman login Payana. <br> 2. Sistem menampilkan opsi autentikasi melalui Privy (email, Google, atau koneksi langsung wallet). <br> 3. Pengguna memilih metode autentikasi dan menyetujui permintaan tanda tangan pesan EIP-191 melalui dompet digital. <br> 4. Privy memproses autentikasi dan mengembalikan JWT serta alamat wallet pengguna ke frontend. <br> 5. Frontend mengirim JWT ke backend API melalui endpoint `GET /auth/me`. <br> 6. Backend memverifikasi JWT, mengambil data profil pengguna dari database, dan menentukan role berdasarkan alamat wallet yang terdaftar on-chain. <br> 7. Backend menerbitkan JWT token dengan klaim role dan wallet address, lalu mengembalikan data profil lengkap ke frontend. <br> 8. Frontend membaca nilai role dan mengarahkan pengguna ke dashboard yang sesuai: HR Admin ke `/hr/vault`, Karyawan ke `/employee/ewa`, Legal Officer ke `/hr/phk`, atau Owner ke `/owner/dashboard`. |
-| **Alternative Flow** | A1. Apabila pengguna sudah memiliki sesi JWT yang masih valid di browser, frontend langsung memanggil `GET /auth/me` tanpa menampilkan halaman login, sehingga pengguna otomatis diarahkan ke dashboard sesuai role. <br> A2. Apabila pengguna adalah Legal Officer, sistem memeriksa `LEGAL_ROLE` on-chain dan mengarahkan ke dashboard legal pada halaman `/hr/phk`. |
+| **Pos Kondisi** | Sistem menerbitkan JWT token; pengguna diarahkan ke dashboard sesuai perannya (HR atau Employee). |
+| **Basic Flow** | 1. Pengguna membuka halaman login Payana. <br> 2. Sistem menampilkan opsi autentikasi melalui Privy (email, Google, atau koneksi langsung wallet). <br> 3. Pengguna memilih metode autentikasi dan menyetujui permintaan tanda tangan pesan EIP-191 melalui dompet digital. <br> 4. Privy memproses autentikasi dan mengembalikan JWT serta alamat wallet pengguna ke frontend. <br> 5. Frontend mengirim JWT ke backend API melalui endpoint `GET /auth/me`. <br> 6. Backend memverifikasi JWT, mengambil data profil pengguna dari database, dan menentukan role berdasarkan alamat wallet yang terdaftar on-chain (`useRole.ts`: Owner → HR → Karyawan). <br> 7. Backend menerbitkan JWT token dengan klaim role dan wallet address, lalu mengembalikan data profil lengkap ke frontend. <br> 8. Frontend membaca nilai role dan mengarahkan pengguna ke dashboard yang sesuai: HR Admin ke `/hr/vault` (termasuk akses ke antrian PHK di `/hr/phk`, lihat §3.1 soal `LEGAL_ROLE`), Karyawan ke `/employee/ewa`, atau Owner ke `/owner/dashboard`. |
+| **Alternative Flow** | A1. Apabila pengguna sudah memiliki sesi JWT yang masih valid di browser, frontend langsung memanggil `GET /auth/me` tanpa menampilkan halaman login, sehingga pengguna otomatis diarahkan ke dashboard sesuai role. |
 | **Error Flow** | E1. Apabila JWT tidak valid atau telah kedaluwarsa, backend mengembalikan status `401 Unauthorized`. Sistem menghapus token dari penyimpanan lokal dan menampilkan kembali halaman login dengan pesan "Sesi Anda telah berakhir. Silakan login kembali." <br> E2. Apabila wallet address tidak ditemukan dalam sistem (role null), pengguna diarahkan ke halaman `/onboarding` dengan pesan "Akun tidak ditemukan dalam sistem. Silakan lakukan pendaftaran." <br> E3. Apabila layanan Privy mengalami gangguan, frontend menampilkan pesan "Layanan autentikasi sedang tidak tersedia. Silakan coba beberapa saat lagi." dan menolak melanjutkan proses login. |
 
 ---
@@ -1319,58 +1323,60 @@ sequenceDiagram
     CV->>CV: Simpan proposal: hrApproved=true, expiresAt=now+7hari
     CV->>CV: Simpan flowRateSnapshot untuk kalkulasi pesangon
     CV-->>FE: event TerminationProposed
-    FE-->>HR: Proposal PHK aktif — menunggu Legal Officer
+    FE-->>HR: Proposal PHK aktif — menunggu persetujuan LEGAL_ROLE
 ```
 
 | | |
 |-|-|
 | **Nama Use Case** | Inisiasi PHK oleh HR Admin |
-| **Deskripsi Singkat** | HR Admin mengajukan proposal Pemutusan Hubungan Kerja (PHK) terhadap karyawan tertentu melalui smart contract CompanyVault. Proposal ini memerlukan persetujuan Legal Officer sebelum dapat dieksekusi, sebagai mekanisme pengamanan hukum dua pihak (multi-signature). |
+| **Deskripsi Singkat** | HR Admin mengajukan proposal Pemutusan Hubungan Kerja (PHK) terhadap karyawan tertentu melalui smart contract CompanyVault. Proposal ini memerlukan persetujuan kedua dari pemegang `LEGAL_ROLE` sebelum dapat dieksekusi, sebagai mekanisme pengamanan dua-peran (multi-signature) — lihat §3.1 SKPL untuk penjelasan bahwa `LEGAL_ROLE` saat ini digenggam HR Admin sendiri secara default. |
 | **Aktor** | HR Admin |
 | **Pre Kondisi** | HR Admin telah login dengan role `hr`. Karyawan yang akan di-PHK memiliki status aktif dengan stream gaji yang sedang berjalan. Belum ada proposal PHK aktif untuk karyawan tersebut. |
-| **Pos Kondisi** | Proposal PHK tersimpan di smart contract dengan status `menunggu_persetujuan_legal`. Legal Officer menerima notifikasi untuk meninjau proposal. Stream gaji karyawan ditangguhkan sementara menunggu eksekusi. |
-| **Basic Flow** | 1. HR Admin mengakses halaman `/hr/phk` dan mengklik "Buat Proposal PHK". <br> 2. Sistem menampilkan formulir proposal PHK. HR Admin memilih nama karyawan dari daftar karyawan aktif perusahaan. <br> 3. HR Admin mengisi formulir: alasan PHK (restrukturisasi, pelanggaran berat, berakhirnya kontrak, atau lainnya), tanggal efektif yang diusulkan, dan catatan tambahan pendukung. <br> 4. HR Admin mengklik "Ajukan Proposal". Frontend memanggil `CompanyVault.proposeTermination(employeeAddress, reason, effectiveDate)` melalui Privy. <br> 5. Smart contract memverifikasi bahwa HR Admin memiliki `HR_ROLE` yang valid dan tidak ada proposal PHK aktif untuk karyawan tersebut. <br> 6. Proposal tersimpan on-chain dengan timestamp pengajuan dan batas waktu persetujuan (misalnya 30 hari). Status berubah menjadi `menunggu_persetujuan_legal`. <br> 7. Backend menerima webhook dari Alchemy, menyimpan data proposal ke database, dan mengirimkan notifikasi ke Legal Officer melalui email dan notifikasi in-app. <br> 8. Frontend menampilkan konfirmasi "Proposal PHK berhasil diajukan dan sedang menunggu persetujuan Legal Officer." |
-| **Alternative Flow** | A1. Apabila HR Admin ingin membatalkan proposal sebelum Legal Officer memberikan keputusan, HR dapat memanggil `CompanyVault.cancelProposal(employeeAddress)`. Status proposal berubah menjadi `dibatalkan` dan Legal Officer menerima notifikasi pembatalan. |
+| **Pos Kondisi** | Proposal PHK tersimpan di smart contract dengan `hrApproved=true`, `legalApproved=false`, dan `expiresAt` 7 hari sejak pengajuan. Stream gaji karyawan tetap berjalan sampai eksekusi final. |
+| **Basic Flow** | 1. HR Admin mengakses halaman `/hr/phk` dan mengklik "Buat Proposal PHK". <br> 2. Sistem menampilkan formulir proposal PHK. HR Admin memilih nama karyawan dari daftar karyawan aktif perusahaan. <br> 3. HR Admin mengisi formulir: alasan PHK (restrukturisasi, pelanggaran berat, berakhirnya kontrak, atau lainnya) dan catatan tambahan pendukung — alasan lengkap dikirim terpisah ke backend (`POST /termination/reason`) untuk disimpan plaintext off-chain, sementara on-chain hanya menyimpan hash-nya. <br> 4. HR Admin mengklik "Ajukan Proposal". Frontend memanggil `CompanyVault.proposeTermination(employeeAddress, reasonHash)` melalui Privy. <br> 5. Smart contract memverifikasi bahwa HR Admin memiliki `HR_ROLE` yang valid dan tidak ada proposal PHK aktif untuk karyawan tersebut. <br> 6. Proposal tersimpan on-chain dengan `hrApproved=true` dan `expiresAt = now + 7 hari`. <br> 7. Backend menerima webhook dari Alchemy dan menyimpan data proposal ke database. <br> 8. Frontend menampilkan konfirmasi "Proposal PHK berhasil diajukan dan sedang menunggu persetujuan kedua." |
+| **Alternative Flow** | A1. Apabila HR Admin ingin membatalkan proposal sebelum persetujuan kedua diberikan, HR dapat memanggil `CompanyVault.cancelProposal(employeeAddress)`. Proposal dihapus dari state on-chain (`expiresAt` direset ke 0). |
 | **Error Flow** | E1. Apabila sudah terdapat proposal PHK aktif yang belum selesai diproses untuk karyawan yang sama (`TerminationAlreadyProposed`), smart contract menolak pengajuan baru. Frontend menampilkan pesan "Proposal PHK untuk karyawan ini sudah pernah diajukan dan masih dalam proses. Selesaikan atau batalkan proposal yang ada sebelum membuat proposal baru." <br> E2. Apabila HR Admin tidak memiliki `HR_ROLE` yang valid di smart contract (`Unauthorized`), transaksi akan di-revert. Frontend menampilkan pesan "Akses ditolak. Anda tidak memiliki wewenang untuk mengajukan proposal PHK." <br> E3. Apabila karyawan yang dipilih tidak ditemukan atau sudah dalam status non-aktif, backend mengembalikan error `404 Not Found`. Frontend menampilkan pesan "Karyawan tidak ditemukan atau sudah tidak aktif dalam sistem." |
 
 ---
 
-#### UC-07: Persetujuan PHK (mode Legal)
+#### UC-07: Persetujuan PHK oleh Pemegang LEGAL_ROLE
+
+> **Catatan implementasi:** Use case ini secara arsitektur adalah langkah persetujuan independen oleh pemegang `LEGAL_ROLE` — namun dalam produk saat ini, `LEGAL_ROLE` di-auto-grant ke alamat HR Admin sendiri saat onboarding vault, dan frontend tidak memiliki dashboard/alur login terpisah untuk pemegang `LEGAL_ROLE` yang berbeda dari HR Admin (lihat §3.1 untuk detail lengkap). Diagram dan alur di bawah karenanya menunjukkan HR Admin sebagai pelaku, memanggil fungsi kontrak yang sama seolah bertindak sebagai pemegang `LEGAL_ROLE` terpisah — bukan aktor lain yang login sendiri.
 
 ```mermaid
 sequenceDiagram
-    actor LEGAL as Legal Officer
+    actor HR as HR Admin (pemegang LEGAL_ROLE)
     participant FE as Frontend
     participant CV as CompanyVault
     participant SBT as EmploymentSBT
     participant IDRX as IDRX Token
 
-    LEGAL->>FE: Buka daftar proposal PHK menunggu persetujuan
+    HR->>FE: Buka /hr/phk — lihat proposal menunggu persetujuan
     FE->>CV: approveTermination(employee)
     CV->>CV: Validasi LEGAL_ROLE
     CV->>CV: Validasi AlreadyApproved + ProposalExpired
     CV->>CV: legalApproved = true
-    CV-->>FE: event TerminationApproved — kedua pihak setuju
-    LEGAL->>FE: Klik "Eksekusi PHK"
+    CV-->>FE: event TerminationApproved — kedua langkah persetujuan terpenuhi
+    HR->>FE: Klik "Eksekusi PHK"
     FE->>CV: executeTermination(employee)
     CV->>CV: Hitung pesangon (PayrollMath.severanceMultiplier)
     CV->>CV: _forfeitAllVests(employee)
     CV->>SBT: revoke(tokenId)
     CV->>IDRX: transfer(employee, severanceDue)
     CV-->>FE: event TerminationExecuted
-    FE-->>LEGAL: PHK berhasil dieksekusi
+    FE-->>HR: PHK berhasil dieksekusi
 ```
 
 | | |
 |-|-|
-| **Nama Use Case** | Persetujuan PHK (mode Legal) |
-| **Deskripsi Singkat** | Pemegang wewenang legal (di level persona diagram digambarkan sebagai bagian dari domain HR Admin; secara teknis on-chain dikendalikan oleh alamat pemegang `LEGAL_ROLE`, bisa staf legal internal terpisah atau HR Admin yang juga diberi role tersebut) meninjau proposal PHK yang diajukan, memverifikasi kelengkapan dokumen dan kepatuhan hukum, kemudian memberikan persetujuan atau penolakan. Setelah disetujui, eksekusi PHK final dapat dilakukan on-chain. |
+| **Nama Use Case** | Persetujuan PHK oleh Pemegang LEGAL_ROLE |
+| **Deskripsi Singkat** | Pemegang `LEGAL_ROLE` pada `CompanyVault` — dalam praktik HR Admin sendiri, lihat catatan implementasi di atas — meninjau proposal PHK yang diajukan dan memberikan persetujuan kedua. Setelah kedua persetujuan (`hrApproved` dan `legalApproved`) terpenuhi, HR Admin dapat menjalankan eksekusi PHK final on-chain. |
 | **Aktor** | HR Admin (pemegang `LEGAL_ROLE`) |
-| **Pre Kondisi** | Legal Officer telah login dengan role `legal`. Terdapat minimal satu proposal PHK dengan status `menunggu_persetujuan_legal` di database. Proposal belum kedaluwarsa (masih dalam batas waktu persetujuan 30 hari). |
-| **Pos Kondisi** | Status proposal PHK berubah menjadi `disetujui` atau `ditolak`. Apabila disetujui, HR Admin dapat mengeksekusi PHK final yang akan mencabut SBT karyawan, menghentikan stream, dan mencairkan pesangon. |
-| **Basic Flow** | 1. Legal Officer menerima notifikasi melalui email atau in-app bahwa ada proposal PHK yang memerlukan persetujuan. <br> 2. Legal Officer login dan mengakses halaman `/hr/phk`, kemudian melihat daftar proposal dengan status "Menunggu Persetujuan Legal". <br> 3. Legal Officer mengklik proposal untuk melihat detail: nama karyawan, alasan PHK yang diajukan HR, tanggal efektif, catatan pendukung, dan riwayat kinerja karyawan. <br> 4. Legal Officer meninjau kelengkapan dokumen dan memastikan alasan PHK sesuai dengan ketentuan hukum ketenagakerjaan yang berlaku. <br> 5. Legal Officer mengklik "Setujui". Frontend memanggil `CompanyVault.approveTermination(employeeAddress)` menggunakan akun Legal Officer yang memiliki `LEGAL_ROLE`. <br> 6. Smart contract memverifikasi bahwa pemanggil memiliki `LEGAL_ROLE`, proposal masih aktif dan belum kedaluwarsa, serta Legal Officer ini belum pernah menyetujui proposal yang sama sebelumnya. <br> 7. Status proposal berubah menjadi `disetujui` on-chain. <br> 8. Backend menerima webhook, memperbarui status di database, dan mengirimkan notifikasi ke HR Admin bahwa PHK siap dieksekusi. <br> 9. Frontend menampilkan konfirmasi "Persetujuan PHK berhasil diberikan. HR Admin akan mengeksekusi PHK secara final." |
-| **Alternative Flow** | A1. Apabila Legal Officer menolak proposal, pada langkah 5 Legal Officer mengklik "Tolak" dan mengisi alasan penolakan secara tertulis. Frontend memanggil `CompanyVault.rejectTermination(employeeAddress, reason)`. Status proposal berubah menjadi `ditolak_legal`. HR Admin menerima notifikasi penolakan beserta alasannya dan dapat mengajukan proposal baru dengan perbaikan. |
-| **Error Flow** | E1. Apabila Legal Officer yang sama mencoba menyetujui proposal yang sudah pernah disetujui oleh akun mereka sebelumnya (`AlreadyApproved`), smart contract menolak dan mengembalikan error. Frontend menampilkan pesan "Anda sudah memberikan persetujuan untuk proposal PHK ini sebelumnya." <br> E2. Apabila proposal PHK telah melampaui batas waktu persetujuan yang ditetapkan (`ProposalExpired`), smart contract menolak aksi approval. Frontend menampilkan pesan "Proposal PHK ini telah kedaluwarsa. HR Admin perlu mengajukan proposal baru." <br> E3. Apabila Legal Officer tidak memiliki `LEGAL_ROLE` yang valid di smart contract (`Unauthorized`), transaksi akan di-revert. Frontend menampilkan pesan "Akses ditolak. Anda tidak memiliki wewenang sebagai Legal Officer untuk menyetujui PHK." |
+| **Pre Kondisi** | HR Admin telah login dengan role `hr`. Terdapat minimal satu proposal PHK dengan `hrApproved=true` dan `legalApproved=false` yang belum kedaluwarsa (dalam 7 hari sejak pengajuan). |
+| **Pos Kondisi** | `legalApproved` berubah menjadi `true` on-chain. HR Admin dapat langsung melanjutkan ke eksekusi PHK final, yang akan mencabut SBT karyawan, menghentikan stream, dan mencairkan pesangon. |
+| **Basic Flow** | 1. HR Admin mengakses halaman `/hr/phk` dan melihat daftar proposal dengan status menunggu persetujuan kedua. <br> 2. HR Admin membuka detail proposal: nama karyawan, alasan PHK (dibaca dari `GET /termination/reason/:employeeAddress`), dan tanggal pengajuan. <br> 3. HR Admin mengklik "Setujui". Frontend memanggil `CompanyVault.approveTermination(employeeAddress)`. <br> 4. Smart contract memverifikasi pemanggil memiliki `LEGAL_ROLE`, proposal masih aktif dan belum kedaluwarsa, serta belum pernah disetujui sebelumnya dari langkah ini. <br> 5. `legalApproved` berubah menjadi `true` on-chain; event `TerminationApproved` diterbitkan. <br> 6. Frontend menampilkan konfirmasi dan tombol "Eksekusi PHK" menjadi aktif. <br> 7. HR Admin mengklik "Eksekusi PHK" — memanggil `executeTermination(employeeAddress)`, yang menghitung pesangon, mencabut SBT, dan mentransfer dana pesangon ke karyawan dalam satu transaksi. |
+| **Alternative Flow** | A1. Tidak ada fungsi `rejectTermination()` pada kontrak — untuk membatalkan proposal sebelum persetujuan kedua, HR Admin memanggil `cancelProposal(employeeAddress)` (lihat UC-06, A1). Sistem tidak menyediakan mekanisme "tolak dengan alasan" yang terpisah dari pembatalan. |
+| **Error Flow** | E1. Apabila persetujuan kedua untuk proposal yang sama sudah pernah diberikan (`AlreadyApproved`), smart contract menolak dan mengembalikan error. Frontend menampilkan pesan "Persetujuan untuk proposal PHK ini sudah pernah diberikan sebelumnya." <br> E2. Apabila proposal PHK telah melampaui batas waktu 7 hari (`ProposalExpired`), smart contract menolak aksi approval. Frontend menampilkan pesan "Proposal PHK ini telah kedaluwarsa. HR Admin perlu mengajukan proposal baru." <br> E3. Apabila pemanggil tidak memiliki `LEGAL_ROLE` yang valid di smart contract (`Unauthorized`), transaksi akan di-revert. Frontend menampilkan pesan "Akses ditolak. Alamat ini tidak memiliki wewenang LEGAL_ROLE untuk menyetujui PHK." Ini adalah satu-satunya jalur bagi alamat terpisah (bukan HR Admin) yang diberi `LEGAL_ROLE` via `/hr/settings` untuk berinteraksi dengan fungsi ini — melalui panggilan kontrak langsung di luar aplikasi, karena frontend tidak merutekan mereka ke halaman ini (lihat §3.1). |
 
 ---
 

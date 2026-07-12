@@ -1795,17 +1795,16 @@ erDiagram
 ### 2.4 Perancangan Antarmuka
 
 
-Frontend Payana menyajikan empat portal yang dipisahkan berdasarkan hasil resolusi peran (hook `useRole`). Routing dilakukan dengan App Router Next.js, dan setiap portal dilindungi oleh role guard berbasis peran on-chain.
+Frontend Payana menyajikan tiga portal yang dipisahkan berdasarkan hasil resolusi peran (hook `useRole`, tipe `Role = "owner" | "hr" | "employee" | "terminated" | null`). Routing dilakukan dengan App Router Next.js, dan setiap portal dilindungi oleh role guard (`useRoleGuard`) berbasis peran on-chain.
 
 | Portal | Prefiks URL | Aktor | Mekanisme Deteksi Peran |
 |--------|-------------|-------|--------------------------|
 | Autentikasi & Onboarding | `/`, `/login`, `/onboarding`, `/verify` | Publik / calon HR | Belum terautentikasi atau belum memiliki peran |
-| Portal HR | `/hr/*` | HR Admin | `PayrollFactory.companyVaults(address) != 0` |
+| Portal HR | `/hr/*` (termasuk `/hr/phk` — lihat catatan LEGAL_ROLE di bawah) | HR Admin | `PayrollFactory.companyVaults(address) != 0` |
 | Portal Karyawan | `/employee/*` | Karyawan | Stream aktif/paused di Ponder |
 | Portal Owner SaaS | `/owner` | Owner SaaS | `address == NEXT_PUBLIC_OWNER_ADDRESS` |
-| Portal Legal Officer | (memanfaatkan `/hr/phk`) | Legal Officer | `CompanyVault.hasRole(LEGAL_ROLE, address)` |
 
-Urutan prioritas deteksi peran (sesuai FR-PAYANA-106): Owner → HR → Legal → Karyawan. Pengguna yang tidak memenuhi kriteria peran apa pun diarahkan ke halaman onboarding.
+Urutan prioritas deteksi peran (`useRole.ts`, `resolveRole()`): Owner → HR → Karyawan (via stream aktif) → Karyawan diberhentikan (`terminated`, via riwayat termination yang sudah dieksekusi). **Tidak ada cabang pemeriksaan `LEGAL_ROLE`** — lihat §2.4.5 untuk penjelasan lengkap kenapa portal "Legal Officer" terpisah tidak eksis di frontend meski `LEGAL_ROLE` adalah peran `AccessControl` yang genuinely terpisah on-chain. Pengguna yang tidak memenuhi kriteria peran apa pun (termasuk pemegang `LEGAL_ROLE` yang bukan juga `HR_ROLE`) diarahkan ke halaman onboarding.
 
 ---
 
@@ -1814,7 +1813,7 @@ Bab ini merinci rancangan antarmuka pengguna Payana per portal. Setiap halaman d
 
 Setiap halaman mengikuti satu dari dua pola interaksi on-chain:
 
-1. **Pola tulis langsung (`useContractWrite`)** untuk aksi HR, Owner, dan Legal. Transaksi ditandatangani dan biaya gasnya dibayar oleh wallet pengguna melalui embedded wallet Privy. Hook melakukan `switchChain(84532)` sebelum penandatanganan, lalu memanggil `walletClient.writeContract`.
+1. **Pola tulis langsung (`useContractWrite`)** untuk aksi HR dan Owner (termasuk langkah persetujuan `LEGAL_ROLE` pada PHK, yang dijalankan lewat sesi HR Admin — lihat §2.4.5). Transaksi ditandatangani dan biaya gasnya dibayar oleh wallet pengguna melalui embedded wallet Privy. Hook melakukan `switchChain(84532)` sebelum penandatanganan, lalu memanggil `walletClient.writeContract`.
 2. **Pola relay gasless (ERC-4337)** yang dikhususkan untuk `claimSalary()` karyawan. UserOperation ditandatangani secara silent oleh Privy lalu direlay melalui `POST /bundler/relay` dan disponsori Paymaster.
 
 Pembacaan data terbagi menjadi dua sumber: (a) pembacaan agregat historis melalui klien `ponder` di `lib/api.ts`, dan (b) pembacaan nilai real-time on-chain (mis. `getAccrued`) melalui `publicClient.readContract` (viem).
@@ -1855,7 +1854,7 @@ sequenceDiagram
 ##### 2.4.1.2 Halaman Login (`/login`)
 
 **Deskripsi:** Autentikasi tanpa kata sandi berbasis tanda tangan kriptografi EIP-191 menggunakan embedded wallet Privy.
-**Aktor:** Seluruh pengguna (HR, Karyawan, Legal, Owner).
+**Aktor:** Seluruh pengguna (HR Admin, Karyawan, Owner SaaS).
 **FR Terkait:** FR-PAYANA-101, FR-PAYANA-102, FR-PAYANA-106.
 
 **Alur Interaksi:**
@@ -1898,7 +1897,7 @@ sequenceDiagram
 2. Jika ada `payana_refresh_token` di `localStorage`, coba `POST /auth/refresh` terlebih dahulu untuk menghindari tanda tangan ulang.
 3. Jika refresh gagal, bentuk pesan `Sign in to Payana\nTimestamp: <unix_seconds>`, panggil `switchChain(84532)`, lalu `personal_sign`.
 4. Kirim `{address, message, signature, timestamp}` ke `POST /auth/login`; simpan `token` (akses) dan `refreshToken`.
-5. Jalankan `useRole()` untuk menentukan peran dan mengarahkan ke `/owner`, `/hr/*`, `/hr/phk` (Legal), atau `/employee/*`.
+5. Jalankan `useRole()` untuk menentukan peran dan mengarahkan ke `/owner`, `/hr/vault` (termasuk akses ke `/hr/phk` untuk langkah persetujuan LEGAL_ROLE, lihat §2.4.5), atau `/employee/ewa`.
 
 ##### 2.4.1.3 Halaman Onboarding Karyawan (`/onboarding`) — invitation-only
 
@@ -2337,23 +2336,22 @@ sequenceDiagram
 
 ##### 2.4.2.9 PHK (`/hr/phk`)
 
-**Deskripsi:** Antrian dan alur PHK multi-tanda tangan (HR mengajukan, Legal menyetujui, HR mengeksekusi), termasuk pembatalan proposal.
-**Aktor:** HR Admin dan Legal Officer (mode terbatas).
+**Deskripsi:** Antrian dan alur PHK multi-tanda tangan (HR mengajukan, lalu pemegang `LEGAL_ROLE` menyetujui, HR mengeksekusi), termasuk pembatalan proposal. Halaman ini satu-satunya UI untuk kedua langkah persetujuan — lihat §2.4.5 untuk penjelasan bahwa `LEGAL_ROLE` di-auto-grant ke HR Admin sendiri, sehingga kedua langkah dijalankan dari sesi HR Admin yang sama.
+**Aktor:** HR Admin (menjalankan kedua langkah persetujuan: `HR_ROLE` dan `LEGAL_ROLE`).
 **FR Terkait:** FR-PAYANA-501, FR-PAYANA-502, FR-PAYANA-503, FR-PAYANA-504.
 
 **Alur Interaksi:**
 
 ```mermaid
 sequenceDiagram
-    actor HR
-    actor Legal as Legal Officer
+    actor HR as HR Admin
     participant V as CompanyVault
     HR->>V: proposeTermination(employee, reasonHash)
     V->>V: hrApproved=true, expiresAt=+7 hari, snapshot flowRate
     V-->>HR: TerminationProposed
-    Legal->>V: approveTermination(employee)
-    V->>V: legalApproved=true (cek LEGAL_ROLE)
-    V-->>Legal: TerminationApproved
+    HR->>V: approveTermination(employee)
+    V->>V: legalApproved=true (cek LEGAL_ROLE pada msg.sender)
+    V-->>HR: TerminationApproved
     HR->>V: executeTermination(employee)
     V->>V: hitung pesangon (UU Cipta Kerja) + top-up
     V->>V: revoke SBT + forfeit vest + cancel stream
@@ -2366,16 +2364,18 @@ sequenceDiagram
 |----------|------|-----------|
 | Form proposal | Field + tombol | Alamat karyawan + alasan (di-hash jadi `reasonHash`). |
 | Daftar proposal | Tabel data | Status `hrApproved`/`legalApproved`, kadaluarsa. |
-| Tombol setujui (Legal) | Tombol tulis | `approveTermination(employee)`. |
+| Tombol setujui (LEGAL_ROLE) | Tombol tulis | `approveTermination(employee)` — dipanggil dari sesi HR Admin yang sama, karena `LEGAL_ROLE`-nya digenggam HR itu sendiri. |
 | Tombol eksekusi | Tombol tulis | `executeTermination(employee)`. |
-| Tombol batalkan | Tombol tulis | `cancelProposal(employee)` sebelum disetujui Legal. |
+| Tombol batalkan | Tombol tulis | `cancelProposal(employee)` sebelum langkah persetujuan LEGAL_ROLE dilakukan. |
 
 **Method/Algoritma Utama:**
 
 1. HR: hash alasan ke `reasonHash` (keccak256), panggil `proposeTermination(employee, reasonHash)`.
-2. Legal: panggil `approveTermination(employee)` (memerlukan `LEGAL_ROLE`).
+2. HR (sebagai pemegang `LEGAL_ROLE`): panggil `approveTermination(employee)` — kontrak memvalidasi `hasRole(LEGAL_ROLE, msg.sender)`, yang bernilai `true` untuk alamat HR karena auto-grant saat onboarding.
 3. HR: panggil `executeTermination(employee)` (memerlukan kedua persetujuan dan belum kadaluarsa).
-4. Pembatalan memanggil `cancelProposal(employee)` selama belum disetujui Legal.
+4. Pembatalan memanggil `cancelProposal(employee)` selama langkah persetujuan LEGAL_ROLE belum dilakukan.
+
+**Catatan arsitektur:** Bila HR sebelumnya menetapkan `legalAddress` terpisah lewat `/hr/settings` (yang di-`grantRole(LEGAL_ROLE, legalAddress)` on-chain), alamat tersebut tetap dapat memanggil `approveTermination()` langsung terhadap kontrak dari luar aplikasi (mis. Etherscan). Namun karena `useRole()` tidak mendeteksi `LEGAL_ROLE` dan `useRoleGuard` pada layout `/hr/*` hanya meloloskan `role === "hr"`, alamat legal terpisah tersebut tidak bisa membuka halaman `/hr/phk` ini melalui produk — role guard akan mengarahkannya ke `/onboarding` sebelum sempat melihat antrian proposal.
 
 ##### 2.4.2.10 Audit HR (`/hr/audit`)
 
@@ -3031,37 +3031,22 @@ sequenceDiagram
 3. `handleApprove`/`handleReject` memanggil endpoint registrasi lalu refresh.
 4. Konfigurasi fee via `setPlatformFee(bps)`; pembekuan via `emergencyFreezeAll()`.
 
-#### 2.4.5 Portal Legal Officer
+#### 2.4.5 Portal Legal Officer — TIDAK DIIMPLEMENTASIKAN (dokumentasi status & keterbatasan)
 
-**Deskripsi:** Legal Officer tidak memiliki prefiks rute tersendiri; perannya difokuskan pada persetujuan PHK melalui antarmuka `/hr/phk` dalam mode terbatas.
-**Aktor:** Legal Officer.
-**FR Terkait:** FR-PAYANA-502.
+**Status:** Portal ini **tidak eksis** sebagai jalur produk terpisah. Bagian ini didokumentasikan secara eksplisit (bukan dihapus begitu saja) supaya perbedaan antara desain AccessControl on-chain dan implementasi frontend tercatat dengan jelas.
 
-**Alur Interaksi:**
+**Apa yang genuinely ada on-chain:** `CompanyVault` mendefinisikan `LEGAL_ROLE` sebagai peran `AccessControl` yang independen dari `HR_ROLE`. `approveTermination()` hanya memvalidasi `hasRole(LEGAL_ROLE, msg.sender)` — kontrak tidak peduli apakah pemanggil juga punya `HR_ROLE` atau tidak. HR dapat men-`grantRole(LEGAL_ROLE, legalAddress)` ke alamat mana pun lewat halaman `/hr/settings`.
 
-```mermaid
-sequenceDiagram
-    actor Legal as Legal Officer
-    participant FE as Frontend /hr/phk (mode Legal)
-    participant V as CompanyVault
-    FE->>FE: useRole deteksi LEGAL_ROLE pada vault
-    FE-->>Legal: Tampilkan hanya proposal menunggu persetujuan
-    Legal->>V: approveTermination(employee)
-    V-->>Legal: TerminationApproved
-```
+**Apa yang TIDAK ada di frontend:**
+1. `useRole.ts` (`resolveRole()`) tidak memiliki cabang pemeriksaan `hasRole(LEGAL_ROLE, address)` sama sekali — fungsi ini hanya mengecek Owner (env var), HR (`companyVaults`), dan Karyawan (stream Ponder). Sebuah alamat yang hanya punya `LEGAL_ROLE` (bukan `HR_ROLE`) akan selalu mendapat `role: null` dari hook ini.
+2. `useRoleGuard` yang membungkus layout `/hr/*` (termasuk `/hr/phk`) hanya meloloskan `allowedRoles: ["hr"]`. Karena langkah 1 di atas tidak pernah menghasilkan `role: "legal"`, guard ini akan mengarahkan (`router.replace`) alamat legal terpisah tersebut ke `/onboarding` sebelum sempat merender antrian proposal PHK.
+3. Tidak ada rute atau komponen UI berlabel "mode Legal" di manapun dalam `frontend/src/app/`.
 
-**Deskripsi Antarmuka:**
+**Konsekuensi:** Satu-satunya jalur bagi `approveTermination()` untuk benar-benar dipanggil adalah:
+- (a) HR Admin memanggilnya dari sesi `/hr/phk` miliknya sendiri, memanfaatkan fakta bahwa `LEGAL_ROLE` di-auto-grant ke alamatnya sendiri saat onboarding (lihat §2.4.2.1 dan §2.4.2.9) — ini adalah jalur yang benar-benar berfungsi dan diuji (lihat PDHUPL AU-07-01); atau
+- (b) alamat legal terpisah yang di-`grantRole` lewat `/hr/settings` memanggil kontrak secara langsung di luar aplikasi (mis. lewat Etherscan atau skrip `viem`/`ethers` manual) — secara teknis valid di level kontrak, tetapi tidak pernah dilatih/diuji melalui produk karena tidak ada UI untuknya.
 
-| Komponen | Tipe | Deskripsi |
-|----------|------|-----------|
-| Daftar proposal menunggu | Tabel data | Hanya proposal yang `legalApproved == false`. |
-| Tombol setujui | Tombol tulis | `approveTermination(employee)`. |
-
-**Method/Algoritma Utama:**
-
-1. `useRole` mengiterasi `getCompanies()` dan memeriksa `hasRole(LEGAL_ROLE, address)` per vault.
-2. Pada mode Legal, antarmuka hanya menampilkan proposal menunggu dan tombol `approveTermination`.
-3. Legal Officer tidak dapat mengajukan proposal, mengelola stream, atau mengakses treasury.
+**Rekomendasi pengembangan lanjutan** (di luar cakupan implementasi skripsi ini): tambahkan cabang `legal` pada `useRole.ts` (mengecek `hasRole(LEGAL_ROLE, address)` pada setiap `CompanyVault` yang dikenal — catatan performa: ini butuh cara mengenumerasi company tanpa iterasi penuh `getCompanies()`, mis. via index terbalik dari Ponder), lalu izinkan `role === "legal"` masuk ke `/hr/phk` dalam mode terbatas (hanya lihat & approve proposal, tanpa akses ke fungsi HR lain).
 
 ---
 
@@ -3126,7 +3111,7 @@ sequenceDiagram
 | FR-PAYANA-404 | — | POST /bundler/relay (rateLimiter) | /employee/ewa |
 | FR-PAYANA-405 | — | GET /bundler/status/:hash | /employee/ewa |
 | FR-PAYANA-501 | CompanyVault.proposeTermination, cancelProposal | — | /hr/phk |
-| FR-PAYANA-502 | CompanyVault.approveTermination | — | /hr/phk (Legal) |
+| FR-PAYANA-502 | CompanyVault.approveTermination | — | /hr/phk (langkah LEGAL_ROLE, dijalankan dari sesi HR Admin — lihat §2.4.5) |
 | FR-PAYANA-503 | CompanyVault.executeTermination | — | /hr/phk |
 | FR-PAYANA-504 | PayrollMath.severanceMultiplier | — | /hr/phk |
 | FR-PAYANA-505 | CompanyVault.resignEmployee | — | /hr/employees/[id], /employee/severance |
@@ -4149,17 +4134,18 @@ Frontend dibangun dengan Next.js 16 (App Router), React 19, Tailwind CSS 4, Shad
 | | |
 |---|---|
 | Input | - |
-| Output | `{ role, vaultAddress, isLoading }` |
-| Deskripsi |  |
+| Output | `{ role, vaultAddress, hrAddress, isLoading }`, `role: "owner" \| "hr" \| "employee" \| "terminated" \| null` |
+| Deskripsi | Dibangun di atas React Query (`useQuery`, keyed by `["role", address]`, `staleTime: 60_000`, `retry: 3`) — bukan cache `Map` module-level, karena code-splitting per-route App Router membuat state modul biasa tidak benar-benar singleton lintas navigasi. |
 
-**Algoritma (FR-PAYANA-106, prioritas Owner → HR → Legal → Karyawan):**
+**Algoritma (FR-PAYANA-106, prioritas Owner → HR → Karyawan → Karyawan Diberhentikan):**
 
-1. Cache `Map` per alamat; kembalikan jika ada.
-2. **Owner:** jika `address == NEXT_PUBLIC_OWNER_ADDRESS` → `owner`.
-3. **HR:** `companyVaults(address) != 0` → `hr` dengan `vaultAddress`.
-4. **Legal:** iterasi `getCompanies()`, resolusi vault tiap company, cek `hasRole(LEGAL_ROLE, address)` → `legal`.
-5. **Karyawan:** `ponder.getStream(address)` dengan status `Active`/`Paused` → `employee` (resolusi `vaultAddress` dari `hrAuthority`).
-6. Jika tidak ada → `role = null` (diarahkan ke onboarding).
+1. **Owner:** jika `address == NEXT_PUBLIC_OWNER_ADDRESS` (perbandingan env langsung, tidak bisa gagal karena RPC/indexer) → `owner`.
+2. **HR:** `PayrollFactory.companyVaults(address) != zeroAddress` → `hr` dengan `vaultAddress = vault`, `hrAddress = address`.
+3. **Karyawan:** `ponder.getStream(employeeLookupAddress)` (Smart Account address, fallback ke EOA) dengan status `Active`/`Paused` → `employee`, `vaultAddress` diresolusi dari `hrAuthority` milik stream tersebut.
+4. **Karyawan Diberhentikan:** jika stream berstatus `Cancelled` DAN ada `termination` yang `executedAt` terisi dan belum `cancelled` → `terminated` (menampilkan UI severance, bukan dashboard employee biasa). Status `Cancelled` tanpa termination yang tereksekusi tidak dianggap `terminated` — bisa jadi sisa `migrateEmployeeAddress()` pada alamat lama.
+5. Jika tidak ada kondisi di atas yang terpenuhi → `role = null` (diarahkan ke onboarding).
+
+**Catatan penting:** algoritma ini **tidak memiliki cabang untuk `LEGAL_ROLE`** — tidak ada langkah yang memanggil `hasRole(LEGAL_ROLE, address)` di manapun dalam hook ini. Lihat §2.4.5 untuk pembahasan lengkap konsekuensinya (portal Legal Officer terpisah tidak dapat diakses lewat produk).
 
 **[useContractWrite (`hooks/useContractWrite.ts`)]**
 | | |
@@ -4234,7 +4220,7 @@ sequenceDiagram
     FE-->>E: tampilkan konfirmasi klaim
 ```
 
-Catatan: untuk aksi HR/Owner/Legal (mis. `startStream`, `proposeTermination`, `fundVault`), frontend memakai jalur `useContractWrite` standar (transaksi ditandatangani dan dibayar gas oleh wallet pengguna), bukan jalur relay gasless yang dikhususkan untuk `claimSalary()` karyawan.
+Catatan: untuk aksi HR/Owner (mis. `startStream`, `proposeTermination`, `approveTermination`, `fundVault`), frontend memakai jalur `useContractWrite` standar (transaksi ditandatangani dan dibayar gas oleh wallet pengguna), bukan jalur relay gasless yang dikhususkan untuk `claimSalary()` karyawan.
 
 ---
 
@@ -4268,7 +4254,7 @@ Catatan: untuk aksi HR/Owner/Legal (mis. `startStream`, `proposeTermination`, `f
 ### D.3 Keamanan Frontend
 
 1. **Privy WaaS:** kunci privat dikelola Privy (embedded wallet); pengguna tidak menyimpan seed phrase. Penandatanganan dilakukan secara silent untuk klaim gaji.
-2. **Role Guard:** `useRole` menentukan peran dari kondisi on-chain; akses portal dibatasi sesuai peran, dengan prioritas Owner → HR → Legal → Karyawan.
+2. **Role Guard:** `useRole` menentukan peran dari kondisi on-chain; akses portal dibatasi sesuai peran, dengan prioritas Owner → HR → Karyawan → Karyawan Diberhentikan (tidak ada cabang `LEGAL_ROLE`, lihat §2.4.5).
 3. **Token Refresh:** `useAuth` menyimpan refresh token di `localStorage` dan mencoba `/auth/refresh` sebelum meminta tanda tangan ulang, mengurangi friksi sekaligus menjaga umur access token pendek.
 4. **Pemisahan Chain:** seluruh interaksi dipaksa ke Base Sepolia (`switchChain(84532)`) sebelum penandatanganan untuk mencegah salah jaringan.
 
