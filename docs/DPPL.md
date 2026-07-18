@@ -1232,6 +1232,8 @@ erDiagram
     EMPLOYEE_STREAM ||--o{ CLIFF_VEST : employee
     EMPLOYEE_STREAM ||--o| EMPLOYMENT_CERTIFICATE : id
     COMPANY ||--o{ SALARY_ADVANCE : hrAuthority
+    COMPANY ||--o{ VAULT_WITHDRAWAL : hr_authority
+    COMPANY ||--o{ ROLE_CHANGE : vault_address
 
     COMPANY {
         hex id PK "hrAuthority/vault"
@@ -1239,6 +1241,24 @@ erDiagram
         text status
         bigint vaultBalance
         bigint createdAt
+        hex vaultAddress "BARU — resolve role_change ke company"
+    }
+    VAULT_WITHDRAWAL {
+        text id PK
+        hex hr_authority
+        hex vault_address
+        bigint amount
+        hex recipient
+        bigint timestamp
+    }
+    ROLE_CHANGE {
+        text id PK
+        hex vault_address
+        hex role "bytes32 mentah — lihat catatan di bawah"
+        hex account
+        hex sender
+        boolean granted
+        bigint timestamp
     }
     SALARY_CLAIM {
         text id PK
@@ -1283,6 +1303,12 @@ erDiagram
 | `platform_fee_payment` | `id` | `PlatformFeePaid` | `/owner` |
 | `employment_certificate` | `id` | `EmploymentCertified/Revoked` | `/verify` |
 | `low_balance_alert` | `id` | `LowVaultBalance` | `/hr/vault` |
+| `vault_withdrawal` | `id` | `VaultWithdrawn` `[BARU]` | `anomalyDetector.ts` (lihat Lampiran B.6) |
+| `role_change` | `id` | `RoleGranted`/`RoleRevoked` `[BARU]` | `anomalyDetector.ts` (lihat Lampiran B.6) |
+
+> **Catatan (`role_change.role`):** disimpan sebagai hash `bytes32` mentah — `keccak256("HR_ROLE")` = `0xfd70517941c75212b0f9013e45c47a37d6d983c5304288c7af285f2ea40cbba7`, `keccak256("LEGAL_ROLE")` = `0xb9f13ecb5e7f0f859c44b76b3a163e504787b446da95a26bf75e53e1ff4a1e0e`, `DEFAULT_ADMIN_ROLE` = `bytes32(0)`. Interpretasi nama peran dilakukan di `anomalyDetector.ts` (`roleName()`), bukan di handler Ponder — menjaga handler tetap sebagai mirror event yang dumb dan reliable.
+>
+> **Catatan (`RoleGranted`/`RoleRevoked`):** kedua event ini adalah event bawaan `AccessControl` OpenZeppelin yang diwarisi `CompanyVault` — sudah diemit sejak kontrak pertama kali di-deploy, hanya saja sebelumnya tidak ada di ABI yang dipakai Ponder (`abis/PayrollContractAbi.ts`) sehingga tidak pernah diindeks. Menambahkannya adalah perubahan murni di lapisan indexing, **tidak memerlukan redeploy kontrak** — backfill otomatis mengindeks ulang seluruh riwayat `RoleGranted` sejak `startBlock`, termasuk grant `HR_ROLE`/`DEFAULT_ADMIN_ROLE` awal saat setiap vault pertama kali dibuat.
 
 ---
 
@@ -1485,6 +1511,23 @@ Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh
 | `legal_address` | `text` | NULL | — | Hex 0x + 40 char | `NULL` | Cermin tampilan dari `LEGAL_ROLE` on-chain — bukan sumber otoritatif |
 | `updated_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu terakhir diperbarui |
 
+**Tabel `anomaly_alerts`** `[BARU — lihat SKPL Kelompok U, FR-PAYANA-2101 s.d. 2104]`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `bigint` | NOT NULL | PRIMARY KEY, identity | — | auto-increment | ID alert |
+| `hr_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Perusahaan yang terdampak |
+| `vault_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Alamat `CompanyVault` terkait |
+| `type` | `text` | NOT NULL | — | `SUSPICIOUS_WITHDRAWAL` \| `UNEXPECTED_ROLE_GRANT` \| `HIGH_FREQUENCY_ACTIVITY` | — | Jenis anomali |
+| `severity` | `text` | NOT NULL | — | `medium` \| `high` \| `critical` | — | Tingkat keparahan |
+| `title` | `text` | NOT NULL | — | — | — | Judul singkat untuk tampilan daftar |
+| `detail` | `text` | NOT NULL | — | — | — | Penjelasan lengkap, termasuk angka/alamat spesifik |
+| `meta` | `text` | NULL | — | JSON string | `NULL` | Konteks tambahan terstruktur (amount, recipient, role, dll.) |
+| `tx_hash` | `text` | NULL | — | Hex 0x + 64 char | `NULL` | Transaksi on-chain yang memicu alert, jika ada |
+| `resolved` | `boolean` | NOT NULL | — | `true` \| `false` | `false` | Sudah ditinjau Owner atau belum |
+| `detected_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu anomali terdeteksi |
+| `resolved_at` | `timestamptz` | NULL | — | — | `NULL` | Waktu ditandai selesai |
+
 > **Catatan:** Slip Gaji (Payslip, UC-25/FR-1601) dan Bukti Potong Pajak (Tax Cert, UC-26/FR-1701)
 > TIDAK memiliki tabel tersendiri — keduanya murni membaca dan mengagregasi tabel `salary_claim`
 > yang sudah diindeks Ponder (lihat subbab berikut), dikombinasikan dengan `employees` untuk
@@ -1505,6 +1548,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `status` | `text` | NOT NULL | — | `Active` \| `Paused` \| `Frozen` | — | Status vault saat ini |
 | `vault_balance` | `bigint` | NOT NULL | — | ≥ 0 | — | Saldo vault IDRX (wei) |
 | `created_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp saat vault di-deploy |
+| `vault_address` | `hex` | NULL | — | Hex 0x + 40 char | `NULL` | `[BARU]` Alamat kontrak `CompanyVault` — dipakai `role_change` untuk resolve balik ke company (lihat FR-PAYANA-2101 s.d. 2104) |
 
 **Tabel `employee_stream`**
 
@@ -1622,6 +1666,33 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `balance` | `bigint` | NOT NULL | — | ≥ 0 | — | Saldo vault IDRX wei saat alert ter-emit |
 | `monthly_need` | `bigint` | NOT NULL | — | ≥ 0 | — | Estimasi kebutuhan payroll bulanan IDRX wei |
 | `timestamp` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp alert |
+
+**Tabel `vault_withdrawal`** `[BARU — lihat SKPL Kelompok U, FR-PAYANA-2101]`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `text` | NOT NULL | PRIMARY KEY | `${txHash}-${logIndex}` | — | ID unik per event penarikan |
+| `hr_authority` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Perusahaan pemilik vault |
+| `vault_address` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat kontrak `CompanyVault` |
+| `amount` | `bigint` | NOT NULL | — | ≥ 0 | — | Jumlah IDRX wei yang ditarik |
+| `recipient` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat penerima dana |
+| `block_number` | `bigint` | NOT NULL | — | ≥ 0 | — | Nomor blok event |
+| `timestamp` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp event |
+
+> **Catatan:** sebelum penambahan tabel ini, `VaultWithdrawn` hanya memicu resync `company.vault_balance` (lihat `syncVaultBalance()`) — tidak ada riwayat per-penarikan. Tabel ini murni aditif; tidak mengubah perilaku handler yang sudah ada.
+
+**Tabel `role_change`** `[BARU — lihat SKPL Kelompok U, FR-PAYANA-2102]`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `text` | NOT NULL | PRIMARY KEY | `${txHash}-${logIndex}` | — | ID unik per event perubahan peran |
+| `vault_address` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat kontrak `CompanyVault` |
+| `role` | `hex` | NOT NULL | — | `bytes32` | — | Hash peran mentah — lihat catatan interpretasi di §Dekomposisi Data — Ponder Indexed |
+| `account` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat yang diberi/dicabut peran |
+| `sender` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat pemanggil `grantRole`/`revokeRole` |
+| `granted` | `boolean` | NOT NULL | — | `true` \| `false` | — | `true` = `RoleGranted`, `false` = `RoleRevoked` |
+| `block_number` | `bigint` | NOT NULL | — | ≥ 0 | — | Nomor blok event |
+| `timestamp` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp event |
 
 ---
 
@@ -3129,6 +3200,42 @@ sequenceDiagram
 3. `handleApprove`/`handleReject` memanggil endpoint registrasi lalu refresh.
 4. Konfigurasi fee via `setPlatformFee(bps)`; pembekuan via `emergencyFreezeAll()`.
 
+##### 2.4.4.1 Portal Owner — Keamanan Vault (`/owner/security`) `[BARU — lihat SKPL UC-30, FR-PAYANA-2101 s.d. 2104]`
+
+**Deskripsi:** Daftar alert keamanan yang dihasilkan `anomalyDetector.ts` (lihat Lampiran B.6) lintas seluruh tenant — penarikan vault tidak wajar, perubahan peran tak terduga, dan aktivitas beruntun — dengan tab "Belum Ditangani"/"Semua" dan tombol tandai selesai per alert.
+**Aktor:** Owner SaaS.
+**FR Terkait:** FR-PAYANA-2101, FR-PAYANA-2102, FR-PAYANA-2103, FR-PAYANA-2104.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor O as Owner
+    participant FE as Frontend /owner/security
+    participant BE as Backend /security
+    FE->>BE: GET /security/alerts (Bearer JWT, refetch tiap 30s)
+    BE-->>FE: daftar alert (belum ditangani dulu)
+    O->>FE: Klik "Tandai Selesai"
+    FE->>BE: PATCH /security/alerts/:id/resolve
+    BE-->>FE: {ok: true}
+    FE->>FE: invalidateQueries(["securityAlerts"]) — refetch
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Kartu ringkasan | Panel data | Jumlah alert belum ditangani. |
+| Tab filter | Tab | "Belum Ditangani" / "Semua". |
+| Kartu alert | Panel data | Badge severity (`medium`/`high`/`critical`), judul, detail, alamat vault (dengan salin), waktu, tautan BaseScan bila ada `txHash`. |
+| Tombol tandai selesai | Tombol tulis | `PATCH /security/alerts/:id/resolve`, disembunyikan untuk alert yang sudah `resolved`. |
+
+**Method/Algoritma Utama:**
+
+1. `useSecurityAlerts(token)` — React Query, `refetchInterval: 30_000` (bukan WebSocket — alert juga sudah didorong sebagai notifikasi in-app terpisah untuk kebutuhan real-time, lihat B.6).
+2. Filter client-side: `resolved === false` untuk tab default, seluruh array untuk tab "Semua".
+3. `useResolveAlert(token)` — `PATCH` lalu `invalidateQueries(["securityAlerts"])`.
+
 #### 2.4.5 Portal Legal Officer — TIDAK DIIMPLEMENTASIKAN (dokumentasi status & keterbatasan)
 
 **Status:** Portal ini **tidak eksis** sebagai jalur produk terpisah. Bagian ini didokumentasikan secara eksplisit (bukan dihapus begitu saja) supaya perbedaan antara desain AccessControl on-chain dan implementasi frontend tercatat dengan jelas.
@@ -3247,6 +3354,13 @@ sequenceDiagram
 | FR-PAYANA-1006 | PayrollFactory.setPlatformFee | — | /owner |
 | FR-PAYANA-1007 | CompanyVault.claimSalary (platformCut) | — | — |
 | FR-PAYANA-1008 | (transfer ke protocolTreasury) | webhook → WS PLATFORM_FEE_PAID | /owner (ponder.getPlatformFees) |
+
+> **Catatan cakupan:** tabel di atas berhenti pada FR-PAYANA-1008 — Kelompok M s.d. T (FR-PAYANA-1301 s.d. 2001, lihat SKPL.md) belum pernah dipetakan ke tabel ini, gap pre-existing yang tidak terkait perubahan pada revisi ini. FR-PAYANA-2101 s.d. 2104 (Kelompok U, ditambahkan bersamaan dokumen ini) dipetakan langsung di bawah agar tidak menambah gap baru.
+
+| FR-PAYANA-2101 | CompanyVault (event `VaultWithdrawn`, dibaca via Ponder) | GET /security/alerts | /owner/security |
+| FR-PAYANA-2102 | CompanyVault (event `RoleGranted`/`RoleRevoked`, dibaca via Ponder) | GET /security/alerts | /owner/security |
+| FR-PAYANA-2103 | — (agregasi lintas `vault_withdrawal`/`role_change`) | GET /security/alerts | /owner/security |
+| FR-PAYANA-2104 | — | GET /security/alerts, PATCH /security/alerts/:id/resolve | /owner/security |
 
 ### A.3 Alamat Kontrak Ter-Deploy
 
@@ -3392,7 +3506,8 @@ Tabel berikut memetakan event ke pemicu fungsi, konsumen indeksasi (Ponder), dan
 | `PlatformFeeUpdated` | PayrollFactory | `setPlatformFee` | Ponder |
 | `ProtocolTreasuryUpdated` | PayrollFactory | `setProtocolTreasury` | Ponder |
 | `VaultInitialized` | CompanyVault | constructor | Ponder `company` |
-| `VaultFunded` / `VaultWithdrawn` | CompanyVault | `fundVault` / `withdrawVault` | Ponder, `/hr/vault` |
+| `VaultFunded` / `VaultWithdrawn` | CompanyVault | `fundVault` / `withdrawVault` | Ponder (`company.vault_balance` + `vault_withdrawal` `[BARU]`), `/hr/vault`, `anomalyDetector.ts` |
+| `RoleGranted` / `RoleRevoked` | CompanyVault (bawaan `AccessControl`) | `grantRole`/`revokeRole` | Ponder `role_change` `[BARU]`, `anomalyDetector.ts` |
 | `VaultPaused` / `VaultResumed` / `VaultFreeze` | CompanyVault | `pauseVault`/`resumeVault`/`freezeVault` | Ponder |
 | `StreamCreated` | CompanyVault | `startStream` | Ponder `employee_stream` |
 | `StreamPaused`/`StreamResumed`/`StreamCancelled` | CompanyVault | kontrol stream | Ponder `employee_stream` |
@@ -3420,7 +3535,7 @@ Tabel berikut memetakan event ke pemicu fungsi, konsumen indeksasi (Ponder), dan
 | `HR_ROLE` | CompanyVault | Manajemen stream, vault, kepatuhan, vesting, proposal PHK. |
 | `LEGAL_ROLE` | CompanyVault | `approveTermination` (tanda tangan kedua PHK); **[Diperbaiki]** juga berhak baca `GET /termination/reason/:employeeAddress` dan `GET /auth/profile/by-address/:address` di backend (lihat catatan di bawah — sebelumnya keliru selalu 403). |
 | `MINTER_ROLE` | EmploymentSBT | `mint`/`revoke` (dipegang `CompanyVault`). |
-| Owner SaaS | Backend/Frontend | `requireOwner` (registrasi); akses `/owner`. |
+| Owner SaaS | Backend/Frontend | `requireOwner` (registrasi); akses `/owner`; `[BARU]` `GET`/`PATCH /security/alerts` (lihat A.2 FR-PAYANA-2101 s.d. 2104). |
 
 > **[Temuan & Diperbaiki]** `canViewEmployeeData()` di `backend/src/services/authz.ts`
 > sebelumnya HANYA mengecek `caller === hrAuthority`, sehingga pemegang `LEGAL_ROLE` on-chain
@@ -4053,6 +4168,20 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
 2. Jika `>= ALERT_THRESHOLD` (default 0,05 ETH), berhenti.
 3. Jika di bawah ambang, catat `PAYMASTER_LOW_BALANCE` dan kirim alert ke `OPS_ALERT_WEBHOOK_URL`.
 
+**[Anomaly Detector (`anomalyDetector.ts`)]** `[BARU — lihat SKPL Kelompok U, FR-PAYANA-2101 s.d. 2104]`
+| | |
+|---|---|
+| Input | - |
+| Output | Baris baru di `app.anomaly_alerts`; notifikasi in-app (`SECURITY_ANOMALY`) ke Owner SaaS |
+| Deskripsi | Cron setiap 2 menit; memantau `vault_withdrawal`/`role_change` (Ponder) untuk pola konsisten dengan wallet HR yang dikompromikan. |
+
+**Algoritma:**
+
+1. Query `vault_withdrawal`/`role_change` untuk baris dengan `timestamp` lebih baru dari watermark siklus sebelumnya (watermark di-set ke waktu boot layanan, bukan 0 — backlog historis/onboarding tidak pernah memicu alert).
+2. Evaluasi tiga detektor: penarikan tidak wajar (jumlah vs. rata-rata historis, atau penerima baru — termasuk kasus penarikan pertama tanpa histori sama sekali), perubahan peran tak terduga (`HR_ROLE`/`DEFAULT_ADMIN_ROLE`/`LEGAL_ROLE` ke alamat bukan `hrAuthority`), dan aktivitas beruntun (≥3 aksi sensitif dalam satu siklus).
+3. Untuk setiap anomali, `insert` ke `app.anomaly_alerts` dan panggil `createNotification()` ke `OWNER_ADDRESS`.
+4. Perbarui watermark ke waktu evaluasi saat ini.
+
 ### B.7 Layanan WebSocket (`wsServer.ts`)
 
 `WebSocketServer` dilampirkan ke server HTTP yang sama (`ws://host:PORT`). Fungsi `broadcast(type, payload)` mengirim pesan JSON ke seluruh klien `OPEN`.
@@ -4197,6 +4326,30 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
 **[GET /company-settings]** — HR (JWT). Mengembalikan baris `company_settings` milik caller, atau `null` jika belum pernah disimpan. Sesuai FR-PAYANA-2001.
 
 **[PUT /company-settings]** — Input `name?`, `country?`, `logoUrl?`, `ewaLimitBps?`, `yieldRateBps?`, `legalAddress?`. Upsert (`onConflictDoUpdate` by `hrAddress`).
+
+---
+
+### B.17 Grup Keamanan (`/security`) `[BARU — lihat SKPL UC-30, FR-PAYANA-2101 s.d. 2104]`
+
+Seluruh endpoint di grup ini owner-only (`requireAuth` + `requireOwner`) — alert keamanan adalah sinyal platform-wide, bukan sumber daya per-tenant seperti kebanyakan grup lain di lampiran ini.
+
+**[GET /security/alerts]**
+| | |
+|---|---|
+| Input | - (Owner, JWT) |
+| Output | Array `anomaly_alerts`, terurut `resolved` (belum ditangani dulu) lalu `detectedAt` menurun |
+| Deskripsi | Sesuai FR-PAYANA-2104. |
+
+**[PATCH /security/alerts/:id/resolve]**
+| | |
+|---|---|
+| Input | - (Owner, JWT) |
+| Output | `{ ok: true }` |
+| Deskripsi | Set `resolved = true`, `resolvedAt = now()`. Tidak memicu tindakan on-chain apa pun — murni bookkeeping bahwa Owner sudah meninjau. |
+
+**Tabel Error:** 403 (bukan Owner); 404 (`id` tidak ditemukan pada `PATCH`).
+
+**Algoritma:** Baris `anomaly_alerts` ditulis oleh `anomalyDetector.ts` (§B.6), bukan oleh route ini — grup ini murni baca/update, tidak ada logika deteksi di lapisan HTTP.
 
 ---
 
@@ -4359,6 +4512,18 @@ Catatan: untuk aksi HR/Owner (mis. `startStream`, `proposeTermination`, `approve
 2. **Role Guard:** `useRole` menentukan peran dari kondisi on-chain; akses portal dibatasi sesuai peran, dengan prioritas Owner → HR → Karyawan → Karyawan Diberhentikan (tidak ada cabang `LEGAL_ROLE`, lihat §2.4.5).
 3. **Token Refresh:** `useAuth` menyimpan refresh token di `localStorage` dan mencoba `/auth/refresh` sebelum meminta tanda tangan ulang, mengurangi friksi sekaligus menjaga umur access token pendek.
 4. **Pemisahan Chain:** seluruh interaksi dipaksa ke Base Sepolia (`switchChain(84532)`) sebelum penandatanganan untuk mencegah salah jaringan.
+
+### D.4 Deteksi Anomali — Lapisan Pertahanan Kedua `[BARU — lihat SKPL Kelompok U, FR-PAYANA-2101 s.d. 2104]`
+
+D.1–D.3 di atas adalah kontrol **preventif** — mencegah aksi tidak sah terjadi sama sekali. Kontrol ini tidak berdaya begitu kunci privat HR sendiri dikompromikan: `onlyHR`/`AccessControl` tidak bisa membedakan pemanggil sah dari penyerang yang memegang kunci yang sama, karena keduanya menghasilkan tanda tangan yang valid. `anomalyDetector.ts` (Lampiran B.6) adalah lapisan **detektif** yang independen dari validitas kriptografis — mengevaluasi pola perilaku on-chain, bukan keabsahan tanda tangan:
+
+1. **Penarikan tidak wajar:** jumlah jauh di atas rata-rata historis vault, atau ke penerima yang belum pernah menerima penarikan sebelumnya (termasuk kasus penarikan pertama sebuah vault, yang secara definisi tidak punya "penerima dikenal" untuk dibandingkan).
+2. **Perubahan peran tak terduga:** `HR_ROLE`/`DEFAULT_ADMIN_ROLE`/`LEGAL_ROLE` diberikan ke alamat yang bukan `hrAuthority` terdaftar — indikator paling kuat dari penyerang yang membangun akses persisten (backdoor) pada vault yang sudah dikuasai.
+3. **Aktivitas beruntun:** ≥3 aksi sensitif dari satu vault dalam satu siklus pemeriksaan (2 menit).
+
+**Batasan yang disengaja:** deteksi ini murni observasional — tidak ada tindakan otomatis (freeze, revoke) yang dipicu langsung oleh sebuah alert; keputusan tindak lanjut tetap di tangan Owner SaaS (FR-PAYANA-2104). Watermark waktu di-set ke saat layanan boot (bukan 0), sehingga backlog historis/event onboarding wajar (mis. grant `HR_ROLE` awal saat vault pertama dibuat) tidak pernah menghasilkan false positive.
+
+**Validasi:** diuji dengan simulasi serangan nyata (bukan mock/unit test) terhadap vault demo di Base Sepolia — `payroll-web3-saas/testing-scripts/attacker-sim.mjs` menggunakan wallet HR test untuk menjalankan `withdrawVault()` ke alamat baru dan `grantRole(HR_ROLE, ...)` ke alamat baru, dikonfirmasi ter-deteksi end-to-end (event → indexing Ponder → siklus cron → `anomaly_alerts` → `GET /security/alerts`). Detail eksekusi dan bukti transaksi: PDHUPL_v2.md KU-32.
 
 ---
 

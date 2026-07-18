@@ -48,7 +48,7 @@ Pembaca yang dituju adalah:
 
 Payana adalah platform perangkat lunak berbasis web yang menyediakan layanan penggajian real-time terdesentralisasi untuk perusahaan dengan skala 50 hingga 500 karyawan di Indonesia. Sistem ini beroperasi di atas jaringan blockchain **Base** (Ethereum Layer-2) dan menggunakan stablecoin **IDRX** (ERC-20 berpegged Rupiah Indonesia) sebagai medium pembayaran gaji.
 
-Ruang lingkup sistem Payana mencakup sebelas fungsi utama yang dikelompokkan ke dalam tujuh modul:
+Ruang lingkup sistem Payana mencakup dua belas fungsi utama yang dikelompokkan ke dalam delapan modul:
 
 1. **Modul Core Payroll (A):** Pengelolaan vault dana perusahaan, pendaftaran karyawan ke dalam sistem stream, distribusi gaji real-time detik per detik, penarikan mandiri gaji yang sudah diperoleh (Earned Wage Access / EWA) dengan mekanisme auto-split 93% (gaji bersih) / 5% (kepatuhan BPJS dan PPh21) / 2% (pesangon).
 
@@ -63,6 +63,8 @@ Ruang lingkup sistem Payana mencakup sebelas fungsi utama yang dikelompokkan ke 
 6. **Modul Dashboard (F):** Antarmuka HR untuk manajemen vault, stream, laporan kepatuhan, dan persetujuan PHK (termasuk langkah persetujuan `LEGAL_ROLE` yang secara default digenggam HR sendiri, lihat §3.1); antarmuka karyawan untuk pemantauan EWA secara langsung.
 
 7. **Modul Audit dan Notifikasi (K):** Jejak audit aktivitas HR yang immutable dan sistem notifikasi in-app.
+
+8. **Modul Keamanan Vault (U):** Deteksi anomali otomatis untuk pola yang konsisten dengan wallet HR yang dikompromikan — penarikan vault tidak wajar, perubahan peran (`HR_ROLE`/`DEFAULT_ADMIN_ROLE`) mendadak ke alamat tak dikenal, dan aktivitas sensitif beruntun — beserta antarmuka Owner untuk meninjau dan menandai selesai setiap alert.
 
 Sistem yang berada **di luar ruang lingkup** MVP ini antara lain: integrasi HRIS pihak ketiga (Talenta, Gadjian, SAP), fiat on/off ramp langsung dalam platform, payroll multi-chain, ESOP dengan secondary market, notifikasi push mobile native, stealth addresses (EIP-5564), dan private streaming rate on-chain.
 
@@ -161,7 +163,7 @@ Dokumen SKPL Payana disusun dalam empat bab utama dan satu lampiran, dengan urai
 
 **Bab 1 — Pendahuluan** menjelaskan konteks dan motivasi penulisan dokumen, mendefinisikan ruang lingkup sistem secara ringkas, menyediakan glosarium istilah teknis dan akronim yang digunakan sepanjang dokumen, serta mencantumkan seluruh referensi standar, regulasi, dan dokumen internal yang menjadi landasan penulisan.
 
-**Bab 2 — Deskripsi Umum Kebutuhan** memberikan gambaran makro tentang sistem Payana tanpa masuk ke spesifikasi detail. Bab ini menjelaskan posisi Payana dalam ekosistem teknologi yang lebih luas dan hubungan antar komponen arsitekturalnya (Bagian 2.1), merangkum sebelas fungsi produk beserta rasional keberadaannya (Bagian 2.2), mendeskripsikan karakteristik empat kelompok pengguna utama beserta hak aksesnya (Bagian 2.3), mengidentifikasi kekangan teknis, regulasi, dan bisnis yang membatasi ruang solusi (Bagian 2.4), serta mendaftarkan asumsi dan kebergantungan eksternal yang harus terpenuhi agar sistem berfungsi (Bagian 2.5).
+**Bab 2 — Deskripsi Umum Kebutuhan** memberikan gambaran makro tentang sistem Payana tanpa masuk ke spesifikasi detail. Bab ini menjelaskan posisi Payana dalam ekosistem teknologi yang lebih luas dan hubungan antar komponen arsitekturalnya (Bagian 2.1), merangkum dua belas fungsi produk beserta rasional keberadaannya (Bagian 2.2), mendeskripsikan karakteristik empat kelompok pengguna utama beserta hak aksesnya (Bagian 2.3), mengidentifikasi kekangan teknis, regulasi, dan bisnis yang membatasi ruang solusi (Bagian 2.4), serta mendaftarkan asumsi dan kebergantungan eksternal yang harus terpenuhi agar sistem berfungsi (Bagian 2.5).
 
 **Bab 3 — Kebutuhan Rinci** merinci seluruh kebutuhan fungsional dalam format Use Case dan daftar FR berpenomoran, disertai kebutuhan non-fungsional (performa, keamanan, kepatuhan, kebergunaan, skalabilitas, privasi, dan observabilitas) dengan kriteria penerimaan yang terukur.
 
@@ -250,6 +252,12 @@ Rasional   : Autentikasi berbasis tanda tangan kriptografi mengeliminasi risiko 
 Deskripsi  : Sistem menyediakan mekanisme agar seluruh transaksi yang dilakukan karyawan (terutama klaim EWA) tidak memerlukan ETH sebagai biaya gas. Transaksi dikemas sebagai `UserOperation` sesuai standar ERC-4337 dan dikirim ke Backend Bundler Relay, yang kemudian melampirkan tanda tangan Paymaster sebelum meneruskannya ke `EntryPoint` contract di Base. Backend memantau saldo ETH Paymaster secara aktif dan memberi peringatan jika di bawah ambang batas 0,05 ETH.
 
 Rasional   : Persyaratan memiliki ETH sebagai biaya gas merupakan hambatan onboarding terbesar bagi pengguna non-kripto. Dengan menanggung biaya gas, perusahaan menjamin bahwa karyawan dapat mengakses hak gajinya kapan saja tanpa biaya tambahan apapun, sesuai dengan proposisi nilai "zero Web3 knowledge required".
+
+**12. Deteksi Anomali Keamanan Vault**
+
+Deskripsi  : Sistem memantau event on-chain dari setiap `CompanyVault` secara berkala (siklus 2 menit) untuk tiga pola yang konsisten dengan wallet HR yang dikompromikan: (1) penarikan vault (`withdrawVault()`) dengan jumlah jauh di atas rata-rata historis vault tersebut atau ke alamat penerima yang belum pernah menerima penarikan sebelumnya (termasuk penarikan pertama yang pernah tercatat, yang secara definisi tidak punya penerima yang terverifikasi); (2) pemberian peran `HR_ROLE`/`DEFAULT_ADMIN_ROLE` ke alamat yang bukan `hrAuthority` terdaftar untuk vault tersebut; (3) rangkaian ≥3 aksi sensitif (penarikan/perubahan peran) dari satu vault dalam satu siklus pemeriksaan. Setiap anomali tersimpan sebagai alert terstruktur (jenis, tingkat keparahan, detail, tautan transaksi) yang dapat ditinjau dan ditandai selesai oleh Owner SaaS melalui `/owner/security`, serta didorong sebagai notifikasi in-app real-time.
+
+Rasional   : Wallet HR yang dikompromikan (phishing, malware, kebocoran kunci privat) adalah risiko keamanan yang tidak dapat dicegah sepenuhnya oleh kontrol akses on-chain saja — begitu penyerang menguasai kunci privat HR, seluruh operasi `onlyHR`/`DEFAULT_ADMIN_ROLE` (termasuk `withdrawVault()` dan `grantRole()`) tampak sah secara kriptografis. Lapisan deteksi anomali off-chain memberi Owner SaaS visibilitas dan waktu respons terhadap eksploitasi yang sedang berlangsung, alih-alih hanya mengetahuinya setelah dana hilang. Fitur ini divalidasi dengan simulasi serangan nyata di Base Sepolia (`testing-scripts/attacker-sim.mjs`) — lihat PDHUPL_v2.md KU-32.
 
 ### 2.3 Karakteristik Pengguna
 
@@ -1022,6 +1030,52 @@ Deskripsi      : Sistem harus memampukan HR untuk menyimpan dan memperbarui peng
 
 ---
 
+### Kelompok U: Deteksi Anomali Keamanan Vault
+
+Kelompok ini mendefinisikan kebutuhan fungsional untuk pemantauan otomatis terhadap event on-chain setiap `CompanyVault`, mendeteksi pola yang konsisten dengan wallet HR yang dikompromikan, dan menyediakan antarmuka Owner SaaS untuk meninjau serta menindaklanjuti setiap temuan.
+
+---
+
+#### 3.2.41. Deteksi Penarikan Vault Tidak Wajar
+
+ID Requirement : FR-PAYANA-2101
+
+Deskripsi      : Sistem harus memeriksa setiap event `VaultWithdrawn` baru pada siklus 2 menit dan membandingkannya dengan riwayat penarikan vault yang sama. Sistem harus menghasilkan alert `SUSPICIOUS_WITHDRAWAL` apabila: (a) vault belum pernah memiliki riwayat penarikan sebelumnya (penerima secara definisi belum terverifikasi); (b) jumlah penarikan melebihi 3 kali rata-rata historis vault tersebut; atau (c) alamat penerima belum pernah menerima penarikan dari vault tersebut sebelumnya. Tingkat keparahan `critical` diberikan apabila lebih dari satu kondisi terpenuhi sekaligus, selain itu `high`.
+
+Rasional   : `withdrawVault()` hanya dapat dipanggil oleh `HR_ROLE`, sehingga secara kriptografis selalu tampak sah — pembeda antara penarikan legitimate dan penarikan hasil kompromi kunci privat HR hanya bisa dideteksi dari pola perilaku (jumlah dan tujuan), bukan dari validitas tanda tangan.
+
+---
+
+#### 3.2.42. Deteksi Perubahan Peran Tidak Terduga
+
+ID Requirement : FR-PAYANA-2102
+
+Deskripsi      : Sistem harus memeriksa setiap event `RoleGranted` baru pada `CompanyVault` (termasuk peran bawaan `AccessControl` milik OpenZeppelin yang diwarisi kontrak) pada siklus 2 menit. Sistem harus menghasilkan alert `UNEXPECTED_ROLE_GRANT` apabila peran diberikan ke alamat yang bukan `hrAuthority` terdaftar untuk vault tersebut. Tingkat keparahan `critical` diberikan untuk `HR_ROLE` atau `DEFAULT_ADMIN_ROLE` (peran admin inti); tingkat keparahan `medium` diberikan untuk `LEGAL_ROLE` (delegasi ke pihak legal terpisah adalah skenario yang lebih wajar, meski tetap dicatat untuk visibilitas).
+
+Rasional   : Pemberian `HR_ROLE`/`DEFAULT_ADMIN_ROLE` ke alamat baru adalah indikator kompromi yang paling kuat — ini adalah langkah yang secara khas diambil penyerang untuk membangun akses persisten (backdoor) yang bertahan meski kunci HR asli kemudian diputar/dicabut.
+
+---
+
+#### 3.2.43. Deteksi Aktivitas Sensitif Beruntun
+
+ID Requirement : FR-PAYANA-2103
+
+Deskripsi      : Sistem harus menghitung jumlah aksi sensitif (penarikan vault dan perubahan peran yang diberikan) dari satu vault dalam satu siklus pemeriksaan (2 menit). Sistem harus menghasilkan alert `HIGH_FREQUENCY_ACTIVITY` dengan tingkat keparahan `high` apabila jumlah tersebut mencapai atau melebihi 3.
+
+Rasional   : Penyerang yang sudah menguasai kunci HR biasanya bertindak cepat sebelum terdeteksi — rangkaian aksi sensitif dalam waktu singkat adalah sinyal tambahan yang independen dari besaran/tujuan masing-masing transaksi individual.
+
+---
+
+#### 3.2.44. Tinjauan dan Penyelesaian Alert Keamanan oleh Owner SaaS
+
+ID Requirement : FR-PAYANA-2104
+
+Deskripsi      : Sistem harus memampukan Owner SaaS untuk melihat seluruh alert keamanan (aktif dan riwayat) melalui `GET /security/alerts`, terurut dengan alert yang belum ditangani ditampilkan lebih dulu. Owner SaaS harus dapat menandai satu alert sebagai selesai ditangani melalui `PATCH /security/alerts/:id/resolve`. Endpoint ini harus ditolak (403 Forbidden) untuk pemanggil yang bukan Owner SaaS. Setiap alert baru juga didorong sebagai notifikasi in-app real-time (`SECURITY_ANOMALY`) ke Owner SaaS.
+
+Rasional   : Deteksi otomatis tanpa jalur tindak lanjut yang jelas tidak memberikan nilai operasional — Owner SaaS memerlukan satu tempat tunggal untuk meninjau seluruh sinyal keamanan lintas tenant dan mencatat bahwa suatu temuan sudah ditindaklanjuti (baik berupa investigasi manual maupun tindakan lain di luar sistem).
+
+---
+
 ### 3.3 Diagram Use Case
 
 > **Catatan untuk Pembaca:** Sistem Payana adalah sistem hybrid tiga lapisan (smart contract on-chain, REST API backend, antarmuka web frontend). Use case di bawah ini menggambarkan interaksi pengguna dengan sistem secara end-to-end tanpa memisahkan lapisan teknis.
@@ -1054,6 +1108,7 @@ Deskripsi      : Sistem harus memampukan HR untuk menyimpan dan memperbarui peng
 | UC-27 | Surat Keterangan Kerja | Karyawan / HR Admin | FR-PAYANA-1801 |
 | UC-28 | Direktori Karyawan | HR Admin | FR-PAYANA-1901 |
 | UC-29 | Pengaturan Perusahaan (Branding) | HR Admin | FR-PAYANA-2001 |
+| UC-30 | Deteksi Anomali & Tinjauan Keamanan Vault | Owner SaaS | FR-PAYANA-2101, 2102, 2103, 2104 |
 
 ---
 
@@ -1102,6 +1157,7 @@ graph LR
     OWNER --> UC21
     OWNER --> UC15["UC-15\nDeploy Company\nVault Baru"]
     OWNER --> UC20["UC-20\nKonfigurasi\nPlatform Fee"]
+    OWNER --> UC30["UC-30\nDeteksi Anomali &\nKeamanan Vault"]
 
     style HR fill:#dbeafe,stroke:#2563eb
     style EMP fill:#dcfce7,stroke:#16a34a
@@ -2040,6 +2096,46 @@ sequenceDiagram
 
 ---
 
+#### UC-30: Deteksi Anomali & Tinjauan Keamanan Vault
+
+```mermaid
+sequenceDiagram
+    participant CV as CompanyVault (on-chain)
+    participant PD as Ponder Indexer
+    participant AD as Backend anomalyDetector.ts (cron/2 menit)
+    participant DB as PostgreSQL (app.anomaly_alerts)
+    actor OWNER as Owner SaaS
+
+    CV-->>PD: event VaultWithdrawn / RoleGranted
+    PD->>PD: index ke vault_withdrawal / role_change
+    AD->>PD: query event baru sejak siklus terakhir
+    AD->>AD: evaluasi pola (jumlah/histori, peran, frekuensi)
+    alt anomali terdeteksi
+        AD->>DB: insert anomaly_alerts (type, severity, detail, txHash)
+        AD-->>OWNER: broadcast notifikasi in-app (SECURITY_ANOMALY)
+    end
+    OWNER->>AD: GET /security/alerts
+    AD-->>OWNER: daftar alert (belum ditangani lebih dulu)
+    OWNER->>AD: PATCH /security/alerts/:id/resolve
+    AD->>DB: update resolved=true
+    AD-->>OWNER: {ok: true}
+```
+
+| | |
+|-|-|
+| **Nama Use Case** | Deteksi Anomali & Tinjauan Keamanan Vault |
+| **Deskripsi Singkat** | Sistem memantau event on-chain setiap `CompanyVault` secara otomatis untuk pola yang konsisten dengan wallet HR yang dikompromikan (penarikan tidak wajar, perubahan peran mendadak, aktivitas beruntun), dan Owner SaaS meninjau serta menandai selesai setiap temuan melalui `/owner/security`. |
+| **Aktor** | Owner SaaS (peninjau); sistem (`anomalyDetector.ts`) sebagai pendeteksi otomatis. |
+| **Pre Kondisi** | Owner SaaS telah login dengan role `owner`. Layanan `anomalyDetector.ts` berjalan sebagai background cron di backend. |
+| **Pos Kondisi** | Alert keamanan yang relevan tersimpan di `app.anomaly_alerts` dan dapat ditinjau; alert yang sudah ditindaklanjuti Owner ditandai `resolved = true`. |
+| **Basic Flow** | 1. `CompanyVault` menerbitkan event `VaultWithdrawn` atau `RoleGranted` (baik dari aktivitas normal maupun aktivitas mencurigakan) — event ini terjadi independen dari use case ini. <br> 2. Ponder mengindeks event tersebut ke tabel `vault_withdrawal`/`role_change`. <br> 3. Setiap 2 menit, `anomalyDetector.ts` memeriksa event baru sejak siklus sebelumnya untuk masing-masing vault. <br> 4. Sistem mengevaluasi tiga pola (FR-PAYANA-2101/2102/2103): penarikan tidak wajar, peran tak terduga, dan aktivitas beruntun. <br> 5. Untuk setiap anomali yang terdeteksi, sistem menyimpan baris di `app.anomaly_alerts` (jenis, tingkat keparahan, detail, tautan transaksi) dan mendorong notifikasi in-app real-time ke Owner SaaS. <br> 6. Owner SaaS membuka `/owner/security`, melihat daftar alert dengan yang belum ditangani ditampilkan lebih dulu. <br> 7. Owner SaaS meninjau detail alert (termasuk tautan ke BaseScan untuk transaksi terkait) dan mengklik "Tandai Selesai" setelah menindaklanjuti (investigasi manual, kontak HR, dsb. — di luar sistem). <br> 8. Sistem memperbarui alert menjadi `resolved = true` dan mencatat waktu penyelesaian. |
+| **Alternative Flow** | A1. Owner SaaS dapat beralih ke tab "Semua" untuk melihat riwayat lengkap termasuk alert yang sudah ditandai selesai, bukan hanya yang aktif. |
+| **Error Flow** | E1. Apabila pemanggil `GET`/`PATCH /security/alerts` bukan Owner SaaS, sistem menolak dengan `403 Forbidden`. <br> E2. Apabila `id` alert pada `PATCH /security/alerts/:id/resolve` tidak ditemukan, sistem mengembalikan `404 Not Found`. <br> E3. Apabila siklus pemeriksaan gagal (mis. RPC/database sementara tidak tersedia), sistem mencatat galat ke log dan mencoba lagi pada siklus berikutnya tanpa menghentikan layanan secara keseluruhan. |
+
+> **Catatan validasi:** Use case ini divalidasi dengan simulasi serangan nyata terhadap vault demo di Base Sepolia (`payroll-web3-saas/testing-scripts/attacker-sim.mjs`), bukan hanya pengujian unit — lihat PDHUPL_v2.md KU-32 untuk detail eksekusi dan bukti transaksi.
+
+---
+
 ### 3.4 Kebutuhan Non-Fungsional
 
 #### 3.4.1 Performance
@@ -2113,6 +2209,10 @@ Rasional       : Endpoint webhook yang tidak divalidasi dapat dieksploitasi untu
 ID Requirement : NFR-PAYANA-16
 Deskripsi      : Smart contract CompanyVault harus mengimplementasikan pola checks-effects-interactions dan menggunakan modifier nonReentrant (OpenZeppelin ReentrancyGuard) pada seluruh fungsi yang melakukan transfer token ERC-20 eksternal, yaitu claimSalary(), withdrawVault(), withdrawCompliance(), executeTermination(), dan claimCliffVest().
 Rasional       : Reentrancy adalah vektor serangan paling umum pada smart contract DeFi. Kegagalan mengimplementasikan perlindungan ini pada fungsi yang mentransfer dana dapat menyebabkan pengosongan vault secara tidak sah.
+
+ID Requirement : NFR-PAYANA-19
+Deskripsi      : Sistem harus mendeteksi dan memberi peringatan atas pola aktivitas on-chain yang konsisten dengan wallet HR yang dikompromikan (penarikan vault tidak wajar, pemberian peran admin ke alamat tak dikenal, aktivitas sensitif beruntun) dalam siklus tidak lebih dari 2 menit sejak event terjadi, dan mendorong notifikasi ke Owner SaaS. Lihat FR-PAYANA-2101 s.d. 2104 (Kelompok U) untuk kriteria deteksi rinci.
+Rasional       : Kontrol akses on-chain (`onlyHR`, `AccessControl`) tidak dapat membedakan pemanggil sah dari penyerang yang telah menguasai kunci privat HR — keduanya menghasilkan transaksi yang valid secara kriptografis. Deteksi anomali berbasis pola perilaku adalah lapisan pertahanan kedua yang independen dari validitas tanda tangan, divalidasi dengan simulasi serangan nyata di Base Sepolia (lihat PDHUPL_v2.md KU-32).
 
 #### 3.4.5 Maintainability
 
@@ -2293,6 +2393,7 @@ erDiagram
         text status
         bigint vault_balance
         bigint created_at
+        hex vault_address
     }
 
     employee_stream {
@@ -2382,6 +2483,27 @@ erDiagram
         bigint timestamp
     }
 
+    vault_withdrawal {
+        text id PK
+        hex hr_authority
+        hex vault_address
+        bigint amount
+        hex recipient
+        bigint block_number
+        bigint timestamp
+    }
+
+    role_change {
+        text id PK
+        hex vault_address
+        hex role
+        hex account
+        hex sender
+        boolean granted
+        bigint block_number
+        bigint timestamp
+    }
+
     company ||--o{ employee_stream : "hr_authority"
     company ||--o{ salary_claim : "hr_authority"
     company ||--o{ severance_vault : "hr_authority"
@@ -2391,6 +2513,8 @@ erDiagram
     company ||--o{ salary_advance : "hr_authority"
     company ||--o{ employment_certificate : "hr_authority"
     company ||--o{ low_balance_alert : "hr_authority"
+    company ||--o{ vault_withdrawal : "hr_authority"
+    company ||--o{ role_change : "vault_address"
     employee_stream ||--o{ salary_claim : "employee"
     employee_stream ||--o{ cliff_vest : "employee"
 ```
@@ -2403,6 +2527,9 @@ Keterangan kolom kunci:
 - `severance_vault.state` — nilai enum: "Locked" (masih aktif bekerja), "Returned" (dikembalikan ke vault karena resign), "Released" (dicairkan ke karyawan pasca PHK).
 - `employment_certificate.revoked_at` — `null` selama karyawan masih aktif bekerja; diisi timestamp saat SBT direvoke pada proses resign atau PHK.
 - `low_balance_alert.id` — komposit `${txHash}-${logIndex}` karena satu vault dapat memicu lebih dari satu alert dalam satu transaksi deposit.
+- `company.vault_address` — alamat kontrak `CompanyVault` (bukan `hrAuthority`); ditambahkan agar `role_change` (yang hanya membawa alamat vault, bukan `hrAuthority`, pada event `RoleGranted`/`RoleRevoked`) dapat di-resolve kembali ke perusahaan yang bersangkutan. Lihat FR-PAYANA-2101 s.d. 2104.
+- `vault_withdrawal.id` / `role_change.id` — komposit `${txHash}-${logIndex}`, mengikuti pola tabel event-log lain di atas. Kedua tabel ini adalah sumber data untuk `anomalyDetector.ts` (lihat DPPL.md Lampiran B untuk detail layanan).
+- `role_change.role` — hash `bytes32` mentah (`keccak256("HR_ROLE")`, `keccak256("LEGAL_ROLE")`, atau `0x00...00` untuk `DEFAULT_ADMIN_ROLE`), bukan nama peran dalam teks — interpretasi dilakukan di lapisan aplikasi (backend), bukan di Ponder.
 
 ---
 
