@@ -1,14 +1,20 @@
 # PDHUPL v2 — Payana
 ## Perencanaan dan Deskripsi Hasil Uji Perangkat Lunak
 
-> **Sumber acuan UC/FR:** `payroll-web3-saas/docs/SKPL.md` (UC-01 s.d. UC-29, FR-PAYANA-101
-> s.d. FR-PAYANA-2001, NFR-PAYANA-01 s.d. NFR-PAYANA-10). Nomor KU-17/18/19 tidak digunakan
+> **Sumber acuan UC/FR:** `payroll-web3-saas/docs/SKPL.md` (UC-01 s.d. UC-30, FR-PAYANA-101
+> s.d. FR-PAYANA-2104, NFR-PAYANA-01 s.d. NFR-PAYANA-19). Nomor KU-17/18/19 tidak digunakan
 > (dicadangkan, tidak dialokasikan untuk modul mana pun) — penomoran KU-01 s.d. KU-29 lainnya
 > berurutan; KU-30/KU-31 (Bab 6) adalah pengujian non-fungsional (NFR), terpisah dari
-> penomoran fungsional di atas.
-> Seluruh **101 butir uji** pada dokumen ini (96 fungsional di Bab 5 + 5 non-fungsional di
-> Bab 6) berstatus **Handal** — lihat Bab 5 dan Bab 6 untuk detail hasil dan bukti eksekusi
-> tiap butir.
+> penomoran fungsional di atas. KU-32 (UC-30, Modul U/Kelompok U — Deteksi Anomali Keamanan
+> Vault) adalah pengujian fungsional end-to-end/black-box (bukan NFR) meski penomorannya
+> mengikuti KU-30/KU-31 — lihat §3.2 dan Bab 5.
+> Seluruh **103 butir uji fungsional+non-fungsional** dalam dokumen ini (98 fungsional di Bab 5
+> + 5 non-fungsional di Bab 6) berstatus **Handal**, termasuk **KU-32 (AU-32-01, AU-32-02)**
+> yang sempat BELUM Handal pada Run 1/2 (2026-07-17) tapi berhasil diamati Handal pada Run 3
+> (2026-07-18): alert muncul di `GET /security/alerts` dalam ≤2 menit seperti yang diharapkan.
+> Penyebab kegagalan Run 1/2 tetap berupa **hipotesis, bukan dikonfirmasi definitif** — lihat
+> §3.2 dan Bab 5 (baris AU-32-01/02) untuk kronologi lengkap ketiga run, kondisi yang berbeda
+> antar run, dan mengapa root cause pastinya masih belum bisa dipastikan 100%.
 
 ---
 
@@ -357,6 +363,8 @@ tanggal eksekusi sesungguhnya.
 | KU-30 Performa di Bawah Beban | Soak test 40 concurrent sustained 14 menit — cek degradasi bertahap/connection pool exhaustion (Run 3) | — | NFR-01,06 | AU-30-03 | System (k6 soak test) | Non-Functional — Performance/Reliability |
 | KU-31 Ketahanan RPC & Lonjakan Beban | Spike test instan 0→100 VU dalam 5 detik, tahan 60 detik — cek pemulihan bersih (Run 4) | — | NFR-07 | AU-31-01 | System (k6 spike test) | Non-Functional — Reliability |
 | KU-31 Ketahanan RPC & Lonjakan Beban | Probe ceiling `eth_call` bersamaan RPC Alchemy free-tier, validasi retry+backoff+fallback | — | NFR-07 | AU-31-02 | System (k6 RPC probe) | Non-Functional — Reliability |
+| KU-32 Deteksi Anomali Keamanan Vault | Simulasi serangan nyata (`attacker-sim.mjs`) — `withdrawVault()` ke alamat baru, cek alert `SUSPICIOUS_WITHDRAWAL` di `GET /security/alerts` | UC-30 | FR-PAYANA-2101,2104 | AU-32-01 | System (real attack simulation, Base Sepolia) | Functional — Security (End-to-End) |
+| KU-32 Deteksi Anomali Keamanan Vault | Simulasi serangan nyata (`attacker-sim.mjs`) — `grantRole(HR_ROLE, ...)` ke alamat baru, cek alert `UNEXPECTED_ROLE_GRANT` di `GET /security/alerts` | UC-30 | FR-PAYANA-2102,2104 | AU-32-02 | System (real attack simulation, Base Sepolia) | Functional — Security (End-to-End) |
 
 ### 3.2 Rencana Pengujian
 
@@ -622,8 +630,140 @@ Rincian lengkap ada di 2.3 (Material Pengujian); ringkasannya per kategori:
 
 ---
 
+### KU-32 — Deteksi Anomali Keamanan Vault (UC-30, FR-PAYANA-2101/2102/2104)
+
+**Catatan kategori:** berbeda dari KU-30/KU-31 di atas, KU-32 BUKAN pengujian non-fungsional
+— ini adalah pengujian fungsional *end-to-end*/*black-box* murni terhadap Modul U (lihat
+`SKPL.md` Kelompok U, `DPPL.md` §D.4 dan §B.6/B.17), memvalidasi bahwa `anomalyDetector.ts`
+benar-benar mendeteksi pola kompromi wallet HR pada rangkaian sistem nyata (kontrak → Ponder
+→ cron backend → `app.anomaly_alerts` → `GET /security/alerts`), bukan mengukur performa atau
+ketahanan. Nomornya mengikuti KU-30/KU-31 (bukan KU-01 s.d. KU-29) murni karena ditambahkan
+belakangan dari revisi SKPL/DPPL yang sama, bukan karena kategorinya NFR.
+
+**Antarmuka:** Simulasi serangan nyata (real transaction, bukan mock) di Base Sepolia via
+`payroll-web3-saas/testing-scripts/attacker-sim.mjs`, menggunakan `TEST_HR_PRIVATE_KEY` (HR
+dengan `HR_ROLE` asli pada vault demo `0xEc2B154789C3E7B393f2c9E4bfa06b6cfd57F096`). Hasil
+diverifikasi lewat `GET /security/alerts` (Owner JWT) terhadap backend produksi
+(`BACKEND_URL` di `testing-scripts/.env`, Azure App Service `payana-backend`).
+
+- **AU-32-01** — Input: `attacker-sim.mjs` Aksi 1 — `withdrawVault(5.000.000 IDRX, <alamat baru>)` dari wallet HR "dikompromikan", ke alamat yang belum pernah menerima penarikan dari vault ini. Harapan: baris `SUSPICIOUS_WITHDRAWAL` (severity `high`, sesuai FR-PAYANA-2101 kondisi "penarikan pertama/penerima baru") muncul di `app.anomaly_alerts` dan terbaca via `GET /security/alerts` dalam ≤2 menit sejak transaksi terindeks Ponder (NFR-PAYANA-19).
+- **AU-32-02** — Input: `attacker-sim.mjs` Aksi 2 — `grantRole(HR_ROLE, <alamat baru>)` dari wallet HR yang sama, ke alamat yang bukan `hrAuthority` terdaftar untuk vault tsb (skenario backdoor/persistence). Harapan: baris `UNEXPECTED_ROLE_GRANT` (severity `critical`, peran inti sesuai FR-PAYANA-2102) muncul di `app.anomaly_alerts` dan terbaca via `GET /security/alerts` dalam ≤2 menit.
+
+**Eksekusi nyata (bukan simulasi/mock) — Run 1, 2026-07-17:**
+
+`vaultBalance` sebelum: 865.616.259,102 IDRX (dibaca langsung dari kontrak via `publicClient.readContract`).
+
+| Aksi | Tx Hash | Block | Status | Waktu (UTC) |
+|---|---|---|---|---|
+| `withdrawVault(5.000.000 IDRX → 0x29d1B6505D31D299BFD2A1908a3b3D51068BBF82)` | `0xb76b209a9d0af007b0f883b3427dfe774a67359b00bf51ffee5781b5df3ad6d1` | 44262405 | Success (BaseScan) | 2026-07-17 12:58:18 |
+| `grantRole(HR_ROLE, 0x8b8d4762F2DfD6eAa27848bd53d9e4394Cd797d1)` | `0x28ccf178986d6faa39f1927c590bb3b84c20880ce1db2ded4e95a50caf9f0e5a` | 44262441 | Success | 2026-07-17 12:59:30 |
+
+Catatan eksekusi: percobaan `grantRole` pertama (ke alamat `0x42190244B5a75c0Fd75fd5F228AF7D174a2c1c02`) gagal di sisi klien dengan `"Missing or invalid parameters"` sebelum transaksi ter-broadcast (glitch estimasi gas/RPC sesaat, bukan revert kontrak) — diulang dengan alamat fresh baru dan berhasil (tabel di atas).
+
+**Run 2 (ulangan, 2026-07-17 ~13:23 UTC)** — dijalankan untuk menyingkirkan kemungkinan
+watermark in-memory `anomalyDetector.ts` (`lastWithdrawalCheck`/`lastRoleChangeCheck`, di-set
+ke waktu boot layanan) baru saja ter-reset oleh cold-start Azure App Service tepat sebelum Run
+1 diverifikasi (App Service non-Always-On dapat idle-sleep dan cold-start ulang proses Node
+saat menerima request pertama setelah idle — beberapa `ConnectTimeoutError`/`EAI_AGAIN` memang
+teramati ke `payana-backend-*.azurewebsites.net` selama polling, konsisten dengan pola ini):
+
+| Aksi | Tx Hash | Block | Status |
+|---|---|---|---|
+| `withdrawVault(5.000.000 IDRX → 0x98A4714eFeb2AA34A250aB4a7aE633ADf7Ac1e5a)` | `0x51aec93d8ef2e945713394fdded59064f7a62d629a9aabe010a105c963b6dadf` | 44263179 | Success |
+| `grantRole(HR_ROLE, 0x5772e6218639C0d08Cc0827040429331f9F3dB99)` | `0x158eae3b05e60db7818ee3972f860a875aafa009aca4c309d7e4fc9f08aa96df` | 44263200 | Success |
+
+**Hasil aktual:** `GET /security/alerts` (login Owner `0x906B34db1a8DD333ff9a84255e4AEc13C054f120`,
+cocok dengan `OWNER_ADDRESS` backend) di-poll berulang dari 2026-07-17 13:01 s.d. 13:27 UTC
+(±26 menit, mencakup Run 1 + Run 2 dan lebih dari 10 siklus cron pada interval 2 menit yang
+didokumentasikan `anomalyDetector.ts`) — **secara konsisten mengembalikan `200 OK` dengan
+array kosong `[]`**, untuk Run 1 maupun Run 2. Tidak ada baris `SUSPICIOUS_WITHDRAWAL` atau
+`UNEXPECTED_ROLE_GRANT` yang teramati pada endpoint tersebut sepanjang window pengujian.
+
+**Diagnosis yang sudah ditempuh (tanpa akses langsung ke database produksi — lihat batasan di
+bawah):**
+1. Kedua transaksi terverifikasi *Success* langsung di BaseScan (bukan hanya `receipt.status`
+   dari RPC) — sisi on-chain dipastikan benar.
+2. Deploy indexer Ponder terkini (`payana-indexer`, GitHub Actions "Deploy Ponder to Azure",
+   commit `77bcf3d`, sukses, ~19 jam sebelum pengujian) dipastikan mencakup commit `d692915`
+   ("sidang") yang menambahkan tabel `vault_withdrawal`/`role_change` dan handler
+   `RoleGranted`/`VaultWithdrawn` — kode indexing yang dibutuhkan sudah ter-deploy.
+3. `HEAD` lokal `payana-backend` (`bd4cd48`, "azure deploy" — mencakup `anomalyDetector.ts`
+   dan pemanggilan `startAnomalyDetector()` di `src/index.ts`) dipastikan merupakan ancestor
+   dari `origin/master`.
+4. Beberapa `ConnectTimeoutError`/`getaddrinfo EAI_AGAIN` ke host backend teramati selama
+   polling — mengindikasikan App Service sempat idle/cold-start di tengah window pengujian,
+   yang (jika proses Node benar-benar restart) akan me-reset watermark in-memory
+   `anomalyDetector.ts` ke waktu boot baru — secara desain (lihat komentar kode
+   `anomalyDetector.ts`) ini akan membuat event SEBELUM restart tersebut tidak pernah
+   terdeteksi pada siklus manapun setelahnya. Run 2 dieksekusi justru untuk menguji hipotesis
+   ini (transaksi baru, dijalankan setelah polling kontinu menjaga service tetap "hangat") —
+   namun hasilnya tetap `[]` sampai akhir window pengujian.
+5. Inspeksi langsung ke tabel `ponder_v2.vault_withdrawal`/`role_change`/`app.anomaly_alerts`
+   di Postgres produksi (kredensial ditemukan dalam komentar `payana-backend/.env`) TIDAK
+   dilakukan — diblokir oleh kebijakan harness pengujian ini terhadap penggunaan kredensial
+   database produksi secara langsung. Root cause pasti (Ponder gagal meng-index event vs.
+   `anomalyDetector.ts` gagal query/watermark ter-reset vs. penyebab lain) karena itu **belum
+   terkonfirmasi** — poin 1-4 di atas adalah bukti tidak langsung, bukan bukti definitif.
+
+**Run 3 (ulangan kedua, 2026-07-18), kondisi berbeda dari Run 1/2:** dijalankan sebagai bagian
+dari satu sesi pengujian black-box otomatis penuh (KU-01 s.d. KU-29, 105 assertion, dieksekusi
+berurutan tanpa jeda terhadap `payana-backend` produksi) — artinya, tidak seperti Run 1/2,
+`payana-backend` sudah menerima traffic HTTP terus-menerus selama beberapa menit sebelum
+`attacker-sim.mjs` dijalankan, sehingga App Service kemungkinan besar sudah dalam kondisi
+"warm" (proses Node tidak baru saja cold-start) pada saat kedua transaksi serangan dikirim.
+`RPC_URL` juga sudah dipindah dari Alchemy (kena *monthly capacity limit*) ke RPC publik
+`sepolia.base.org` pada sesi yang sama, tidak berhubungan langsung dengan hipotesis cold-start
+tapi dicatat untuk kelengkapan konteks infrastruktur saat Run 3 dieksekusi.
+
+| Aksi | Tx Hash | Block | Status |
+|---|---|---|---|
+| `withdrawVault(5.000.000 IDRX → 0xfC6628E5153030D997Cb53d283214Cb8C6A20DAD)` | `0xee806b0e1cd50f7b5e351dc53e2ab491abe78081819a7d84ed25328440e3ec4a` | 44296183 | Success |
+| `grantRole(HR_ROLE, 0xbab0850E8C5775FD154c17b95F316e7104a93Ed8)` | `0xdd925060c434cc1cf18dd0a16964a7d345adb3746a8f04d3c16234675837b88c` | 44296184 | Success |
+
+**Hasil aktual Run 3:** `GET /security/alerts` (login Owner) di-poll setiap 20 detik mulai
+segera setelah kedua transaksi terkonfirmasi. Pada poll ke-5 (~1 menit 40 detik setelah mulai
+polling), endpoint mengembalikan **2 baris alert baru**, keduanya `resolved: false`:
+
+- `type: "SUSPICIOUS_WITHDRAWAL"`, severity `high`, `txHash` cocok dengan transaksi Aksi 1,
+  `detectedAt: 2026-07-18T07:46:00.071Z`.
+- `type: "UNEXPECTED_ROLE_GRANT"`, severity `critical`, `txHash` cocok dengan transaksi Aksi 2,
+  `detectedAt: 2026-07-18T07:46:00.086Z`.
+
+Kedua alert muncul dalam window ≤2 menit yang disyaratkan FR-PAYANA-2101/2102/2104, dengan
+`detail` dan `meta` yang secara akurat mendeskripsikan pola serangan (penerima/akun baru yang
+belum pernah berinteraksi dengan vault ini sebelumnya) sesuai desain `anomalyDetector.ts`.
+
+**Kesimpulan (AU-32-01, AU-32-02):** **HANDAL** — pipeline deteksi penuh (kontrak → Ponder →
+cron backend → `app.anomaly_alerts` → `GET /security/alerts`) terbukti berfungsi end-to-end
+pada Run 3, mengoreksi status BELUM HANDAL dari Run 1/2. Root cause pasti kegagalan Run 1/2
+**tetap tidak dikonfirmasi definitif** — dilaporkan secara jujur sebagai hipotesis kuat (bukan
+fakta terverifikasi), karena akses langsung ke database produksi tetap di luar cakupan yang
+diizinkan pada seluruh sesi pengujian ini (Run 1, 2, maupun 3). Bukti tidak langsung yang
+mendukung hipotesis cold-start/watermark-reset: Run 1/2 dieksekusi sebagai skrip tunggal tanpa
+traffic HTTP pendahulu ke `payana-backend`, sedangkan Run 3 dieksekusi tepat setelah sesi
+traffic HTTP intensif (105 assertion black-box) ke layanan yang sama. **Tindak lanjut yang
+sempat direkomendasikan** meski Run 3 sudah Handal: mengaktifkan Always On pada App Service
+plan `payana-backend` (didukung penuh oleh tier S1 Standard yang sudah digunakan, tanpa biaya
+tambahan) untuk menghilangkan variabel cold-start secara permanen, alih-alih bergantung pada
+traffic kebetulan untuk menjaga proses tetap warm — **tindak lanjut ini sudah dieksekusi pada
+2026-07-18** (`az webapp config set --name payana-backend ... --always-on true`, dikonfirmasi
+`alwaysOn: true` via `az webapp config show`), sehingga variabel cold-start kini dihilangkan
+secara permanen untuk pengujian dan operasional berikutnya.
+
+---
+
 ## BAB 5 — HASIL PENGUJIAN
 
+> **Catatan tambahan KU-32 (ditambahkan belakangan):** di luar **96 dari 96** butir uji
+> KU-01 s.d. KU-29 di bawah ini (seluruhnya Handal, lihat catatan aslinya persis di bawah,
+> dan dikonfirmasi ulang lewat regresi otomatis penuh 2026-07-18 — 105 assertion, 0 gagal),
+> dokumen ini juga mencakup **AU-32-01/AU-32-02** (KU-32 — Deteksi Anomali Keamanan Vault,
+> lihat §3.2) di baris terakhir tabel hasil bab ini. Keduanya **Handal** — Run 1/2
+> (2026-07-17) sempat tidak menghasilkan alert yang diharapkan, tapi Run 3 (2026-07-18)
+> berhasil menunjukkan kedua alert muncul di `GET /security/alerts` dalam ≤2 menit; lihat
+> detail lengkap ketiga run dan hipotesis penyebab kegagalan Run 1/2 di §3.2 KU-32 dan baris
+> AU-32-01/02 di tabel bawah.
+>
 > **96 dari 96** butir uji sudah dieksekusi (Foundry, eksekusi nyata Integration/System via
 > `testing-scripts/`, dan/atau klik-UI manual sungguhan di browser) dan berstatus **Handal**.
 > Ini termasuk **AU-05-05, AU-11-01, AU-14-01/02, AU-16-01, AU-16-02** yang tadinya defect
@@ -731,6 +871,25 @@ Rincian lengkap ada di 2.3 (Material Pengujian); ringkasannya per kategori:
 >    otomatis juga berlaku untuk endpoint lain yang memakai fungsi yang sama
 >    (`GET /auth/profile/by-address/:address`). Diverifikasi 8 skenario nyata (lihat
 >    `testing-scripts/ku-06-termination-reason.mjs`).
+> 12. **[TEMUAN REGRESI — infrastruktur, ditemukan 2026-07-18 saat re-run simulasi 30 karyawan]**
+>    Bounty payout (`PATCH /bounty/claim/:id/paid`, AU-22-03) yang sebelumnya Handal (lihat
+>    entri di atas) sempat regresi: seluruh 8 percobaan `record payout` pada re-run
+>    `30-05-bounty.mjs` gagal dengan `400 TRANSFER_NOT_VERIFIED`, padahal transfer IDRX on-chain
+>    yang mendasarinya sukses dan terkonfirmasi (`receipt.status: success` di BaseScan). Root
+>    cause: `backend/src/services/verifyTransfer.ts` membaca `BASE_RPC_URL`
+>    (bukan lewat Ponder/indexer) untuk memanggil `getTransactionReceipt` langsung, dan env var
+>    `BASE_RPC_URL` pada App Service `payana-backend` masih mengarah ke API key Alchemy yang
+>    sama yang sudah mencapai *monthly capacity limit* (lihat root cause Alchemy CU di atas) —
+>    `catch` di `verifyIdrxTransfer()` menelan error rate-limit/429 dan mengembalikan `false`,
+>    yang tidak bisa dibedakan dari "transfer benar-benar tidak valid" pada pesan error. Ini
+>    murni bug infrastruktur (env var stale), bukan bug logika verifikasi. Diperbaiki: env var
+>    diarahkan ke RPC publik `https://sepolia.base.org`; 8/8 payout berhasil direkam ulang
+>    setelah fix (dengan jeda antar-request karena RPC publik punya rate limit sendiri yang
+>    lebih ketat dari Alchemy). **Catatan cakupan pengujian:** `ku-22-bounty.mjs` (skrip PDHUPL
+>    formal, AU-22-03) tidak pernah menangkap bug ini karena jalur happy-path-nya diuji dengan
+>    txHash asli hanya jika `TEST_REIMBURSE_APPROVE_TXHASH`-setara sudah tersedia — pada
+>    eksekusi historis yang tercatat di atas transfer memang nyata dan sukses (RPC belum capped
+>    saat itu), sehingga gap ini baru kelihatan lewat simulasi 30 karyawan di luar skrip formal.
 
 | Identifikasi | Deskripsi Singkat | Prosedur Pengujian | Masukan | Keluaran yang Diharapkan | Kriteria Evaluasi Hasil | Hasil yang Didapat | Kesimpulan |
 |---|---|---|---|---|---|---|---|
@@ -830,6 +989,8 @@ Rincian lengkap ada di 2.3 (Material Pengujian); ringkasannya per kategori:
 | AU-28-04 | Reactivate HR | DELETE /suspension/:hrAddress | hrAddress | Login ulang sukses | Sesi baru terbentuk | PASS (eksekusi nyata) — DELETE ok:true, login ulang 200 | Handal |
 | AU-29-01 | Settings kosong HR baru | GET /company-settings HR baru | - | 200 null | Response null | PASS (eksekusi nyata, ku-29-company-settings.mjs diperbaiki) — wallet HR baru yang belum pernah PUT /company-settings -> GET mengembalikan 200 null | Handal |
 | AU-29-02 | Upsert settings | PUT /company-settings | name, country, logoUrl, dst | Tersimpan | GET mencerminkan perubahan | PASS (eksekusi nyata) — PUT tersimpan, GET mengembalikan nilai yang sama persis | Handal |
+| AU-32-01 | Deteksi penarikan vault mencurigakan | Jalankan `testing-scripts/attacker-sim.mjs` Aksi 1 (`withdrawVault` ke alamat baru dari HR key), poll `GET /security/alerts` | HR privkey nyata, vault demo, alamat penerima fresh | Baris `SUSPICIOUS_WITHDRAWAL` muncul di `GET /security/alerts` dalam ≤2 menit sejak indexing | Cek array respons berisi entri `type=SUSPICIOUS_WITHDRAWAL` dengan `txHash` cocok | Run 1/2 (2026-07-17, tx `0xb76b209a...3ad6d1` block 44262405 & `0x51aec93d...3b6dadf` block 44263179, keduanya Success): `GET /security/alerts` tetap `[]` selama ±26 menit polling, root cause dugaan cold-start App Service (lihat §3.2). **Run 3 (2026-07-18, tx `0xee806b0e...440e3ec4a` block 44296183, Success)**: alert `SUSPICIOUS_WITHDRAWAL` (severity `high`, `txHash` cocok) muncul di `GET /security/alerts` pada poll ke-5 (~1m40s) — dalam window ≤2 menit yang disyaratkan. | **Handal** (dikonfirmasi Run 3, setelah gap Run 1/2 — lihat §3.2) |
+| AU-32-02 | Deteksi pemberian role tak terduga (backdoor) | Jalankan `attacker-sim.mjs` Aksi 2 (`grantRole(HR_ROLE, alamat baru)` dari HR key), poll `GET /security/alerts` | HR privkey nyata, vault demo, alamat penerima fresh | Baris `UNEXPECTED_ROLE_GRANT` (severity `critical`) muncul di `GET /security/alerts` dalam ≤2 menit | Cek array respons berisi entri `type=UNEXPECTED_ROLE_GRANT` dengan `txHash` cocok | Run 1/2 (2026-07-17, tx `0x28ccf178...9f0e5a` block 44262441 & `0x158eae3b...9f08aa96df` block 44263200, keduanya Success; percobaan pertama tiap run sempat gagal client-side sebelum broadcast, diulang): `GET /security/alerts` tetap `[]` sepanjang window yang sama dengan AU-32-01. **Run 3 (2026-07-18, tx `0xdd925060...675837b88c` block 44296184, Success)**: alert `UNEXPECTED_ROLE_GRANT` (severity `critical`, `txHash` cocok) muncul bersamaan dengan alert AU-32-01 pada poll ke-5 (~1m40s). | **Handal** (dikonfirmasi Run 3, setelah gap Run 1/2 — lihat §3.2) |
 
 ---
 

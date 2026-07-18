@@ -110,6 +110,32 @@ export const COMPANY_VAULT_ABI = [
     outputs: [],
   },
   {
+    name: "rejectAdvance",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "employee", type: "address" }],
+    outputs: [],
+  },
+  {
+    name: "createCliffVest",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "employee", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "cliffTs", type: "uint256" },
+      { name: "vestType", type: "uint8" },
+    ],
+    outputs: [],
+  },
+  {
+    name: "cancelCliffVest",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "employee", type: "address" }, { name: "vestId", type: "uint256" }],
+    outputs: [],
+  },
+  {
     name: "proposeTermination",
     type: "function",
     stateMutability: "nonpayable",
@@ -144,7 +170,22 @@ export const COMPANY_VAULT_ABI = [
     inputs: [{ name: "role", type: "bytes32" }, { name: "account", type: "address" }],
     outputs: [],
   },
+  {
+    name: "withdrawVault",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "amount", type: "uint256" }, { name: "recipient", type: "address" }],
+    outputs: [],
+  },
+  {
+    name: "vaultBalance",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
 ];
 
 export const LEGAL_ROLE = keccak256(toHex("LEGAL_ROLE"));
+export const HR_ROLE = keccak256(toHex("HR_ROLE"));
 
