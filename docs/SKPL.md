@@ -355,7 +355,7 @@ Payana memiliki antarmuka pengguna berikut:
 | No | Nama Form / Halaman | Deskripsi Fungsi |
 |----|---------------------|------------------|
 | 1 | Halaman Login | Autentikasi pengguna melalui tanda tangan kriptografi EIP-191 menggunakan embedded wallet Privy. Pengguna menandatangani pesan tantangan yang mengandung timestamp Unix untuk membuktikan kepemilikan alamat dompet. |
-| 2 | Halaman Onboarding (Umum) | Halaman `/onboarding` sekarang khusus untuk **registrasi karyawan** (invitation-only, lihat UC-21): mengharuskan parameter `?invite=<token>` yang valid dari HR, tanpa pilihan bebas perusahaan. Registrasi company (calon HR Admin) memiliki formulir terpisah yang menyertakan alamat dompet, email, nama, NPWP, NIB, data direktur, dan dokumen akta pendirian; pengguna dapat memantau status permohonan setelah pengajuan. |
+| 2 | Halaman Onboarding (Umum) | Halaman `/onboarding` sekarang khusus untuk **registrasi karyawan** (invitation-only, lihat UC-18): mengharuskan parameter `?invite=<token>` yang valid dari HR, tanpa pilihan bebas perusahaan. Registrasi company (calon HR Admin) memiliki formulir terpisah yang menyertakan alamat dompet, email, nama, NPWP, NIB, data direktur, dan dokumen akta pendirian; pengguna dapat memantau status permohonan setelah pengajuan. |
 | 3 | Dashboard Owner SaaS | Dasbor agregat untuk operator platform Payana: ringkasan Total Value Locked (TVL), jumlah tenant aktif, estimasi Monthly Recurring Revenue, daftar antrian pendaftaran HR baru, dan tombol persetujuan atau penolakan pendaftaran. |
 | 4 | Dashboard Vault HR | Manajemen treasury perusahaan: saldo vault IDRX saat ini, total flow rate penggajian bulanan, tombol deposit dana ke vault, tombol penarikan saldo bebas, dan indikator peringatan saldo rendah. |
 | 5 | Manajemen Karyawan HR | Daftar seluruh karyawan aktif beserta status stream, flow rate masing-masing, dan saldo gaji yang telah terakumulasi secara real-time. Menyediakan navigasi ke detail per karyawan. |
@@ -378,11 +378,11 @@ Payana memiliki antarmuka pengguna berikut:
 | 22 | Pengaturan Karyawan | Pembaruan profil pribadi karyawan: nama lengkap, NIK 16 digit, dan nomor telepon. Data disimpan dalam bentuk terenkripsi AES-256-GCM di server off-chain. |
 | 23 | Reimburse Karyawan | Formulir pengajuan klaim reimbursement oleh karyawan: input keterangan biaya, jumlah IDRX yang diminta, dan unggah bukti pendukung, disertai status persetujuan dari HR. |
 | 24 | Bounty Karyawan | Tampilan daftar program bounty atau tugas berbasis insentif yang tersedia untuk karyawan, beserta tombol klaim hadiah IDRX setelah menyelesaikan tugas yang ditetapkan. |
-| 25 | Notifikasi Karyawan | Daftar notifikasi milik karyawan yang sedang login (maksimum 50 terbaru, urut terbaru dulu), dengan aksi tandai satu atau seluruh notifikasi sebagai telah dibaca. Lihat UC-24. |
-| 26 | Slip Gaji (Payslip) Karyawan | Rincian breakdown satu transaksi klaim gaji tertentu: gaji bruto terakumulasi, potongan platform fee, cicilan kasbon, pajak/BPJS, severance, dan gaji bersih yang diterima. Dapat diakses oleh karyawan pemilik klaim atau HR terkait. Lihat UC-25. |
-| 27 | Bukti Potong Pajak (Tax Cert) Karyawan | Agregasi tahunan total gaji bruto, dana kepatuhan, severance, dan gaji bersih karyawan per tahun pajak, untuk keperluan pelaporan SPT pribadi. Lihat UC-26. |
-| 28 | Surat Keterangan Kerja | Pengajuan permohonan surat keterangan kerja oleh karyawan (dengan tujuan penggunaan seperti KPR, Kredit, Visa) kepada HR, serta pengunduhan dokumen setelah disetujui. Lihat UC-27. |
-| 29 | Direktori Karyawan HR | Daftar seluruh karyawan suatu perusahaan beserta departemen dan jabatan, dengan kemampuan HR meng-assign/memperbarui department dan position per karyawan. Lihat UC-28. |
+| 25 | Notifikasi Karyawan | Daftar notifikasi milik karyawan yang sedang login (maksimum 50 terbaru, urut terbaru dulu), dengan aksi tandai satu atau seluruh notifikasi sebagai telah dibaca. Lihat UC-21. |
+| 26 | Slip Gaji (Payslip) Karyawan | Rincian breakdown satu transaksi klaim gaji tertentu: gaji bruto terakumulasi, potongan platform fee, cicilan kasbon, pajak/BPJS, severance, dan gaji bersih yang diterima. Dapat diakses oleh karyawan pemilik klaim atau HR terkait. Lihat UC-22. |
+| 27 | Bukti Potong Pajak (Tax Cert) Karyawan | Agregasi tahunan total gaji bruto, dana kepatuhan, severance, dan gaji bersih karyawan per tahun pajak, untuk keperluan pelaporan SPT pribadi. Lihat UC-23. |
+| 28 | Surat Keterangan Kerja | Pengajuan permohonan surat keterangan kerja oleh karyawan (dengan tujuan penggunaan seperti KPR, Kredit, Visa) kepada HR, serta pengunduhan dokumen setelah disetujui. Lihat UC-24. |
+| 29 | Direktori Karyawan HR | Daftar seluruh karyawan suatu perusahaan beserta departemen dan jabatan, dengan kemampuan HR meng-assign/memperbarui department dan position per karyawan. Lihat UC-25. |
 
 Selain halaman di atas, Payana juga menyediakan laporan berikut:
 
@@ -783,7 +783,7 @@ Deskripsi      : Sistem harus memampukan Owner SaaS untuk melihat dan menarik to
 > tidak memiliki padanan di docx — seluruh kelompok lain pada rentang FR-PAYANA-1101 s.d. 1801
 > (Kelompok G, M, N, O, P, Q, R, S) sudah disamakan penomorannya dengan docx. Kelompok H
 > melanjutkan pola penomoran per-ratus docx (blok berikutnya setelah FR-PAYANA-1801). Pasangan
-> dari UC-22 s.d. UC-30.
+> dari UC-19 s.d. UC-27.
 
 ### Kelompok G: Notifikasi
 
@@ -1100,18 +1100,18 @@ Deskripsi      : Sistem harus memampukan HR untuk menyimpan dan memperbarui peng
 | UC-13 | HR Generate Laporan Kepatuhan (BPJS/PPh21) | HR Admin | FR-PAYANA-801, 802 |
 | UC-14 | Verifikasi Sertifikat Ketenagakerjaan (SBT) | HR Admin | FR-PAYANA-901, 902 |
 | UC-15 | Owner SaaS Deploy Company Vault Baru | Owner SaaS | FR-PAYANA-1001 |
-| UC-20 | Owner SaaS Konfigurasi dan Klaim Platform Fee | Owner SaaS | FR-PAYANA-1006, 1007, 1008 |
 | UC-16 | HR Lihat Dashboard Vault dan Status Stream | HR Admin | FR-PAYANA-204, 303 |
-| UC-21 | Registrasi & Persetujuan Akun (Company & Employee) | Owner SaaS / HR Admin / Karyawan | FR-PAYANA-107, 108, 109 |
-| UC-22 | Reimburse Karyawan & HR | Karyawan / HR Admin | FR-PAYANA-1101, 1102 |
-| UC-23 | Bounty & Tip | HR Admin / Karyawan | FR-PAYANA-1201, 1202, 1203 |
-| UC-24 | Notifikasi | HR Admin / Karyawan | FR-PAYANA-1301 |
-| UC-25 | Slip Gaji (Payslip) | Karyawan / HR Admin | FR-PAYANA-1401 |
-| UC-26 | Bukti Potong Pajak (Tax Cert) | Karyawan / HR Admin | FR-PAYANA-1501 |
-| UC-27 | Surat Keterangan Kerja | Karyawan / HR Admin | FR-PAYANA-1601 |
-| UC-28 | Direktori Karyawan | HR Admin | FR-PAYANA-1701 |
-| UC-29 | Pengaturan Perusahaan (Branding) | HR Admin | FR-PAYANA-1801 |
-| UC-30 | Deteksi Anomali & Tinjauan Keamanan Vault | Owner SaaS | FR-PAYANA-1901, 1902, 1903, 1904 |
+| UC-17 | Owner SaaS Konfigurasi dan Klaim Platform Fee | Owner SaaS | FR-PAYANA-1006, 1007, 1008 |
+| UC-18 | Registrasi & Persetujuan Akun (Company & Employee) | Owner SaaS / HR Admin / Karyawan | FR-PAYANA-107, 108, 109 |
+| UC-19 | Reimburse Karyawan & HR | Karyawan / HR Admin | FR-PAYANA-1101, 1102 |
+| UC-20 | Bounty & Tip | HR Admin / Karyawan | FR-PAYANA-1201, 1202, 1203 |
+| UC-21 | Notifikasi | HR Admin / Karyawan | FR-PAYANA-1301 |
+| UC-22 | Slip Gaji (Payslip) | Karyawan / HR Admin | FR-PAYANA-1401 |
+| UC-23 | Bukti Potong Pajak (Tax Cert) | Karyawan / HR Admin | FR-PAYANA-1501 |
+| UC-24 | Surat Keterangan Kerja | Karyawan / HR Admin | FR-PAYANA-1601 |
+| UC-25 | Direktori Karyawan | HR Admin | FR-PAYANA-1701 |
+| UC-26 | Pengaturan Perusahaan (Branding) | HR Admin | FR-PAYANA-1801 |
+| UC-27 | Deteksi Anomali & Tinjauan Keamanan Vault | Owner SaaS | FR-PAYANA-1901, 1902, 1903, 1904 |
 
 ---
 
@@ -1126,7 +1126,7 @@ graph LR
     OWNER(["👤 Owner SaaS"])
 
     HR --> UC01["UC-01\nLogin & Autentikasi"]
-    HR --> UC21["UC-21\nRegistrasi &\nPersetujuan Akun"]
+    HR --> UC18["UC-18\nRegistrasi &\nPersetujuan Akun"]
     HR --> UC02["UC-02\nOnboarding Perusahaan\n& Deploy Vault"]
     HR --> UC03["UC-03\nDeposit IDRX\nke Vault"]
     HR --> UC04["UC-04\nOnboarding Karyawan\n& Start Stream"]
@@ -1137,30 +1137,30 @@ graph LR
     HR --> UC13["UC-13\nGenerate Laporan\nKepatuhan"]
     HR --> UC14["UC-14\nVerifikasi SBT\nKetenagakerjaan"]
     HR --> UC16["UC-16\nDashboard Vault\n& Status Stream"]
-    HR --> UC22["UC-22\nReimburse\nKaryawan & HR"]
-    HR --> UC23["UC-23\nBounty & Tip"]
-    HR --> UC24["UC-24\nNotifikasi"]
-    HR --> UC28["UC-28\nDirektori\nKaryawan"]
-    HR --> UC29["UC-29\nPengaturan\nPerusahaan"]
+    HR --> UC19["UC-19\nReimburse\nKaryawan & HR"]
+    HR --> UC20["UC-20\nBounty & Tip"]
+    HR --> UC21["UC-21\nNotifikasi"]
+    HR --> UC25["UC-25\nDirektori\nKaryawan"]
+    HR --> UC26["UC-26\nPengaturan\nPerusahaan"]
 
     EMP --> UC01
-    EMP --> UC21
+    EMP --> UC18
     EMP --> UC05["UC-05\nKlaim Gaji EWA"]
     EMP --> UC08["UC-08\nResign Mandiri"]
     EMP --> UC10["UC-10\nClaim Vested\nBonus"]
     EMP --> UC11["UC-11\nAjukan & Lunasi\nKasbon"]
-    EMP --> UC22
-    EMP --> UC23
-    EMP --> UC24
-    EMP --> UC25["UC-25\nSlip Gaji"]
-    EMP --> UC26["UC-26\nBukti Potong\nPajak"]
-    EMP --> UC27["UC-27\nSurat Keterangan\nKerja"]
+    EMP --> UC19
+    EMP --> UC20
+    EMP --> UC21
+    EMP --> UC22["UC-22\nSlip Gaji"]
+    EMP --> UC23["UC-23\nBukti Potong\nPajak"]
+    EMP --> UC24["UC-24\nSurat Keterangan\nKerja"]
 
     OWNER --> UC01
-    OWNER --> UC21
+    OWNER --> UC18
     OWNER --> UC15["UC-15\nDeploy Company\nVault Baru"]
-    OWNER --> UC20["UC-20\nKonfigurasi\nPlatform Fee"]
-    OWNER --> UC30["UC-30\nDeteksi Anomali &\nKeamanan Vault"]
+    OWNER --> UC17["UC-17\nKonfigurasi\nPlatform Fee"]
+    OWNER --> UC27["UC-27\nDeteksi Anomali &\nKeamanan Vault"]
 
     style HR fill:#dbeafe,stroke:#2563eb
     style EMP fill:#dcfce7,stroke:#16a34a
@@ -1169,11 +1169,15 @@ graph LR
 
 > **Catatan:** Diagram disederhanakan menjadi tiga aktor persona utama (HR Admin, Karyawan, Owner SaaS). Persetujuan PHK (UC-07) digambarkan sebagai bagian dari domain HR Admin bukan sekadar penyederhanaan diagram, melainkan mencerminkan implementasi nyata: `LEGAL_ROLE` di-auto-grant ke alamat HR Admin sendiri saat onboarding, dan tidak ada dashboard/alur login terpisah di frontend bagi pemegang `LEGAL_ROLE` yang berbeda dari HR Admin (lihat §3.1 untuk detail lengkap serta keterbatasannya). Verifikasi SBT (UC-14) tetap murni domain HR Admin.
 >
-> **Catatan (UC-21):** Nomor UC-21 sengaja ditempatkan setelah UC-20 (bukan disisipkan di antara
-> UC-01/UC-02) agar tidak menggeser nomor UC yang sudah dirujuk di tempat lain pada dokumen ini
-> maupun di DPPL/PDHUPL — urutan nomor UC pada dokumen ini tidak selalu mencerminkan urutan
+> **[FLAG-RENUMBERING]** Seluruh nomor Use Case pada dokumen ini telah dirapikan menjadi UC-01
+> s.d. UC-27 berurutan tanpa celah (sebelumnya melompat dari UC-16 ke UC-20, dan tabel ringkasan
+> §3.3 sempat mencantumkan UC-20 sebelum UC-16 secara keliru). UC-18 (Registrasi & Persetujuan
+> Akun) tetap ditempatkan setelah UC-17 mengikuti urutan tampilan dokumen apa adanya, bukan urutan
 > eksekusi kronologis pengguna (registrasi secara logis terjadi sebelum UC-02, walau bernomor
-> lebih besar).
+> lebih besar) — lihat UC-18 di bawah untuk detail alurnya. **Penting:** penomoran baru ini baru
+> berlaku di `SKPL.md`; referensi silang ke nomor UC lama (mis. UC-20, UC-21, UC-28, UC-29, UC-30)
+> di `DPPL.md` dan `PDHUPL_v2.md` belum diperbarui mengikuti pemetaan ini dan perlu disamakan pada
+> revisi berikutnya.
 
 ---
 
@@ -1220,10 +1224,10 @@ sequenceDiagram
 
 #### UC-02: Onboarding Perusahaan dan Deploy Vault
 
-> **Catatan:** Sebelum use case ini berjalan, HR Admin harus sudah melalui dan lulus **UC-21
+> **Catatan:** Sebelum use case ini berjalan, HR Admin harus sudah melalui dan lulus **UC-18
 > (Registrasi & Persetujuan Akun)** — pengajuan profil perusahaan (NPWP/NIB/dokumen) dan
 > persetujuan Owner SaaS bukan lagi bagian dari UC-02, melainkan didokumentasikan penuh di
-> UC-21 (termasuk alur invitation-only untuk registrasi karyawan). UC-02 di bawah ini murni
+> UC-18 (termasuk alur invitation-only untuk registrasi karyawan). UC-02 di bawah ini murni
 > mencakup tahap SETELAH akun disetujui: konfigurasi split alokasi dana dan deploy vault.
 
 ```mermaid
@@ -1233,7 +1237,7 @@ sequenceDiagram
     participant SC as PayrollFactory
     participant Base as Base Blockchain
 
-    Note over HR,SC: Prasyarat: HR sudah lulus UC-21 (Registrasi & Persetujuan Akun)
+    Note over HR,SC: Prasyarat: HR sudah lulus UC-18 (Registrasi & Persetujuan Akun)
     HR->>FE: Buka /hr/onboarding — wizard deploy vault
     HR->>FE: Konfigurasi split alokasi dana (93/5/2 default)
     FE->>SC: deployVault(hrAuthority, companyName, sbtContract)
@@ -1247,13 +1251,13 @@ sequenceDiagram
 | | |
 |-|-|
 | **Nama Use Case** | Onboarding Perusahaan dan Deploy Vault |
-| **Deskripsi Singkat** | HR Admin yang akunnya sudah disetujui (lihat UC-21) mengonfigurasi parameter alokasi dana gaji dan men-deploy smart contract CompanyVault ke blockchain Base Sepolia melalui PayrollFactory. |
+| **Deskripsi Singkat** | HR Admin yang akunnya sudah disetujui (lihat UC-18) mengonfigurasi parameter alokasi dana gaji dan men-deploy smart contract CompanyVault ke blockchain Base Sepolia melalui PayrollFactory. |
 | **Aktor** | Owner SaaS / HR Admin |
-| **Pre Kondisi** | HR Admin telah login dengan role `hr`. Akun HR Admin telah disetujui oleh Owner SaaS (UC-21). Perusahaan belum memiliki vault aktif di sistem Payana. |
+| **Pre Kondisi** | HR Admin telah login dengan role `hr`. Akun HR Admin telah disetujui oleh Owner SaaS (UC-18). Perusahaan belum memiliki vault aktif di sistem Payana. |
 | **Pos Kondisi** | Smart contract CompanyVault berhasil di-deploy ke Base Sepolia. Alamat vault tersimpan di database backend. HR Admin diarahkan ke dashboard `/hr/vault` untuk mulai mengelola karyawan dan melakukan deposit awal. |
-| **Basic Flow** | 1. HR Admin (yang akunnya sudah disetujui via UC-21) mengakses halaman `/hr/onboarding`. <br> 2. Sistem menampilkan wizard onboarding: Konfigurasi Split Alokasi Dana dan Deploy Vault. <br> 3. HR Admin meninjau dan mengonfirmasi parameter split alokasi dana default: 93% ke wallet karyawan, 5% ke Compliance Vault (BPJS/Pajak), dan 2% ke Severance Vault (pesangon). HR Admin dapat menyesuaikan nilai dalam satuan Basis Points (BPS) selama total tetap 10.000 BPS. <br> 4. HR Admin mengklik "Deploy Vault". Frontend memanggil fungsi `PayrollFactory.deployVault(hrAddress, companyName, sbtContract)` melalui Privy. <br> 5. Transaksi on-chain ditandatangani oleh HR Admin dan dikirim ke jaringan Base Sepolia. Frontend menampilkan indikator progres dengan pesan "Sedang men-deploy vault ke blockchain...". <br> 6. Setelah transaksi dikonfirmasi, backend menerima webhook dari Alchemy dan menyimpan alamat vault baru beserta konfigurasi split ke database. <br> 7. Sistem menampilkan konfirmasi keberhasilan dan mengarahkan HR Admin ke halaman `/hr/vault`. |
+| **Basic Flow** | 1. HR Admin (yang akunnya sudah disetujui via UC-18) mengakses halaman `/hr/onboarding`. <br> 2. Sistem menampilkan wizard onboarding: Konfigurasi Split Alokasi Dana dan Deploy Vault. <br> 3. HR Admin meninjau dan mengonfirmasi parameter split alokasi dana default: 93% ke wallet karyawan, 5% ke Compliance Vault (BPJS/Pajak), dan 2% ke Severance Vault (pesangon). HR Admin dapat menyesuaikan nilai dalam satuan Basis Points (BPS) selama total tetap 10.000 BPS. <br> 4. HR Admin mengklik "Deploy Vault". Frontend memanggil fungsi `PayrollFactory.deployVault(hrAddress, companyName, sbtContract)` melalui Privy. <br> 5. Transaksi on-chain ditandatangani oleh HR Admin dan dikirim ke jaringan Base Sepolia. Frontend menampilkan indikator progres dengan pesan "Sedang men-deploy vault ke blockchain...". <br> 6. Setelah transaksi dikonfirmasi, backend menerima webhook dari Alchemy dan menyimpan alamat vault baru beserta konfigurasi split ke database. <br> 7. Sistem menampilkan konfirmasi keberhasilan dan mengarahkan HR Admin ke halaman `/hr/vault`. |
 | **Alternative Flow** | A1. Apabila HR Admin mengubah parameter split pada langkah 3, frontend memvalidasi bahwa total BPS tepat 10.000. Jika valid, nilai kustom digunakan sebagai parameter deploy. <br> A2. HR Admin dapat melewati deposit awal dan melakukannya di lain waktu melalui `/hr/vault`. Namun, stream gaji karyawan tidak dapat dimulai sebelum vault memiliki saldo IDRX yang mencukupi. |
-| **Error Flow** | E1. Apabila HR Admin belum lulus UC-21 (belum disetujui Owner) mencoba mengakses `/hr/onboarding`, sistem mengarahkan kembali ke halaman status pendaftaran dengan pesan "Akun Anda masih menunggu persetujuan Owner SaaS." <br> E2. Apabila transaksi deploy gagal (revert) di smart contract karena parameter tidak valid, frontend menampilkan pesan "Deploy vault gagal. Silakan periksa konfigurasi dan coba kembali." <br> E3. Apabila wallet HR Admin tidak memiliki saldo ETH yang cukup untuk membayar gas, frontend menampilkan pesan "Saldo ETH tidak mencukupi untuk membayar gas. Silakan isi saldo ETH terlebih dahulu." |
+| **Error Flow** | E1. Apabila HR Admin belum lulus UC-18 (belum disetujui Owner) mencoba mengakses `/hr/onboarding`, sistem mengarahkan kembali ke halaman status pendaftaran dengan pesan "Akun Anda masih menunggu persetujuan Owner SaaS." <br> E2. Apabila transaksi deploy gagal (revert) di smart contract karena parameter tidak valid, frontend menampilkan pesan "Deploy vault gagal. Silakan periksa konfigurasi dan coba kembali." <br> E3. Apabila wallet HR Admin tidak memiliki saldo ETH yang cukup untuk membayar gas, frontend menampilkan pesan "Saldo ETH tidak mencukupi untuk membayar gas. Silakan isi saldo ETH terlebih dahulu." |
 
 ---
 
@@ -1765,7 +1769,7 @@ sequenceDiagram
 
 ---
 
-#### UC-20: Owner SaaS Konfigurasi dan Klaim Platform Fee
+#### UC-17: Owner SaaS Konfigurasi dan Klaim Platform Fee
 
 ```mermaid
 sequenceDiagram
@@ -1801,12 +1805,12 @@ sequenceDiagram
 
 ---
 
-#### UC-21: Registrasi & Persetujuan Akun
+#### UC-18: Registrasi & Persetujuan Akun
 
 > **Catatan:** UC ini ditambahkan untuk menutup celah nomor use case — FR-PAYANA-107/108/109
 > ("Kelompok B: Manajemen Akun dan Autentikasi") sebelumnya tidak memiliki UC yang sesuai; alur
 > registrasinya sempat tercampur (dan sebagian tumpang tindih secara keliru) dengan UC-02.
-> Nomor UC-21 dipilih agar tidak menggeser nomor UC-01 s.d. UC-20 yang sudah dirujuk di tempat
+> Nomor UC-18 dipilih agar tidak menggeser nomor UC-01 s.d. UC-17 yang sudah dirujuk di tempat
 > lain pada dokumen ini maupun di DPPL/PDHUPL. Mencakup DUA alur registrasi: **company** (oleh
 > calon HR Admin, ditinjau Owner SaaS) dan **employee** (invitation-only, lihat Error Flow E3
 > s.d. E6 — perubahan arsitektur yang menutup celah keamanan "pilih perusahaan bebas").
@@ -1857,7 +1861,7 @@ sequenceDiagram
 
 ---
 
-#### UC-22: Reimburse Karyawan & HR
+#### UC-19: Reimburse Karyawan & HR
 
 ```mermaid
 sequenceDiagram
@@ -1888,7 +1892,7 @@ sequenceDiagram
 
 ---
 
-#### UC-23: Bounty & Tip
+#### UC-20: Bounty & Tip
 
 ```mermaid
 sequenceDiagram
@@ -1921,7 +1925,7 @@ sequenceDiagram
 
 ---
 
-#### UC-24: Notifikasi
+#### UC-21: Notifikasi
 
 ```mermaid
 sequenceDiagram
@@ -1950,7 +1954,7 @@ sequenceDiagram
 
 ---
 
-#### UC-25: Slip Gaji (Payslip)
+#### UC-22: Slip Gaji (Payslip)
 
 ```mermaid
 sequenceDiagram
@@ -1977,7 +1981,7 @@ sequenceDiagram
 
 ---
 
-#### UC-26: Bukti Potong Pajak (Tax Cert)
+#### UC-23: Bukti Potong Pajak (Tax Cert)
 
 ```mermaid
 sequenceDiagram
@@ -2007,7 +2011,7 @@ sequenceDiagram
 
 ---
 
-#### UC-27: Surat Keterangan Kerja
+#### UC-24: Surat Keterangan Kerja
 
 ```mermaid
 sequenceDiagram
@@ -2037,7 +2041,7 @@ sequenceDiagram
 
 ---
 
-#### UC-28: Direktori Karyawan
+#### UC-25: Direktori Karyawan
 
 ```mermaid
 sequenceDiagram
@@ -2066,7 +2070,7 @@ sequenceDiagram
 
 ---
 
-#### UC-29: Pengaturan Perusahaan (Branding)
+#### UC-26: Pengaturan Perusahaan (Branding)
 
 ```mermaid
 sequenceDiagram
@@ -2099,7 +2103,7 @@ sequenceDiagram
 
 ---
 
-#### UC-30: Deteksi Anomali & Tinjauan Keamanan Vault
+#### UC-27: Deteksi Anomali & Tinjauan Keamanan Vault
 
 ```mermaid
 sequenceDiagram
