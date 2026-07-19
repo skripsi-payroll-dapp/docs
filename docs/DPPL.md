@@ -4125,7 +4125,7 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
 |---|---|
 | Input | - |
 | Output | - |
-| Deskripsi | ; sesuai FR-PAYANA-207, FR-PAYANA-405, FR-PAYANA-1008, FR-PAYANA-1102 |
+| Deskripsi | Menerima push event on-chain dari Alchemy dan menangani tiga topic: `LowVaultBalance`, `SalaryClaimed`, `PlatformFeePaid` — sesuai FR-PAYANA-207, FR-PAYANA-405, FR-PAYANA-1008 (lihat `webhook.ts` `handleLog()` — hanya tiga topic ini yang dicocokkan; referensi FR-PAYANA-1102 pada revisi sebelumnya tidak sesuai kode dan telah dihapus). |
 
 **Request Body (ringkas):**
 
