@@ -901,10 +901,14 @@ Deskripsi      : Sistem harus memampukan Owner SaaS untuk melihat dan menarik to
 
 > **Catatan (Kelompok M s.d. S):** Ketujuh kelompok di bawah ini memformalkan tujuh modul yang
 > sudah diimplementasikan penuh (backend/frontend berfungsi, diuji nyata — lihat PDHUPL_v2.md
-> KU-21 s.d. KU-27, KU-29). Nomor FR dimulai dari 1301.
+> KU-21 s.d. KU-27, KU-29). Nomor FR dimulai dari 1101, disamakan dengan penomoran pada
+> `SPESIFIKASI KEBUTUHAN PERANGKAT LUNAK.docx` (lihat Catatan Kelompok U di bawah untuk satu
+> pengecualian).
 
-> **[FLAG-BARU-VS-DOCX]** Kelompok M s.d. T (FR-PAYANA-1301 s.d. 2001), 8 kelompok, seluruhnya BARU
-> — tidak ada padanan sama sekali di docx lama. Pasangan dari UC-22 s.d. UC-29.
+> **[FLAG-BARU-VS-DOCX]** Kelompok U (FR-PAYANA-1901 s.d. 1904) tidak memiliki padanan di docx —
+> Kelompok M s.d. T (FR-PAYANA-1101 s.d. 1801) sudah disamakan penomorannya dengan docx. Kelompok
+> U melanjutkan pola penomoran per-ratus docx (blok berikutnya setelah 1801). Pasangan dari
+> UC-22 s.d. UC-30.
 
 ### Kelompok M: Reimburse Karyawan & HR
 
@@ -914,7 +918,7 @@ Kelompok ini mendefinisikan kebutuhan fungsional untuk penggantian biaya operasi
 
 #### 3.2.30. Pengajuan Klaim Reimbursement oleh Karyawan
 
-ID Requirement : FR-PAYANA-1301
+ID Requirement : FR-PAYANA-1101
 
 Deskripsi      : Sistem harus memampukan karyawan untuk mengajukan klaim reimbursement kepada HR perusahaannya melalui `POST /reimburse` dengan menyertakan kategori biaya, jumlah IDRX yang diminta, keterangan, dan tautan bukti pendukung (opsional). Klaim tersimpan dengan status awal `pending` dan hanya dapat dilihat oleh karyawan pengaju serta HR perusahaan terkait (`hrAddress` yang disertakan saat pengajuan).
 
@@ -922,7 +926,7 @@ Deskripsi      : Sistem harus memampukan karyawan untuk mengajukan klaim reimbur
 
 #### 3.2.31. Peninjauan Klaim Reimbursement oleh HR
 
-ID Requirement : FR-PAYANA-1302
+ID Requirement : FR-PAYANA-1102
 
 Deskripsi      : Sistem harus memampukan HR untuk menyetujui atau menolak klaim reimbursement milik karyawan di perusahaannya melalui `PATCH /reimburse/:id/approve` atau `/reject`. Persetujuan mensyaratkan HR menyertakan `txHash` transfer IDRX on-chain nyata sejumlah klaim ke alamat karyawan; sistem memverifikasi keabsahan transfer tersebut (`verifyIdrxTransfer`) sebelum mengubah status menjadi `approved` — persetujuan dengan `txHash` yang tidak sesuai ditolak. Sistem harus menolak (403 Forbidden) upaya peninjauan oleh HR yang bukan pemilik `hrAddress` klaim tersebut, dan menolak (409 Conflict) peninjauan ulang atas klaim yang statusnya sudah tidak lagi `pending`.
 
@@ -936,7 +940,7 @@ Kelompok ini mendefinisikan kebutuhan fungsional untuk program insentif berbasis
 
 #### 3.2.32. Pembuatan dan Klaim Program Bounty
 
-ID Requirement : FR-PAYANA-1401
+ID Requirement : FR-PAYANA-1201
 
 Deskripsi      : Sistem harus memampukan HR untuk membuat program bounty melalui `POST /bounty` dengan judul, deskripsi, besaran hadiah IDRX per klaim, dan kuota jumlah klaim yang dapat disetujui. Karyawan dapat mengajukan klaim atas bounty yang berstatus `open` melalui `POST /bounty/:id/claim`. Begitu jumlah klaim yang disetujui mencapai kuota, status bounty otomatis berubah menjadi `closed` dan klaim baru ditolak (`409 BOUNTY_CLOSED`).
 
@@ -944,15 +948,15 @@ Deskripsi      : Sistem harus memampukan HR untuk membuat program bounty melalui
 
 #### 3.2.33. Persetujuan dan Pembayaran Klaim Bounty
 
-ID Requirement : FR-PAYANA-1402
+ID Requirement : FR-PAYANA-1202
 
-Deskripsi      : Sistem harus memampukan HR untuk menyetujui klaim bounty karyawan dan mencatat pembayarannya melalui `PATCH /bounty/claim/:id/paid` dengan menyertakan `txHash` transfer IDRX nyata sejumlah hadiah bounty, diverifikasi dengan mekanisme yang sama seperti FR-PAYANA-1302.
+Deskripsi      : Sistem harus memampukan HR untuk menyetujui klaim bounty karyawan dan mencatat pembayarannya melalui `PATCH /bounty/claim/:id/paid` dengan menyertakan `txHash` transfer IDRX nyata sejumlah hadiah bounty, diverifikasi dengan mekanisme yang sama seperti FR-PAYANA-1102.
 
 ---
 
 #### 3.2.34. Tip Peer-to-Peer Antar Karyawan
 
-ID Requirement : FR-PAYANA-1403
+ID Requirement : FR-PAYANA-1203
 
 Deskripsi      : Sistem harus memampukan karyawan untuk mencatat pemberian tip IDRX kepada karyawan lain melalui `POST /bounty/tip` dengan menyertakan alamat penerima, jumlah, dan `txHash` transfer yang telah dilakukan secara independen oleh pengirim. Riwayat tip harus dapat diakses baik oleh pengirim maupun penerima melalui `GET /bounty/tips/:address`.
 
@@ -964,7 +968,7 @@ Deskripsi      : Sistem harus memampukan karyawan untuk mencatat pemberian tip I
 
 #### 3.2.35. Notifikasi Real-Time Berbasis Peristiwa
 
-ID Requirement : FR-PAYANA-1501
+ID Requirement : FR-PAYANA-1301
 
 Deskripsi      : Sistem harus memampukan setiap pengguna untuk melihat daftar notifikasi miliknya sendiri melalui `GET /notifications` (maksimum 50 notifikasi terbaru, terurut dari yang paling baru), serta menandai satu (`PATCH /notifications/:id/read`) atau seluruh (`PATCH /notifications/read-all`) notifikasi sebagai telah dibaca. Sistem harus menolak (403 Forbidden) upaya menandai notifikasi yang bukan milik pengguna yang sedang login. Notifikasi diterbitkan otomatis oleh backend pada peristiwa signifikan yang relevan bagi penerima (mis. reimbursement disetujui/ditolak).
 
@@ -976,7 +980,7 @@ Deskripsi      : Sistem harus memampukan setiap pengguna untuk melihat daftar no
 
 #### 3.2.36. Slip Gaji Digital per Klaim
 
-ID Requirement : FR-PAYANA-1601
+ID Requirement : FR-PAYANA-1401
 
 Deskripsi      : Sistem harus memampukan karyawan (atau HR perusahaan terkait) untuk melihat rincian slip gaji digital dari satu transaksi klaim gaji spesifik melalui `GET /payslip/:claimId`, mencakup gaji bruto terakumulasi, potongan platform fee, cicilan kasbon yang dipotong, potongan pajak/BPJS, potongan severance, dan gaji bersih yang diterima — seluruhnya dihitung dari data `salary_claim` yang diindeks Ponder. Sistem harus menolak (403 Forbidden) akses oleh pihak yang bukan karyawan pemilik klaim maupun HR terkait, dan mengembalikan 404 Not Found untuk `claimId` yang tidak ada.
 
@@ -988,7 +992,7 @@ Deskripsi      : Sistem harus memampukan karyawan (atau HR perusahaan terkait) u
 
 #### 3.2.37. Bukti Potong Pajak Tahunan
 
-ID Requirement : FR-PAYANA-1701
+ID Requirement : FR-PAYANA-1501
 
 Deskripsi      : Sistem harus memampukan karyawan untuk melihat agregasi tahunan (`GET /tax-cert/:year`) dari total gaji bruto terakumulasi, total dana kepatuhan (BPJS/PPh21), total severance, dan total gaji bersih untuk keperluan pelaporan SPT pribadi, dihitung dari seluruh `salary_claim` pada tahun pajak yang diminta. HR dapat mengakses agregasi milik karyawan di perusahaannya melalui `GET /tax-cert/hr/:employee/:year`, namun sistem harus menolak (403 Forbidden) akses oleh HR yang bukan `hr_authority` dari karyawan tersebut. Sistem harus menolak (400 Bad Request) permintaan dengan tahun di luar rentang valid (2020–2100).
 
@@ -1000,7 +1004,7 @@ Deskripsi      : Sistem harus memampukan karyawan untuk melihat agregasi tahunan
 
 #### 3.2.38. Pengajuan dan Penerbitan Surat Keterangan Kerja
 
-ID Requirement : FR-PAYANA-1801
+ID Requirement : FR-PAYANA-1601
 
 Deskripsi      : Sistem harus memampukan karyawan dengan status stream `Active` di suatu perusahaan untuk mengajukan permohonan surat keterangan kerja melalui `POST /employment-letter/request` dengan menyertakan tujuan penggunaan dari daftar tetap (KPR, Kredit, Visa, Umum, Lainnya). Sistem harus menolak (400 Bad Request) tujuan di luar daftar tersebut, dan menolak (400 NOT_EMPLOYEE) permohonan dari karyawan yang tidak memiliki stream aktif di perusahaan yang dituju. HR meninjau dan menyetujui/menolak permohonan melalui `PATCH /employment-letter/:id/approve|reject`; dokumen surat hanya dapat diunduh (`GET /employment-letter/:id/document`) setelah berstatus `approved` — permintaan atas surat yang masih `pending` ditolak (400 NOT_APPROVED).
 
@@ -1012,7 +1016,7 @@ Deskripsi      : Sistem harus memampukan karyawan dengan status stream `Active` 
 
 #### 3.2.39. Direktori dan Penugasan Departemen/Jabatan Karyawan
 
-ID Requirement : FR-PAYANA-1901
+ID Requirement : FR-PAYANA-1701
 
 Deskripsi      : Sistem harus memampukan HR untuk melihat direktori seluruh karyawan di perusahaannya melalui `GET /directory/:hrAddress`, mencakup nama, departemen, jabatan, status, dan flow rate masing-masing karyawan. Sistem harus menolak (403 Forbidden) akses oleh HR yang meminta direktori perusahaan lain. HR dapat menetapkan atau memperbarui departemen dan jabatan karyawan melalui `PATCH /directory/:address`, yang hasilnya harus tercermin saat karyawan tersebut melihat profilnya sendiri melalui `GET /directory/me`.
 
@@ -1024,7 +1028,7 @@ Deskripsi      : Sistem harus memampukan HR untuk melihat direktori seluruh kary
 
 #### 3.2.40. Konfigurasi Branding dan Preferensi Perusahaan
 
-ID Requirement : FR-PAYANA-2001
+ID Requirement : FR-PAYANA-1801
 
 Deskripsi      : Sistem harus memampukan HR untuk menyimpan dan memperbarui pengaturan branding serta preferensi perusahaannya melalui `GET`/`PUT /company-settings`, mencakup nama tampilan, negara, URL logo, batas EWA (`ewaLimitBps`), tarif yield (`yieldRateBps`), dan alamat kontak legal. Operasi bersifat upsert — HR yang belum pernah menyimpan pengaturan menerima `null` pada `GET`, dan `PUT` pertama membuat baris baru sementara `PUT` berikutnya memperbarui baris yang sudah ada. Pengaturan ini murni kosmetik/preferensi tampilan dan tidak memengaruhi logika keuangan on-chain.
 
@@ -1038,7 +1042,7 @@ Kelompok ini mendefinisikan kebutuhan fungsional untuk pemantauan otomatis terha
 
 #### 3.2.41. Deteksi Penarikan Vault Tidak Wajar
 
-ID Requirement : FR-PAYANA-2101
+ID Requirement : FR-PAYANA-1901
 
 Deskripsi      : Sistem harus memeriksa setiap event `VaultWithdrawn` baru pada siklus 2 menit dan membandingkannya dengan riwayat penarikan vault yang sama. Sistem harus menghasilkan alert `SUSPICIOUS_WITHDRAWAL` apabila: (a) vault belum pernah memiliki riwayat penarikan sebelumnya (penerima secara definisi belum terverifikasi); (b) jumlah penarikan melebihi 3 kali rata-rata historis vault tersebut; atau (c) alamat penerima belum pernah menerima penarikan dari vault tersebut sebelumnya. Tingkat keparahan `critical` diberikan apabila lebih dari satu kondisi terpenuhi sekaligus, selain itu `high`.
 
@@ -1048,7 +1052,7 @@ Rasional   : `withdrawVault()` hanya dapat dipanggil oleh `HR_ROLE`, sehingga se
 
 #### 3.2.42. Deteksi Perubahan Peran Tidak Terduga
 
-ID Requirement : FR-PAYANA-2102
+ID Requirement : FR-PAYANA-1902
 
 Deskripsi      : Sistem harus memeriksa setiap event `RoleGranted` baru pada `CompanyVault` (termasuk peran bawaan `AccessControl` milik OpenZeppelin yang diwarisi kontrak) pada siklus 2 menit. Sistem harus menghasilkan alert `UNEXPECTED_ROLE_GRANT` apabila peran diberikan ke alamat yang bukan `hrAuthority` terdaftar untuk vault tersebut. Tingkat keparahan `critical` diberikan untuk `HR_ROLE` atau `DEFAULT_ADMIN_ROLE` (peran admin inti); tingkat keparahan `medium` diberikan untuk `LEGAL_ROLE` (delegasi ke pihak legal terpisah adalah skenario yang lebih wajar, meski tetap dicatat untuk visibilitas).
 
@@ -1058,7 +1062,7 @@ Rasional   : Pemberian `HR_ROLE`/`DEFAULT_ADMIN_ROLE` ke alamat baru adalah indi
 
 #### 3.2.43. Deteksi Aktivitas Sensitif Beruntun
 
-ID Requirement : FR-PAYANA-2103
+ID Requirement : FR-PAYANA-1903
 
 Deskripsi      : Sistem harus menghitung jumlah aksi sensitif (penarikan vault dan perubahan peran yang diberikan) dari satu vault dalam satu siklus pemeriksaan (2 menit). Sistem harus menghasilkan alert `HIGH_FREQUENCY_ACTIVITY` dengan tingkat keparahan `high` apabila jumlah tersebut mencapai atau melebihi 3.
 
@@ -1068,7 +1072,7 @@ Rasional   : Penyerang yang sudah menguasai kunci HR biasanya bertindak cepat se
 
 #### 3.2.44. Tinjauan dan Penyelesaian Alert Keamanan oleh Owner SaaS
 
-ID Requirement : FR-PAYANA-2104
+ID Requirement : FR-PAYANA-1904
 
 Deskripsi      : Sistem harus memampukan Owner SaaS untuk melihat seluruh alert keamanan (aktif dan riwayat) melalui `GET /security/alerts`, terurut dengan alert yang belum ditangani ditampilkan lebih dulu. Owner SaaS harus dapat menandai satu alert sebagai selesai ditangani melalui `PATCH /security/alerts/:id/resolve`. Endpoint ini harus ditolak (403 Forbidden) untuk pemanggil yang bukan Owner SaaS. Setiap alert baru juga didorong sebagai notifikasi in-app real-time (`SECURITY_ANOMALY`) ke Owner SaaS.
 
@@ -1100,15 +1104,15 @@ Rasional   : Deteksi otomatis tanpa jalur tindak lanjut yang jelas tidak memberi
 | UC-20 | Owner SaaS Konfigurasi dan Klaim Platform Fee | Owner SaaS | FR-PAYANA-1006, 1007, 1008 |
 | UC-16 | HR Lihat Dashboard Vault dan Status Stream | HR Admin | FR-PAYANA-204, 303 |
 | UC-21 | Registrasi & Persetujuan Akun (Company & Employee) | Owner SaaS / HR Admin / Karyawan | FR-PAYANA-107, 108, 109 |
-| UC-22 | Reimburse Karyawan & HR | Karyawan / HR Admin | FR-PAYANA-1301, 1302 |
-| UC-23 | Bounty & Tip | HR Admin / Karyawan | FR-PAYANA-1401, 1402, 1403 |
-| UC-24 | Notifikasi | HR Admin / Karyawan | FR-PAYANA-1501 |
-| UC-25 | Slip Gaji (Payslip) | Karyawan / HR Admin | FR-PAYANA-1601 |
-| UC-26 | Bukti Potong Pajak (Tax Cert) | Karyawan / HR Admin | FR-PAYANA-1701 |
-| UC-27 | Surat Keterangan Kerja | Karyawan / HR Admin | FR-PAYANA-1801 |
-| UC-28 | Direktori Karyawan | HR Admin | FR-PAYANA-1901 |
-| UC-29 | Pengaturan Perusahaan (Branding) | HR Admin | FR-PAYANA-2001 |
-| UC-30 | Deteksi Anomali & Tinjauan Keamanan Vault | Owner SaaS | FR-PAYANA-2101, 2102, 2103, 2104 |
+| UC-22 | Reimburse Karyawan & HR | Karyawan / HR Admin | FR-PAYANA-1101, 1102 |
+| UC-23 | Bounty & Tip | HR Admin / Karyawan | FR-PAYANA-1201, 1202, 1203 |
+| UC-24 | Notifikasi | HR Admin / Karyawan | FR-PAYANA-1301 |
+| UC-25 | Slip Gaji (Payslip) | Karyawan / HR Admin | FR-PAYANA-1401 |
+| UC-26 | Bukti Potong Pajak (Tax Cert) | Karyawan / HR Admin | FR-PAYANA-1501 |
+| UC-27 | Surat Keterangan Kerja | Karyawan / HR Admin | FR-PAYANA-1601 |
+| UC-28 | Direktori Karyawan | HR Admin | FR-PAYANA-1701 |
+| UC-29 | Pengaturan Perusahaan (Branding) | HR Admin | FR-PAYANA-1801 |
+| UC-30 | Deteksi Anomali & Tinjauan Keamanan Vault | Owner SaaS | FR-PAYANA-1901, 1902, 1903, 1904 |
 
 ---
 
@@ -2128,7 +2132,7 @@ sequenceDiagram
 | **Aktor** | Owner SaaS (peninjau); sistem (`anomalyDetector.ts`) sebagai pendeteksi otomatis. |
 | **Pre Kondisi** | Owner SaaS telah login dengan role `owner`. Layanan `anomalyDetector.ts` berjalan sebagai background cron di backend. |
 | **Pos Kondisi** | Alert keamanan yang relevan tersimpan di `app.anomaly_alerts` dan dapat ditinjau; alert yang sudah ditindaklanjuti Owner ditandai `resolved = true`. |
-| **Basic Flow** | 1. `CompanyVault` menerbitkan event `VaultWithdrawn` atau `RoleGranted` (baik dari aktivitas normal maupun aktivitas mencurigakan) — event ini terjadi independen dari use case ini. <br> 2. Ponder mengindeks event tersebut ke tabel `vault_withdrawal`/`role_change`. <br> 3. Setiap 2 menit, `anomalyDetector.ts` memeriksa event baru sejak siklus sebelumnya untuk masing-masing vault. <br> 4. Sistem mengevaluasi tiga pola (FR-PAYANA-2101/2102/2103): penarikan tidak wajar, peran tak terduga, dan aktivitas beruntun. <br> 5. Untuk setiap anomali yang terdeteksi, sistem menyimpan baris di `app.anomaly_alerts` (jenis, tingkat keparahan, detail, tautan transaksi) dan mendorong notifikasi in-app real-time ke Owner SaaS. <br> 6. Owner SaaS membuka `/owner/security`, melihat daftar alert dengan yang belum ditangani ditampilkan lebih dulu. <br> 7. Owner SaaS meninjau detail alert (termasuk tautan ke BaseScan untuk transaksi terkait) dan mengklik "Tandai Selesai" setelah menindaklanjuti (investigasi manual, kontak HR, dsb. — di luar sistem). <br> 8. Sistem memperbarui alert menjadi `resolved = true` dan mencatat waktu penyelesaian. |
+| **Basic Flow** | 1. `CompanyVault` menerbitkan event `VaultWithdrawn` atau `RoleGranted` (baik dari aktivitas normal maupun aktivitas mencurigakan) — event ini terjadi independen dari use case ini. <br> 2. Ponder mengindeks event tersebut ke tabel `vault_withdrawal`/`role_change`. <br> 3. Setiap 2 menit, `anomalyDetector.ts` memeriksa event baru sejak siklus sebelumnya untuk masing-masing vault. <br> 4. Sistem mengevaluasi tiga pola (FR-PAYANA-1901/1902/1903): penarikan tidak wajar, peran tak terduga, dan aktivitas beruntun. <br> 5. Untuk setiap anomali yang terdeteksi, sistem menyimpan baris di `app.anomaly_alerts` (jenis, tingkat keparahan, detail, tautan transaksi) dan mendorong notifikasi in-app real-time ke Owner SaaS. <br> 6. Owner SaaS membuka `/owner/security`, melihat daftar alert dengan yang belum ditangani ditampilkan lebih dulu. <br> 7. Owner SaaS meninjau detail alert (termasuk tautan ke BaseScan untuk transaksi terkait) dan mengklik "Tandai Selesai" setelah menindaklanjuti (investigasi manual, kontak HR, dsb. — di luar sistem). <br> 8. Sistem memperbarui alert menjadi `resolved = true` dan mencatat waktu penyelesaian. |
 | **Alternative Flow** | A1. Owner SaaS dapat beralih ke tab "Semua" untuk melihat riwayat lengkap termasuk alert yang sudah ditandai selesai, bukan hanya yang aktif. |
 | **Error Flow** | E1. Apabila pemanggil `GET`/`PATCH /security/alerts` bukan Owner SaaS, sistem menolak dengan `403 Forbidden`. <br> E2. Apabila `id` alert pada `PATCH /security/alerts/:id/resolve` tidak ditemukan, sistem mengembalikan `404 Not Found`. <br> E3. Apabila siklus pemeriksaan gagal (mis. RPC/database sementara tidak tersedia), sistem mencatat galat ke log dan mencoba lagi pada siklus berikutnya tanpa menghentikan layanan secara keseluruhan. |
 
@@ -2211,7 +2215,7 @@ Deskripsi      : Smart contract CompanyVault harus mengimplementasikan pola chec
 Rasional       : Reentrancy adalah vektor serangan paling umum pada smart contract DeFi. Kegagalan mengimplementasikan perlindungan ini pada fungsi yang mentransfer dana dapat menyebabkan pengosongan vault secara tidak sah.
 
 ID Requirement : NFR-PAYANA-19
-Deskripsi      : Sistem harus mendeteksi dan memberi peringatan atas pola aktivitas on-chain yang konsisten dengan wallet HR yang dikompromikan (penarikan vault tidak wajar, pemberian peran admin ke alamat tak dikenal, aktivitas sensitif beruntun) dalam siklus tidak lebih dari 2 menit sejak event terjadi, dan mendorong notifikasi ke Owner SaaS. Lihat FR-PAYANA-2101 s.d. 2104 (Kelompok U) untuk kriteria deteksi rinci.
+Deskripsi      : Sistem harus mendeteksi dan memberi peringatan atas pola aktivitas on-chain yang konsisten dengan wallet HR yang dikompromikan (penarikan vault tidak wajar, pemberian peran admin ke alamat tak dikenal, aktivitas sensitif beruntun) dalam siklus tidak lebih dari 2 menit sejak event terjadi, dan mendorong notifikasi ke Owner SaaS. Lihat FR-PAYANA-1901 s.d. 1904 (Kelompok U) untuk kriteria deteksi rinci.
 Rasional       : Kontrol akses on-chain (`onlyHR`, `AccessControl`) tidak dapat membedakan pemanggil sah dari penyerang yang telah menguasai kunci privat HR — keduanya menghasilkan transaksi yang valid secara kriptografis. Deteksi anomali berbasis pola perilaku adalah lapisan pertahanan kedua yang independen dari validitas tanda tangan, divalidasi dengan simulasi serangan nyata di Base Sepolia (lihat PDHUPL_v2.md KU-32).
 
 #### 3.4.5 Maintainability
@@ -2527,7 +2531,7 @@ Keterangan kolom kunci:
 - `severance_vault.state` — nilai enum: "Locked" (masih aktif bekerja), "Returned" (dikembalikan ke vault karena resign), "Released" (dicairkan ke karyawan pasca PHK).
 - `employment_certificate.revoked_at` — `null` selama karyawan masih aktif bekerja; diisi timestamp saat SBT direvoke pada proses resign atau PHK.
 - `low_balance_alert.id` — komposit `${txHash}-${logIndex}` karena satu vault dapat memicu lebih dari satu alert dalam satu transaksi deposit.
-- `company.vault_address` — alamat kontrak `CompanyVault` (bukan `hrAuthority`); ditambahkan agar `role_change` (yang hanya membawa alamat vault, bukan `hrAuthority`, pada event `RoleGranted`/`RoleRevoked`) dapat di-resolve kembali ke perusahaan yang bersangkutan. Lihat FR-PAYANA-2101 s.d. 2104.
+- `company.vault_address` — alamat kontrak `CompanyVault` (bukan `hrAuthority`); ditambahkan agar `role_change` (yang hanya membawa alamat vault, bukan `hrAuthority`, pada event `RoleGranted`/`RoleRevoked`) dapat di-resolve kembali ke perusahaan yang bersangkutan. Lihat FR-PAYANA-1901 s.d. 1904.
 - `vault_withdrawal.id` / `role_change.id` — komposit `${txHash}-${logIndex}`, mengikuti pola tabel event-log lain di atas. Kedua tabel ini adalah sumber data untuk `anomalyDetector.ts` (lihat DPPL.md Lampiran B untuk detail layanan).
 - `role_change.role` — hash `bytes32` mentah (`keccak256("HR_ROLE")`, `keccak256("LEGAL_ROLE")`, atau `0x00...00` untuk `DEFAULT_ADMIN_ROLE`), bukan nama peran dalam teks — interpretasi dilakukan di lapisan aplikasi (backend), bukan di Ponder.
 
