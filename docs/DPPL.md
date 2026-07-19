@@ -1376,7 +1376,7 @@ Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh
 | `requested_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu pengajuan registrasi |
 | `updated_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu status terakhir diperbarui |
 
-**Tabel `employee_invitations`** `[BARU — invitation-only registration, lihat SKPL UC-21]`
+**Tabel `employee_invitations`** `[BARU — invitation-only registration, lihat SKPL UC-18]`
 
 > Menutup celah keamanan/integritas data di mana employee sebelumnya dapat memilih `hrAddress`
 > bebas dari dropdown tak terfilter di `/onboarding`. Sekarang `POST /registration/request` untuk
@@ -1407,7 +1407,7 @@ Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh
 
 ---
 
-**Tabel `reimbursement_claims`** `[BARU — lihat SKPL UC-22, FR-PAYANA-1301/1302]`
+**Tabel `reimbursement_claims`** `[BARU — lihat SKPL UC-19, FR-PAYANA-1301/1302]`
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1424,7 +1424,7 @@ Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh
 | `requested_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu pengajuan |
 | `reviewed_at` | `timestamptz` | NULL | — | — | `NULL` | Waktu ditinjau HR |
 
-**Tabel `bounties`** `[BARU — lihat SKPL UC-23, FR-PAYANA-1401]`
+**Tabel `bounties`** `[BARU — lihat SKPL UC-20, FR-PAYANA-1401]`
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1438,7 +1438,7 @@ Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh
 | `status` | `text` | NOT NULL | — | `open` \| `closed` | `'open'` | Otomatis `closed` saat `claimed_count == quota` |
 | `created_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu dibuat |
 
-**Tabel `bounty_claims`** `[BARU — lihat SKPL UC-23, FR-PAYANA-1401/1402]`
+**Tabel `bounty_claims`** `[BARU — lihat SKPL UC-20, FR-PAYANA-1401/1402]`
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1450,7 +1450,7 @@ Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh
 | `paid_tx_hash` | `text` | NULL | — | Hex 0x + 64 char | `NULL` | Terisi begitu `paid` — transfer IDRX terverifikasi |
 | `submitted_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu klaim diajukan |
 
-**Tabel `tips`** `[BARU — lihat SKPL UC-23, FR-PAYANA-1403]`
+**Tabel `tips`** `[BARU — lihat SKPL UC-20, FR-PAYANA-1403]`
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1462,7 +1462,7 @@ Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh
 | `tx_hash` | `text` | NOT NULL | — | Hex 0x + 64 char | — | Transfer sudah terjadi on-chain sebelum dicatat (bukan diverifikasi backend seperti reimburse/bounty) |
 | `created_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu dicatat |
 
-**Tabel `notifications`** `[BARU — lihat SKPL UC-24, FR-PAYANA-1501]`
+**Tabel `notifications`** `[BARU — lihat SKPL UC-21, FR-PAYANA-1501]`
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1475,7 +1475,7 @@ Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh
 | `meta` | `text` | NULL | — | JSON string | `NULL` | Konteks tambahan (mis. `txHash`, `amount`) |
 | `created_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu diterbitkan |
 
-**Tabel `employee_profiles`** `[BARU — lihat SKPL UC-28, FR-PAYANA-1901]`
+**Tabel `employee_profiles`** `[BARU — lihat SKPL UC-25, FR-PAYANA-1901]`
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1485,7 +1485,7 @@ Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh
 | `position` | `text` | NULL | — | mis. "Software Engineer" | `NULL` | Jabatan |
 | `updated_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu terakhir diperbarui |
 
-**Tabel `employment_letters`** `[BARU — lihat SKPL UC-27, FR-PAYANA-1801]`
+**Tabel `employment_letters`** `[BARU — lihat SKPL UC-24, FR-PAYANA-1801]`
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1498,7 +1498,7 @@ Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh
 | `requested_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu pengajuan |
 | `reviewed_at` | `timestamptz` | NULL | — | — | `NULL` | Waktu ditinjau |
 
-**Tabel `company_settings`** `[BARU — lihat SKPL UC-29, FR-PAYANA-2001]`
+**Tabel `company_settings`** `[BARU — lihat SKPL UC-26, FR-PAYANA-2001]`
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1528,7 +1528,7 @@ Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh
 | `detected_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu anomali terdeteksi |
 | `resolved_at` | `timestamptz` | NULL | — | — | `NULL` | Waktu ditandai selesai |
 
-> **Catatan:** Slip Gaji (Payslip, UC-25/FR-1601) dan Bukti Potong Pajak (Tax Cert, UC-26/FR-1701)
+> **Catatan:** Slip Gaji (Payslip, UC-22/FR-1601) dan Bukti Potong Pajak (Tax Cert, UC-23/FR-1701)
 > TIDAK memiliki tabel tersendiri — keduanya murni membaca dan mengagregasi tabel `salary_claim`
 > yang sudah diindeks Ponder (lihat subbab berikut), dikombinasikan dengan `employees` untuk
 > nama/NIK terdekripsi.
@@ -2072,7 +2072,7 @@ sequenceDiagram
 
 > **[Diperbaiki]** Subbab ini sebelumnya mendeskripsikan `/onboarding` sebagai formulir
 > registrasi HR/company (arsitektur lama, sebelum invitation-only). Sejak perubahan arsitektur
-> registrasi karyawan (lihat SKPL UC-21, PDHUPL AU-02-02/06..09), `/onboarding` adalah halaman
+> registrasi karyawan (lihat SKPL UC-18, PDHUPL AU-02-02/06..09), `/onboarding` adalah halaman
 > **karyawan**, bukan HR — registrasi company sekarang ada di `/hr/onboarding` (lihat 2.4.2.1).
 
 **Deskripsi:** Halaman registrasi karyawan yang **wajib** diakses melalui link undangan berisi `inviteToken` (`?invite=<token>`) yang dibuat oleh HR — tidak ada lagi jalur "pilih perusahaan bebas" dari dropdown tak terfilter. `hrAddress` di-resolve server-side dari token, tidak pernah diambil langsung dari input karyawan.
@@ -2179,9 +2179,9 @@ Seluruh halaman portal HR dibungkus oleh layout `hr/layout.tsx` yang menyediakan
 ##### 2.4.2.1 Dashboard HR Onboarding (`/hr/onboarding`)
 
 > Signature saat ini: `deployVault(hrAuthority, companyName, sbtContract)`, 3 parameter. Lihat
-> SKPL UC-21 untuk spesifikasi penuh alur registrasi company yang mendahului wizard ini.
+> SKPL UC-18 untuk spesifikasi penuh alur registrasi company yang mendahului wizard ini.
 
-**Deskripsi:** Wizard yang mencakup registrasi profil company (ditinjau Owner SaaS, lihat UC-21) diikuti deploy `CompanyVault`, konfigurasi parameter potongan (BPS), dan deposit awal IDRX.
+**Deskripsi:** Wizard yang mencakup registrasi profil company (ditinjau Owner SaaS, lihat UC-18) diikuti deploy `CompanyVault`, konfigurasi parameter potongan (BPS), dan deposit awal IDRX.
 **Aktor:** HR Admin.
 **FR Terkait:** FR-PAYANA-107, FR-PAYANA-108, FR-PAYANA-109, FR-PAYANA-201, FR-PAYANA-202, FR-PAYANA-901.
 
@@ -2223,7 +2223,7 @@ sequenceDiagram
 | Komponen | Tipe | Deskripsi |
 |----------|------|-----------|
 | Stepper | Indikator langkah | Empat tahap: Registrasi, Konfigurasi, Deposit, Selesai. |
-| Input Nama Perusahaan / NPWP / NIB / Nama & NIK Direktur / Dokumen Akta / Email | Field teks | Metadata perusahaan untuk peninjauan Owner (UC-21); NPWP/NIB/NIK Direktur divalidasi format server-side, opsional saat submit tapi harus valid jika diisi. Nama digunakan untuk metadata SBT. |
+| Input Nama Perusahaan / NPWP / NIB / Nama & NIK Direktur / Dokumen Akta / Email | Field teks | Metadata perusahaan untuk peninjauan Owner (UC-18); NPWP/NIB/NIK Direktur divalidasi format server-side, opsional saat submit tapi harus valid jika diisi. Nama digunakan untuk metadata SBT. |
 | Input BPS BPJS / Pesangon | Field angka | Konfigurasi potongan (informatif untuk `setCompanyConfig`). |
 | Tombol "Deploy Vault" | Tombol tulis | Memanggil `PayrollFactory.deployVault(hrAuthority, companyName, sbtContract)` — hanya aktif setelah registrasi company disetujui Owner. |
 | Kartu alamat vault | Panel hasil | Menampilkan alamat vault terindeks + tombol salin. |
@@ -2580,7 +2580,7 @@ sequenceDiagram
 
 > **[Diperbaiki]** Subbab ini sebelumnya hanya mendokumentasikan tab konfigurasi ON-CHAIN
 > (`setCompanyConfig`). Halaman ini sebenarnya juga memiliki tab "Profil" dan "Aturan" yang
-> murni OFF-CHAIN (`GET`/`PUT /company-settings`, lihat B.16/SKPL UC-29) — ditambahkan di bawah.
+> murni OFF-CHAIN (`GET`/`PUT /company-settings`, lihat B.16/SKPL UC-26) — ditambahkan di bawah.
 
 **Deskripsi:** Konfigurasi parameter vault ON-CHAIN (BPS BPJS, BPS PPh21, threshold peringatan saldo rendah) sekaligus preferensi branding OFF-CHAIN (nama tampilan, negara, logo, batas EWA, tarif yield) dalam satu halaman.
 **Aktor:** HR Admin.
@@ -3200,7 +3200,7 @@ sequenceDiagram
 3. `handleApprove`/`handleReject` memanggil endpoint registrasi lalu refresh.
 4. Konfigurasi fee via `setPlatformFee(bps)`; pembekuan via `emergencyFreezeAll()`.
 
-##### 2.4.4.1 Portal Owner — Keamanan Vault (`/owner/security`) `[BARU — lihat SKPL UC-30, FR-PAYANA-2101 s.d. 2104]`
+##### 2.4.4.1 Portal Owner — Keamanan Vault (`/owner/security`) `[BARU — lihat SKPL UC-27, FR-PAYANA-2101 s.d. 2104]`
 
 **Deskripsi:** Daftar alert keamanan yang dihasilkan `anomalyDetector.ts` (lihat Lampiran B.6) lintas seluruh tenant — penarikan vault tidak wajar, perubahan peran tak terduga, dan aktivitas beruntun — dengan tab "Belum Ditangani"/"Semua" dan tombol tandai selesai per alert.
 **Aktor:** Owner SaaS.
@@ -3978,7 +3978,7 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
 
 > **[Diperbaiki]** Seluruh subbab ini sebelumnya hanya mendokumentasikan registrasi company
 > (tanpa NPWP/NIB/dst, tanpa jalur employee sama sekali). Diperbarui mengikuti implementasi
-> `backend/src/routes/registration.ts` saat ini — lihat SKPL UC-21 untuk spesifikasi use case
+> `backend/src/routes/registration.ts` saat ini — lihat SKPL UC-18 untuk spesifikasi use case
 > penuh, dan B.4a untuk grup endpoint `/invitations` yang menjadi prasyarat registrasi employee.
 
 **[POST /registration/request]**
@@ -4201,7 +4201,7 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
 
 ---
 
-### B.9 Grup Reimburse (`/reimburse`) `[BARU — lihat SKPL UC-22, FR-PAYANA-1301/1302]`
+### B.9 Grup Reimburse (`/reimburse`) `[BARU — lihat SKPL UC-19, FR-PAYANA-1301/1302]`
 
 **[POST /reimburse]**
 | | |
@@ -4231,7 +4231,7 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
 
 ---
 
-### B.10 Grup Bounty & Tip (`/bounty`) `[BARU — lihat SKPL UC-23, FR-PAYANA-1401/1402/1403]`
+### B.10 Grup Bounty & Tip (`/bounty`) `[BARU — lihat SKPL UC-20, FR-PAYANA-1401/1402/1403]`
 
 **[POST /bounty]** — HR (JWT). Input `title`, `description`, `rewardIdrx`, `quota`. Membuat baris `bounties` (`status: "open"`). Sesuai FR-PAYANA-1401.
 
@@ -4256,7 +4256,7 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
 
 ---
 
-### B.11 Grup Notifikasi (`/notifications`) `[BARU — lihat SKPL UC-24, FR-PAYANA-1501]`
+### B.11 Grup Notifikasi (`/notifications`) `[BARU — lihat SKPL UC-21, FR-PAYANA-1501]`
 
 **[GET /notifications]** — Pengguna (JWT). Mengembalikan maksimum 50 baris `notifications` milik `recipientAddress = caller`, terurut `createdAt DESC`. Sesuai FR-PAYANA-1501.
 
@@ -4270,7 +4270,7 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
 
 ---
 
-### B.12 Grup Slip Gaji (`/payslip`) `[BARU — lihat SKPL UC-25, FR-PAYANA-1601]`
+### B.12 Grup Slip Gaji (`/payslip`) `[BARU — lihat SKPL UC-22, FR-PAYANA-1601]`
 
 **[GET /payslip/:claimId]**
 | | |
@@ -4285,7 +4285,7 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
 
 ---
 
-### B.13 Grup Bukti Potong Pajak (`/tax-cert`) `[BARU — lihat SKPL UC-26, FR-PAYANA-1701]`
+### B.13 Grup Bukti Potong Pajak (`/tax-cert`) `[BARU — lihat SKPL UC-23, FR-PAYANA-1701]`
 
 **[GET /tax-cert/:year]** — Karyawan (JWT). Mengagregasi seluruh `salary_claim` milik caller pada tahun tsb: `totalGrossAccrued`, `totalCompliance`, `totalSeverance`, `totalNet`, plus breakdown bulanan. Sesuai FR-PAYANA-1701.
 
@@ -4295,7 +4295,7 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
 
 ---
 
-### B.14 Grup Surat Keterangan Kerja (`/employment-letter`) `[BARU — lihat SKPL UC-27, FR-PAYANA-1801]`
+### B.14 Grup Surat Keterangan Kerja (`/employment-letter`) `[BARU — lihat SKPL UC-24, FR-PAYANA-1801]`
 
 **[POST /employment-letter/request]** — Karyawan (JWT). Input `hrAddress`, `purpose` (whitelist `KPR|Kredit|Visa|Umum|Lainnya`). Membuat baris `employment_letters` (`status: "pending"`). Sesuai FR-PAYANA-1801.
 
@@ -4309,7 +4309,7 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
 
 ---
 
-### B.15 Grup Direktori Karyawan (`/directory`) `[BARU — lihat SKPL UC-28, FR-PAYANA-1901]`
+### B.15 Grup Direktori Karyawan (`/directory`) `[BARU — lihat SKPL UC-25, FR-PAYANA-1901]`
 
 **[GET /directory/:hrAddress]** — HR (JWT, harus `=== hrAddress`). Mengembalikan seluruh karyawan perusahaan tsb (join data Ponder `employee_stream` dengan `employee_profiles` untuk `department`/`position`). Sesuai FR-PAYANA-1901.
 
@@ -4321,7 +4321,7 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
 
 ---
 
-### B.16 Grup Pengaturan Perusahaan (`/company-settings`) `[BARU — lihat SKPL UC-29, FR-PAYANA-2001]`
+### B.16 Grup Pengaturan Perusahaan (`/company-settings`) `[BARU — lihat SKPL UC-26, FR-PAYANA-2001]`
 
 **[GET /company-settings]** — HR (JWT). Mengembalikan baris `company_settings` milik caller, atau `null` jika belum pernah disimpan. Sesuai FR-PAYANA-2001.
 
@@ -4329,7 +4329,7 @@ employee_address,employee_name,employee_nik,employee_phone,claim_count,total_acc
 
 ---
 
-### B.17 Grup Keamanan (`/security`) `[BARU — lihat SKPL UC-30, FR-PAYANA-2101 s.d. 2104]`
+### B.17 Grup Keamanan (`/security`) `[BARU — lihat SKPL UC-27, FR-PAYANA-2101 s.d. 2104]`
 
 Seluruh endpoint di grup ini owner-only (`requireAuth` + `requireOwner`) — alert keamanan adalah sinyal platform-wide, bukan sumber daya per-tenant seperti kebanyakan grup lain di lampiran ini.
 
