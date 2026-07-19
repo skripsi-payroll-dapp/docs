@@ -48,7 +48,7 @@ Pembaca yang dituju adalah:
 
 Payana adalah platform perangkat lunak berbasis web yang menyediakan layanan penggajian real-time terdesentralisasi untuk perusahaan dengan skala 50 hingga 500 karyawan di Indonesia. Sistem ini beroperasi di atas jaringan blockchain **Base** (Ethereum Layer-2) dan menggunakan stablecoin **IDRX** (ERC-20 berpegged Rupiah Indonesia) sebagai medium pembayaran gaji.
 
-Ruang lingkup sistem Payana mencakup dua belas fungsi utama yang dikelompokkan ke dalam delapan modul:
+Ruang lingkup sistem Payana mencakup dua belas fungsi utama yang dikelompokkan ke dalam delapan modul, diberi label alfabetis A–H secara berurutan sesuai urutan penyajian pada bagian ini. *(Catatan: Modul A–H di bagian ini adalah ringkasan level tinggi, sedangkan kebutuhan fungsional rinci di §3.2 dipecah lebih halus menjadi sembilan belas "Kelompok" A–S. Setiap Modul memiliki satu Kelompok "anchor" berhuruf sama sebagai representasi utamanya (mis. Modul E ↔ Kelompok E: Mesin Pajak & Kasbon), namun karena satu Modul dapat mencakup lebih dari satu Kelompok, urutan tampil Kelompok A–S di §3.2 mengikuti pengelompokan per-Modul ini — bukan urutan penomoran FR aslinya. Kelompok non-anchor lain yang tidak diwakili langsung oleh satu huruf Modul mengisi sisa huruf I–S secara berurutan.)*
 
 1. **Modul Core Payroll (A):** Pengelolaan vault dana perusahaan, pendaftaran karyawan ke dalam sistem stream, distribusi gaji real-time detik per detik, penarikan mandiri gaji yang sudah diperoleh (Earned Wage Access / EWA) dengan mekanisme auto-split 93% (gaji bersih) / 5% (kepatuhan BPJS dan PPh21) / 2% (pesangon).
 
@@ -58,13 +58,13 @@ Ruang lingkup sistem Payana mencakup dua belas fungsi utama yang dikelompokkan k
 
 4. **Modul Cliff Vesting (D):** Pengaturan bonus retensi dengan periode cliff, penanganan masa percobaan karyawan, dan skema ESOP.
 
-5. **Modul Mesin Pajak & Kasbon (G):** Pemotongan PPh21 TER dan BPJS otomatis on-chain saat klaim gaji berdasarkan konfigurasi HR, serta fasilitas kasbon (uang muka gaji) hingga 80% gaji bulanan dengan pelunasan otomatis saat klaim gaji berikutnya.
+5. **Modul Mesin Pajak & Kasbon (E):** Pemotongan PPh21 TER dan BPJS otomatis on-chain saat klaim gaji berdasarkan konfigurasi HR, serta fasilitas kasbon (uang muka gaji) hingga 80% gaji bulanan dengan pelunasan otomatis saat klaim gaji berikutnya.
 
 6. **Modul Dashboard (F):** Antarmuka HR untuk manajemen vault, stream, laporan kepatuhan, dan persetujuan PHK (termasuk langkah persetujuan `LEGAL_ROLE` yang secara default digenggam HR sendiri, lihat §3.1); antarmuka karyawan untuk pemantauan EWA secara langsung.
 
-7. **Modul Audit dan Notifikasi (K):** Jejak audit aktivitas HR yang immutable dan sistem notifikasi in-app.
+7. **Modul Audit dan Notifikasi (G):** Jejak audit aktivitas HR yang immutable dan sistem notifikasi in-app.
 
-8. **Modul Keamanan Vault (U):** Deteksi anomali otomatis untuk pola yang konsisten dengan wallet HR yang dikompromikan — penarikan vault tidak wajar, perubahan peran (`HR_ROLE`/`DEFAULT_ADMIN_ROLE`) mendadak ke alamat tak dikenal, dan aktivitas sensitif beruntun — beserta antarmuka Owner untuk meninjau dan menandai selesai setiap alert.
+8. **Modul Keamanan Vault (H):** Deteksi anomali otomatis untuk pola yang konsisten dengan wallet HR yang dikompromikan — penarikan vault tidak wajar, perubahan peran (`HR_ROLE`/`DEFAULT_ADMIN_ROLE`) mendadak ke alamat tak dikenal, dan aktivitas sensitif beruntun — beserta antarmuka Owner untuk meninjau dan menandai selesai setiap alert.
 
 Sistem yang berada **di luar ruang lingkup** MVP ini antara lain: integrasi HRIS pihak ketiga (Talenta, Gadjian, SAP), fiat on/off ramp langsung dalam platform, payroll multi-chain, ESOP dengan secondary market, notifikasi push mobile native, stealth addresses (EIP-5564), dan private streaming rate on-chain.
 
@@ -476,7 +476,43 @@ Payana akan berhubungan dengan sistem-sistem berikut:
 
 ### 3.2 Kebutuhan Fungsional
 
-#### Kelompok A: Manajemen Akun dan Autentikasi
+#### Kelompok A: Onboarding dan Manajemen Vault Perusahaan
+
+#### 3.2.10. Deployment Vault Perusahaan
+ID Requirement : FR-PAYANA-201
+Deskripsi      : Sistem harus memampukan Owner SaaS untuk mendeploy vault CompanyVault baru melalui kontrak PayrollFactory bagi HR Admin yang telah mendapatkan persetujuan. Setiap vault yang dideploy sepenuhnya terisolasi dari vault perusahaan lain — tidak ada dana atau state yang dibagikan antar-tenant. Satu alamat HR hanya dapat memiliki satu vault, dan upaya deployment kedua untuk alamat yang sama ditolak oleh kontrak PayrollFactory.
+
+#### 3.2.11. Pendanaan Vault (Deposit IDRX)
+ID Requirement : FR-PAYANA-202
+Deskripsi      : Sistem harus memampukan HR Admin untuk mendepositkan IDRX ke vault perusahaannya melalui fungsi fundVault() pada kontrak CompanyVault. HR Admin wajib terlebih dahulu memberikan persetujuan ERC-20 (approve) kepada kontrak vault dengan jumlah yang setara atau lebih dari yang akan didepositkan. Saldo vault (vaultBalance) bertambah sebesar jumlah yang berhasil ditransfer dari dompet HR ke kontrak.
+
+#### 3.2.12. Penarikan Saldo Bebas Vault
+ID Requirement : FR-PAYANA-203
+Deskripsi      : Sistem harus memampukan HR Admin untuk menarik IDRX dari saldo bebas vault ke alamat penerima yang ditentukan melalui fungsi withdrawVault(). Sistem menolak penarikan jika saldo bebas vault tidak mencukupi jumlah yang diminta. Setelah penarikan berhasil, sistem secara otomatis memeriksa apakah saldo yang tersisa berada di bawah threshold peringatan saldo rendah dan memancarkan event LowVaultBalance jika kondisi tersebut terpenuhi.
+
+#### 3.2.13. Konfigurasi Parameter Vault
+ID Requirement : FR-PAYANA-204
+Deskripsi      : Sistem harus memampukan HR Admin untuk mengonfigurasi parameter operasional vault perusahaannya melalui fungsi setCompanyConfig() pada kontrak CompanyVault, yaitu tarif BPJS (bpjsBps), tarif PPh21 (pph21Bps), dan threshold persentase peringatan saldo rendah (lowBalanceThresholdBps). Tarif BPJS selalu dipakai langsung sebagai tarif tetap. Untuk PPh21, nilai pph21Bps bersifat opsional: jika HR mengisinya (> 0), sistem memakainya sebagai tarif tetap; jika dibiarkan pada nilai default (0), sistem menghitung tarif secara dinamis berdasarkan Tarif Efektif Rata-rata (TER) sesuai PMK 168/2023 melalui PayrollMath.calcPPh21TerBps(), berbasis estimasi gaji tahunan karyawan.
+
+#### 3.2.14. Jeda dan Lanjutkan Operasi Vault
+ID Requirement : FR-PAYANA-205
+Deskripsi      : Sistem harus memampukan HR Admin untuk menjeda seluruh operasi vault sementara melalui fungsi pauseVault() (mengubah status menjadi Paused) dan mengaktifkannya kembali melalui fungsi resumeVault() (mengubah status menjadi Active). Vault yang sedang dijeda tidak memungkinkan karyawan melakukan klaim gaji melalui claimSalary(). Operasi jeda dan lanjut tidak tersedia apabila vault telah berada dalam status Frozen yang bersifat permanen.
+
+#### 3.2.15. Pembekuan Vault Darurat
+ID Requirement : FR-PAYANA-206
+Deskripsi      : Sistem harus memampukan Owner SaaS untuk membekukan vault perusahaan secara permanen melalui fungsi freezeVault() yang dipanggil dari kontrak PayrollFactory, atau membekukan seluruh vault yang terdaftar secara bersamaan melalui fungsi emergencyFreezeAll(). Pembekuan bersifat irreversible — vault yang telah dibekukan tidak dapat dipulihkan ke status Active oleh siapapun. Fungsi ini diperuntukkan sebagai respons darurat terhadap insiden keamanan global.
+
+#### 3.2.16. Pemantauan dan Peringatan Saldo Vault Rendah
+ID Requirement : FR-PAYANA-207
+Deskripsi      : Sistem harus secara otomatis memancarkan event LowVaultBalance on-chain setiap kali operasi yang mengurangi saldo vault menyebabkan saldo bebas turun di bawah threshold yang dikonfigurasi relatif terhadap kebutuhan penggajian bulanan agregat (totalFlowRate dikali 2.592.000 detik). Mekanisme ini berjalan otomatis setelah setiap operasi yang memengaruhi vaultBalance dan memperingatkan HR Admin agar segera mengisi ulang vault sebelum terjadi kegagalan pembayaran gaji.
+
+#### 3.2.17. Penarikan Dana Kepatuhan
+ID Requirement : FR-PAYANA-208
+Deskripsi      : Sistem harus memampukan HR Admin untuk menarik dana yang telah terakumulasi di sub-pool kepatuhan (complianceBalance) ke alamat agen pajak atau rekening BPJS yang ditentukan melalui fungsi withdrawCompliance() pada kontrak CompanyVault. Sistem menolak penarikan jika complianceBalance tidak mencukupi jumlah yang diminta. Dana kepatuhan ini merupakan 5% (default) dari setiap klaim gaji karyawan yang secara otomatis diarahkan ke sub-pool ini saat claimSalary() dipanggil.
+
+---
+
+#### Kelompok B: Manajemen Akun dan Autentikasi
 
 #### 3.2.1. Login Berbasis Tanda Tangan Kriptografi
 ID Requirement : FR-PAYANA-101
@@ -516,128 +552,55 @@ Deskripsi      : Sistem harus memampukan Owner SaaS untuk menyetujui atau menola
 
 ---
 
-#### Kelompok B: Onboarding dan Manajemen Vault Perusahaan
+### Kelompok C: Kepatuhan dan Pelaporan
 
-#### 3.2.10. Deployment Vault Perusahaan
-ID Requirement : FR-PAYANA-201
-Deskripsi      : Sistem harus memampukan Owner SaaS untuk mendeploy vault CompanyVault baru melalui kontrak PayrollFactory bagi HR Admin yang telah mendapatkan persetujuan. Setiap vault yang dideploy sepenuhnya terisolasi dari vault perusahaan lain — tidak ada dana atau state yang dibagikan antar-tenant. Satu alamat HR hanya dapat memiliki satu vault, dan upaya deployment kedua untuk alamat yang sama ditolak oleh kontrak PayrollFactory.
-
-#### 3.2.11. Pendanaan Vault (Deposit IDRX)
-ID Requirement : FR-PAYANA-202
-Deskripsi      : Sistem harus memampukan HR Admin untuk mendepositkan IDRX ke vault perusahaannya melalui fungsi fundVault() pada kontrak CompanyVault. HR Admin wajib terlebih dahulu memberikan persetujuan ERC-20 (approve) kepada kontrak vault dengan jumlah yang setara atau lebih dari yang akan didepositkan. Saldo vault (vaultBalance) bertambah sebesar jumlah yang berhasil ditransfer dari dompet HR ke kontrak.
-
-#### 3.2.12. Penarikan Saldo Bebas Vault
-ID Requirement : FR-PAYANA-203
-Deskripsi      : Sistem harus memampukan HR Admin untuk menarik IDRX dari saldo bebas vault ke alamat penerima yang ditentukan melalui fungsi withdrawVault(). Sistem menolak penarikan jika saldo bebas vault tidak mencukupi jumlah yang diminta. Setelah penarikan berhasil, sistem secara otomatis memeriksa apakah saldo yang tersisa berada di bawah threshold peringatan saldo rendah dan memancarkan event LowVaultBalance jika kondisi tersebut terpenuhi.
-
-#### 3.2.13. Konfigurasi Parameter Vault
-ID Requirement : FR-PAYANA-204
-Deskripsi      : Sistem harus memampukan HR Admin untuk mengonfigurasi parameter operasional vault perusahaannya melalui fungsi setCompanyConfig() pada kontrak CompanyVault, yaitu tarif BPJS (bpjsBps), tarif PPh21 (pph21Bps), dan threshold persentase peringatan saldo rendah (lowBalanceThresholdBps). Tarif BPJS selalu dipakai langsung sebagai tarif tetap. Untuk PPh21, nilai pph21Bps bersifat opsional: jika HR mengisinya (> 0), sistem memakainya sebagai tarif tetap; jika dibiarkan pada nilai default (0), sistem menghitung tarif secara dinamis berdasarkan Tarif Efektif Rata-rata (TER) sesuai PMK 168/2023 melalui PayrollMath.calcPPh21TerBps(), berbasis estimasi gaji tahunan karyawan.
-
-#### 3.2.14. Jeda dan Lanjutkan Operasi Vault
-ID Requirement : FR-PAYANA-205
-Deskripsi      : Sistem harus memampukan HR Admin untuk menjeda seluruh operasi vault sementara melalui fungsi pauseVault() (mengubah status menjadi Paused) dan mengaktifkannya kembali melalui fungsi resumeVault() (mengubah status menjadi Active). Vault yang sedang dijeda tidak memungkinkan karyawan melakukan klaim gaji melalui claimSalary(). Operasi jeda dan lanjut tidak tersedia apabila vault telah berada dalam status Frozen yang bersifat permanen.
-
-#### 3.2.15. Pembekuan Vault Darurat
-ID Requirement : FR-PAYANA-206
-Deskripsi      : Sistem harus memampukan Owner SaaS untuk membekukan vault perusahaan secara permanen melalui fungsi freezeVault() yang dipanggil dari kontrak PayrollFactory, atau membekukan seluruh vault yang terdaftar secara bersamaan melalui fungsi emergencyFreezeAll(). Pembekuan bersifat irreversible — vault yang telah dibekukan tidak dapat dipulihkan ke status Active oleh siapapun. Fungsi ini diperuntukkan sebagai respons darurat terhadap insiden keamanan global.
-
-#### 3.2.16. Pemantauan dan Peringatan Saldo Vault Rendah
-ID Requirement : FR-PAYANA-207
-Deskripsi      : Sistem harus secara otomatis memancarkan event LowVaultBalance on-chain setiap kali operasi yang mengurangi saldo vault menyebabkan saldo bebas turun di bawah threshold yang dikonfigurasi relatif terhadap kebutuhan penggajian bulanan agregat (totalFlowRate dikali 2.592.000 detik). Mekanisme ini berjalan otomatis setelah setiap operasi yang memengaruhi vaultBalance dan memperingatkan HR Admin agar segera mengisi ulang vault sebelum terjadi kegagalan pembayaran gaji.
-
-#### 3.2.17. Penarikan Dana Kepatuhan
-ID Requirement : FR-PAYANA-208
-Deskripsi      : Sistem harus memampukan HR Admin untuk menarik dana yang telah terakumulasi di sub-pool kepatuhan (complianceBalance) ke alamat agen pajak atau rekening BPJS yang ditentukan melalui fungsi withdrawCompliance() pada kontrak CompanyVault. Sistem menolak penarikan jika complianceBalance tidak mencukupi jumlah yang diminta. Dana kepatuhan ini merupakan 5% (default) dari setiap klaim gaji karyawan yang secara otomatis diarahkan ke sub-pool ini saat claimSalary() dipanggil.
+Kelompok ini mendefinisikan kebutuhan fungsional yang berkaitan dengan pengumpulan, pengelolaan, dan pelaporan dana kepatuhan regulasi Indonesia, mencakup akumulasi iuran BPJS dan Pajak Penghasilan Pasal 21 (PPh21) per karyawan, serta kemampuan HR untuk mengunduh laporan rekonsiliasi bulanan dan menarik dana kepatuhan ke agen pajak.
 
 ---
 
-#### Kelompok C: Manajemen Stream Gaji Karyawan
+#### 3.2.12. Akumulasi Dana Kepatuhan per Karyawan
 
-#### 3.2.18. Aktivasi Stream Gaji Karyawan
-ID Requirement : FR-PAYANA-301
-Deskripsi      : Sistem harus memampukan HR Admin untuk memulai stream gaji karyawan baru melalui fungsi startStream(employee, flowRate, severanceSplitBps) pada kontrak CompanyVault, dengan menentukan flow rate dalam satuan IDRX wei per detik serta persentase porsi severance (severanceSplitBps, basis poin, maksimum 10.000). Porsi karyawan dan kepatuhan (BPJS/PPh21) tidak ditentukan per-stream, melainkan dihitung dinamis saat klaim gaji berdasarkan konfigurasi `bpjsBps`/`pph21Bps` tingkat perusahaan (lihat FR-PAYANA-204). Sistem secara otomatis mencatat timestamp mulai stream, menginisialisasi vault severance karyawan dalam status Locked, dan menerbitkan Soulbound Token (ERC-5192) sebagai sertifikat ketenagakerjaan on-chain ke alamat Work ID karyawan.
+ID Requirement : FR-PAYANA-801
 
-#### 3.2.19. Jeda Stream Gaji
-ID Requirement : FR-PAYANA-302
-Deskripsi      : Sistem harus memampukan HR Admin untuk menjeda stream gaji karyawan yang sedang aktif melalui fungsi pauseStream(). Sebelum menjeda, sistem terlebih dahulu menyelesaikan (settle) saldo yang telah terakumulasi sejak klaim terakhir ke dalam settledBalance karyawan, sehingga tidak ada gaji yang hilang akibat operasi jeda. Stream yang dijeda tidak mengakumulasi gaji baru, namun saldo yang telah tersimpan di settledBalance tetap dapat diklaim oleh karyawan.
-
-#### 3.2.20. Lanjutkan Stream Gaji
-ID Requirement : FR-PAYANA-303
-Deskripsi      : Sistem harus memampukan HR Admin untuk melanjutkan stream gaji karyawan yang sedang dalam status dijeda (Paused) melalui fungsi resumeStream(). Setelah dilanjutkan, akumulasi gaji kembali berjalan berdasarkan flow rate yang telah ditetapkan, dimulai dari waktu dilanjutkan. Sistem memperbarui lastWithdrawnTs ke timestamp saat ini sehingga perhitungan akumulasi berikutnya dimulai dari nol dan tidak ada penghitungan ganda atas periode jeda.
-
-#### 3.2.21. Pembaruan Flow Rate Gaji
-ID Requirement : FR-PAYANA-304
-Deskripsi      : Sistem harus memampukan HR Admin untuk memperbarui flow rate gaji karyawan yang sedang aktif melalui fungsi updateFlowRate(). Sebelum beralih ke flow rate baru, sistem menetapkan (settle) saldo yang telah terakumulasi pada flow rate lama ke dalam settledBalance agar tidak terjadi pembayaran lebih atau kurang pada periode peralihan. Total flow rate vault (totalFlowRate) diperbarui secara atomik bersamaan dengan perubahan flow rate individual karyawan untuk menjaga akurasi penghitungan kebutuhan penggajian bulanan.
-
-#### 3.2.22. Pembaruan Persentase Split Stream
-ID Requirement : FR-PAYANA-305
-Deskripsi      : Sistem harus memampukan HR Admin untuk memperbarui konfigurasi persentase split (employeeBps, complianceBps, severanceBps) pada stream karyawan yang sedang aktif atau dijeda melalui fungsi updateStreamSplits(). Jumlah ketiga persentase harus tetap berjumlah tepat 10.000 basis points; sistem menolak konfigurasi yang tidak memenuhi syarat ini. Apabila stream sedang aktif, sistem terlebih dahulu menetapkan saldo terakumulasi menggunakan persentase split lama sebelum menerapkan konfigurasi baru.
-
-#### 3.2.23. Pembatalan Stream Gaji
-ID Requirement : FR-PAYANA-306
-Deskripsi      : Sistem harus memampukan HR Admin untuk membatalkan stream gaji karyawan melalui fungsi cancelStream() pada kontrak CompanyVault. Jika stream sedang aktif saat pembatalan, sistem menetapkan saldo terakumulasi ke dalam settledBalance karyawan dan mengurangi totalFlowRate vault. Stream yang telah dibatalkan tidak mengakumulasi gaji baru, namun karyawan masih dapat mengklaim saldo yang tersimpan di settledBalance. Pembatalan stream tidak secara otomatis mencabut Soulbound Token karyawan.
+Deskripsi      : Sistem harus secara otomatis mengakumulasikan porsi kepatuhan (complianceBps, default 5%) dari setiap klaim gaji yang dilakukan oleh karyawan ke dalam sub-pool kepatuhan vault perusahaan yang dilacak melalui variabel `complianceBalance`. Setiap karyawan harus memiliki catatan akumulasi kepatuhan individual yang disimpan dalam mapping `employeeComplianceAccumulated` sehingga HR dapat melakukan rekonsiliasi per karyawan untuk keperluan pelaporan BPJS dan PPh21. Akumulasi ini terjadi secara atomik dalam transaksi yang sama dengan distribusi gaji karyawan dan penambahan saldo pesangon, sehingga ketiga komponen split tidak dapat dieksekusi secara parsial. Karyawan tidak dapat mengakses atau menarik dana kepatuhan yang telah diakumulasikan atas namanya; hanya HR yang memiliki akses untuk mengelola dana ini.
 
 ---
 
-#### Kelompok D: Penarikan Gaji — Earned Wage Access (EWA)
+#### 3.2.13. Konfigurasi Tarif BPJS dan PPh21 oleh HR
 
-#### 3.2.24. Klaim Gaji (Earned Wage Access)
-ID Requirement : FR-PAYANA-401
-Deskripsi      : Sistem harus memampukan karyawan untuk menarik seluruh saldo gaji yang telah terakumulasi kapan saja melalui fungsi claimSalary() pada kontrak CompanyVault, tanpa menunggu tanggal gajian bulanan. Sistem melakukan distribusi atomik dalam satu transaksi: platform fee dipotong terlebih dahulu, kemudian apabila karyawan memiliki kasbon aktif, hingga 20% dari total klaim dialokasikan untuk melunasi kasbon secara otomatis (lihat FR-PAYANA-706). Sisanya dipotong PPh21 dan BPJS (dihitung dinamis atau tarif tetap, lihat FR-PAYANA-701/702) ke sub-pool complianceBalance, porsi severance (default 2%) ditambahkan ke vault pesangon karyawan, dan sisa bersih ditransfer langsung ke alamat Work ID karyawan.
+ID Requirement : FR-PAYANA-802
 
-#### 3.2.25. Kalkulasi Saldo Gaji Terakumulasi
-ID Requirement : FR-PAYANA-402
-Deskripsi      : Sistem harus memungkinkan pembacaan saldo gaji yang telah terakumulasi secara real-time untuk setiap karyawan melalui fungsi view getAccrued() pada kontrak CompanyVault. Formula kalkulasi adalah: saldo_total = settledBalance + (flowRate x (waktu_sekarang - lastWithdrawnTs)). Fungsi ini dapat dipanggil kapan saja tanpa biaya gas karena bersifat view-only dan mengembalikan saldo dalam satuan IDRX wei dengan presisi penuh.
+Deskripsi      : Sistem harus memampukan HR Admin untuk mengonfigurasi tarif BPJS (bpjsBps) dan, secara opsional, tarif tetap PPh21 (pph21Bps) dalam satuan basis points melalui fungsi `setCompanyConfig()`. Tarif BPJS selalu dipakai langsung sebagai potongan tetap saat `claimSalary()`. Untuk PPh21, jika HR mengisi `pph21Bps` (> 0), nilai tersebut dipakai sebagai override tarif tetap; jika dibiarkan pada nilai default (0), sistem menghitung tarif secara dinamis mengikuti skema Tarif Efektif Rata-rata (TER) sesuai PMK 168/2023 melalui `PayrollMath.calcPPh21TerBps()` (lihat FR-PAYANA-701), sehingga platform tidak perlu update smart contract setiap kali bracket tarif berubah. Sistem harus memastikan bahwa perubahan tarif hanya dapat dilakukan oleh pengguna dengan `HR_ROLE` pada vault perusahaan yang bersangkutan, dan setiap perubahan konfigurasi harus berlaku untuk klaim gaji yang terjadi setelah perubahan tersebut, tidak berlaku surut.
 
-#### 3.2.26. Relay Transaksi Gasless via ERC-4337
-ID Requirement : FR-PAYANA-403
-Deskripsi      : Sistem harus memampukan karyawan melakukan klaim gaji tanpa membayar biaya gas blockchain melalui mekanisme ERC-4337 (Account Abstraction). Karyawan menandatangani UserOperation menggunakan embedded wallet Privy, kemudian frontend mengirimkannya ke endpoint POST /bundler/relay di backend. Backend memverifikasi kesesuaian alamat JWT dengan sender UserOperation, memeriksa batas laju klaim, lalu meneruskan UserOperation ke Pimlico Bundler yang mensponsori biaya gas melalui Paymaster contract. Hash UserOperation dikembalikan ke klien sebagai referensi pemantauan.
-
-#### 3.2.27. Pembatasan Laju Klaim Gaji
-ID Requirement : FR-PAYANA-404
-Deskripsi      : Sistem harus membatasi frekuensi klaim gaji yang dapat diteruskan oleh backend melalui relayer, dengan batas maksimal 10 kali per jam per alamat karyawan. Permintaan yang melampaui batas ini ditolak oleh backend dengan kode status HTTP 429 sebelum UserOperation diteruskan ke Pimlico, sehingga biaya Paymaster tidak terbuang pada permintaan yang berlebihan.
-
-#### 3.2.28. Pemantauan Status Transaksi
-ID Requirement : FR-PAYANA-405
-Deskripsi      : Sistem harus memampukan pengguna memeriksa status transaksi yang sebelumnya dikirimkan melalui backend relay dengan menggunakan hash UserOperation yang dikembalikan saat pengiriman. Backend meneruskan permintaan ke Pimlico Bundler menggunakan metode eth_getUserOperationReceipt dan mengembalikan receipt transaksi kepada klien, mencakup status keberhasilan dan hash transaksi on-chain yang dihasilkan jika transaksi telah dikonfirmasi.
+> Catatan: FR-PAYANA-802 ini menjelaskan mekanisme konfigurasi yang sama dengan FR-PAYANA-204 (§3.2.13 pada seksi Kelompok D). Duplikasi ini adalah isu penomoran subbab lama yang sudah diketahui (dua section "3.2 Kebutuhan Fungsional" terpisah dalam dokumen ini) dan perlu dirapikan pada revisi renumbering berikutnya.
 
 ---
 
-#### Kelompok E: Pemberhentian Karyawan (PHK dan Resign)
+#### 3.2.14. Penarikan Dana Kepatuhan oleh HR ke Agen Pajak
 
-#### 3.2.29. Pengajuan Proposal Pemutusan Hubungan Kerja
-ID Requirement : FR-PAYANA-501
-Deskripsi      : Sistem harus memampukan HR Admin untuk mengajukan proposal Pemutusan Hubungan Kerja (PHK) terhadap karyawan melalui fungsi proposeTermination() pada kontrak CompanyVault. Proposal menyimpan hash dari alasan PHK on-chain (alasan lengkap disimpan off-chain untuk menjaga privasi), snapshot flow rate karyawan saat pengajuan untuk keperluan kalkulasi pesangon, serta timestamp kadaluarsa yang ditetapkan 7 hari sejak pengajuan. HR Admin secara otomatis memberikan persetujuan pertama (`hrApproved`) dengan mengajukan proposal; persetujuan `LEGAL_ROLE` (`legalApproved`) masih diperlukan sebagai langkah kedua sebelum eksekusi dapat dilakukan — lihat §3.1 untuk siapa yang menjalankan langkah kedua ini dalam praktik.
+ID Requirement : FR-PAYANA-803
 
-#### 3.2.30. Persetujuan Proposal PHK oleh Pemegang LEGAL_ROLE
-ID Requirement : FR-PAYANA-502
-Deskripsi      : Sistem harus memampukan pemegang `LEGAL_ROLE` untuk memberikan persetujuan atas proposal PHK yang aktif melalui fungsi approveTermination() pada kontrak CompanyVault. Sistem memvalidasi bahwa proposal belum kadaluarsa, bahwa pemanggil memiliki `LEGAL_ROLE` pada vault yang bersangkutan, dan bahwa persetujuan dari alamat yang sama belum pernah diberikan sebelumnya. Proposal yang mendapat kedua persetujuan (`hrApproved` dan `legalApproved`) dapat segera dieksekusi oleh HR Admin (`executeTermination()` hanya dapat dipanggil oleh `HR_ROLE`) sebelum masa kadaluarsa berakhir. Dalam operasional saat ini, `LEGAL_ROLE` di-auto-grant ke alamat HR Admin sendiri (lihat §3.1), sehingga langkah persetujuan kedua ini secara de facto juga dijalankan oleh HR Admin — sistem tidak menyediakan dashboard atau alur login terpisah bagi pemegang `LEGAL_ROLE` yang berbeda dari HR Admin.
-
-#### 3.2.31. Eksekusi Pemutusan Hubungan Kerja
-ID Requirement : FR-PAYANA-503
-Deskripsi      : Sistem harus memampukan eksekusi PHK melalui fungsi executeTermination() setelah kedua persetujuan terpenuhi dan proposal belum melewati masa kadaluarsa 7 hari. Eksekusi secara atomik melakukan serangkaian operasi berikut: penghentian stream gaji dengan settlement saldo terakumulasi, penghitungan pesangon wajib sesuai formula UU Cipta Kerja Pasal 156 berdasarkan tenureMonths dan flowRateSnapshot, pengisian kekurangan pesangon dari saldo bebas vault jika dana pesangon karyawan tidak mencukupi, transfer dana pesangon ke Work ID karyawan, pencabutan Soulbound Token ketenagakerjaan, serta pembatalan seluruh cliff vest yang belum matang dengan pengembalian dana ke saldo bebas vault.
-
-#### 3.2.32. Penghitungan Pesangon Sesuai UU Cipta Kerja
-ID Requirement : FR-PAYANA-504
-Deskripsi      : Sistem harus menghitung uang pesangon yang wajib dibayarkan berdasarkan masa kerja karyawan (tenureMonths) menggunakan pengali yang ditetapkan dalam UU Cipta Kerja Pasal 156 melalui fungsi PayrollMath.severanceMultiplier(). Gaji bulanan bruto dihitung dari snapshot flow rate saat pengajuan PHK dikalikan dengan jumlah detik dalam satu bulan (2.592.000 detik). Apabila dana dalam vault pesangon karyawan tidak mencukupi jumlah wajib, sistem mengambil kekurangan dari saldo bebas vault; jika saldo bebas vault pun tidak mencukupi, sistem mentransfer seluruh dana yang tersedia dan memancarkan event SeveranceShortfall on-chain sebagai bukti kekurangan pembayaran.
-
-#### 3.2.33. Proses Pengunduran Diri (Resign) Karyawan
-ID Requirement : FR-PAYANA-505
-Deskripsi      : Sistem harus memampukan HR Admin untuk memproses pengunduran diri sukarela karyawan melalui fungsi resignEmployee() pada kontrak CompanyVault. Saat pengunduran diri diproses, sistem menghentikan stream gaji karyawan dengan terlebih dahulu menetapkan saldo terakumulasi ke settledBalance, mengembalikan seluruh dana pesangon yang pernah terakumulasi ke saldo bebas vault perusahaan (bukan ke karyawan, sesuai ketentuan resign sukarela), membatalkan seluruh cliff vest yang belum matang dengan pengembalian dana ke vault, dan mencabut Soulbound Token ketenagakerjaan karyawan yang bersangkutan.
-
-#### 3.2.34. Pencairan Dana Pesangon Otomatis Pasca-PHK
-ID Requirement : FR-PAYANA-506
-Deskripsi      : Sistem harus memastikan bahwa seluruh dana pesangon yang menjadi hak karyawan setelah eksekusi PHK ditransfer langsung ke alamat Work ID karyawan dalam satu transaksi atomik yang sama dengan eksekusi PHK. Tidak ada langkah manual tambahan yang diperlukan dari karyawan untuk menerima pesangon; sistem secara otomatis mengubah status SeveranceVault dari Locked menjadi Released dan mentransfer dana ke karyawan segera setelah eksekusi dikonfirmasi di blockchain, termasuk dana top-up dari saldo bebas vault jika pesangon yang terakumulasi tidak memenuhi jumlah wajib.
-
+Deskripsi      : Sistem harus memampukan HR Admin untuk menarik akumulasi dana kepatuhan dari sub-pool komplianse vault ke alamat tujuan yang ditentukan (misalnya dompet agen pajak atau rekening bridging pembayaran BPJS) melalui fungsi `withdrawCompliance()`. Sistem harus memvalidasi bahwa jumlah yang akan ditarik tidak melebihi saldo `complianceBalance` yang tersedia; jika tidak mencukupi, transaksi ditolak dengan error `InsufficientComplianceBalance`. Fungsi ini hanya dapat dipanggil oleh pengguna dengan `HR_ROLE` dan transfer dilakukan langsung ke alamat penerima yang ditentukan oleh HR, bukan ke alamat HR itu sendiri secara implisit. Event `ComplianceWithdrawn` diterbitkan setelah penarikan berhasil untuk keperluan audit trail on-chain.
 
 ---
 
-## 3.2 Kebutuhan Fungsional — Kelompok F hingga L
+#### 3.2.15. Unduhan Laporan Kepatuhan oleh HR
+
+ID Requirement : FR-PAYANA-804
+
+Deskripsi      : Sistem harus memampukan HR Admin untuk mengunduh laporan kepatuhan bulanan dalam format CSV yang berisi rincian akumulasi dana kepatuhan per karyawan, mencakup total IDRX yang diakumulasikan untuk periode tertentu, estimasi alokasi BPJS Kesehatan, BPJS Ketenagakerjaan, dan PPh21 berdasarkan tarif yang dikonfigurasi, serta saldo komplianse yang belum ditarik. Laporan ini dihasilkan oleh layanan backend berdasarkan data yang diindeks oleh Ponder dari event `SalaryClaimed` dan `ComplianceWithdrawn` on-chain, yang dipadankan dengan data karyawan (nama, NIK terenkripsi) dari basis data off-chain. Data PII karyawan hanya didekripsi sementara pada saat ekspor laporan dan tidak disimpan dalam bentuk plaintext di server, sesuai dengan kewajiban UU PDP No. 27/2022. Laporan yang diekspor harus mencantumkan periode pelaporan dan cap waktu ekspor untuk keperluan audit.
 
 ---
 
-### Kelompok F: Vesting dan Bonus
+#### 3.2.16. Pemantauan Status Kepatuhan per Karyawan
+
+ID Requirement : FR-PAYANA-805
+
+Deskripsi      : Sistem harus memampukan HR Admin untuk memantau akumulasi dana kepatuhan per karyawan secara individual melalui dashboard, termasuk total IDRX yang telah diakumulasikan sejak karyawan bergabung (`employeeComplianceAccumulated`) dan estimasi kewajiban BPJS serta PPh21 yang telah terpenuhi. Data ini harus ditampilkan dalam bentuk yang mudah dibandingkan dengan kewajiban nominal yang seharusnya dibayarkan ke DJP dan BPJS, sehingga HR dapat mengidentifikasi selisih jika ada. [Perlu dikonfirmasi] Mekanisme rekonsiliasi otomatis antara saldo `complianceBalance` on-chain dan kewajiban pembayaran aktual ke DJP/BPJS belum diimplementasikan pada versi MVP dan memerlukan spesifikasi lebih lanjut untuk integrasi dengan sistem pemerintah.
+
+---
+
+### Kelompok D: Vesting dan Bonus
 
 Kelompok ini mendefinisikan kebutuhan fungsional yang berkaitan dengan mekanisme penguncian insentif karyawan (cliff vesting), mencakup seluruh siklus hidup dari pembuatan jadwal vesting, pengelolaan oleh HR, pencairan oleh karyawan, hingga penyitaan dana saat karyawan keluar sebelum cliff date terpenuhi.
 
@@ -683,7 +646,7 @@ Deskripsi      : Sistem harus mendukung pembuatan lebih dari satu cliff vest akt
 
 ---
 
-### Kelompok G: Mesin Pajak & Kasbon
+### Kelompok E: Mesin Pajak & Kasbon
 
 Kelompok ini mendefinisikan kebutuhan fungsional untuk pemotongan otomatis PPh21 (skema Tarif Efektif Rata-rata/TER sesuai PMK 168/2023) dan BPJS pada setiap klaim gaji, serta fasilitas kasbon (uang muka gaji) yang memampukan karyawan menarik sebagian gaji yang belum accrued sebagai talangan, dengan pelunasan otomatis saat klaim gaji berikutnya.
 
@@ -737,101 +700,7 @@ Deskripsi      : Sistem harus memotong `min(20% dari accrued, sisa kasbon)` dari
 
 ---
 
-### Kelompok H: Kepatuhan dan Pelaporan
-
-Kelompok ini mendefinisikan kebutuhan fungsional yang berkaitan dengan pengumpulan, pengelolaan, dan pelaporan dana kepatuhan regulasi Indonesia, mencakup akumulasi iuran BPJS dan Pajak Penghasilan Pasal 21 (PPh21) per karyawan, serta kemampuan HR untuk mengunduh laporan rekonsiliasi bulanan dan menarik dana kepatuhan ke agen pajak.
-
----
-
-#### 3.2.12. Akumulasi Dana Kepatuhan per Karyawan
-
-ID Requirement : FR-PAYANA-801
-
-Deskripsi      : Sistem harus secara otomatis mengakumulasikan porsi kepatuhan (complianceBps, default 5%) dari setiap klaim gaji yang dilakukan oleh karyawan ke dalam sub-pool kepatuhan vault perusahaan yang dilacak melalui variabel `complianceBalance`. Setiap karyawan harus memiliki catatan akumulasi kepatuhan individual yang disimpan dalam mapping `employeeComplianceAccumulated` sehingga HR dapat melakukan rekonsiliasi per karyawan untuk keperluan pelaporan BPJS dan PPh21. Akumulasi ini terjadi secara atomik dalam transaksi yang sama dengan distribusi gaji karyawan dan penambahan saldo pesangon, sehingga ketiga komponen split tidak dapat dieksekusi secara parsial. Karyawan tidak dapat mengakses atau menarik dana kepatuhan yang telah diakumulasikan atas namanya; hanya HR yang memiliki akses untuk mengelola dana ini.
-
----
-
-#### 3.2.13. Konfigurasi Tarif BPJS dan PPh21 oleh HR
-
-ID Requirement : FR-PAYANA-802
-
-Deskripsi      : Sistem harus memampukan HR Admin untuk mengonfigurasi tarif BPJS (bpjsBps) dan, secara opsional, tarif tetap PPh21 (pph21Bps) dalam satuan basis points melalui fungsi `setCompanyConfig()`. Tarif BPJS selalu dipakai langsung sebagai potongan tetap saat `claimSalary()`. Untuk PPh21, jika HR mengisi `pph21Bps` (> 0), nilai tersebut dipakai sebagai override tarif tetap; jika dibiarkan pada nilai default (0), sistem menghitung tarif secara dinamis mengikuti skema Tarif Efektif Rata-rata (TER) sesuai PMK 168/2023 melalui `PayrollMath.calcPPh21TerBps()` (lihat FR-PAYANA-701), sehingga platform tidak perlu update smart contract setiap kali bracket tarif berubah. Sistem harus memastikan bahwa perubahan tarif hanya dapat dilakukan oleh pengguna dengan `HR_ROLE` pada vault perusahaan yang bersangkutan, dan setiap perubahan konfigurasi harus berlaku untuk klaim gaji yang terjadi setelah perubahan tersebut, tidak berlaku surut.
-
-> Catatan: FR-PAYANA-802 ini menjelaskan mekanisme konfigurasi yang sama dengan FR-PAYANA-204 (§3.2.13 pada seksi Kelompok D). Duplikasi ini adalah isu penomoran subbab lama yang sudah diketahui (dua section "3.2 Kebutuhan Fungsional" terpisah dalam dokumen ini) dan perlu dirapikan pada revisi renumbering berikutnya.
-
----
-
-#### 3.2.14. Penarikan Dana Kepatuhan oleh HR ke Agen Pajak
-
-ID Requirement : FR-PAYANA-803
-
-Deskripsi      : Sistem harus memampukan HR Admin untuk menarik akumulasi dana kepatuhan dari sub-pool komplianse vault ke alamat tujuan yang ditentukan (misalnya dompet agen pajak atau rekening bridging pembayaran BPJS) melalui fungsi `withdrawCompliance()`. Sistem harus memvalidasi bahwa jumlah yang akan ditarik tidak melebihi saldo `complianceBalance` yang tersedia; jika tidak mencukupi, transaksi ditolak dengan error `InsufficientComplianceBalance`. Fungsi ini hanya dapat dipanggil oleh pengguna dengan `HR_ROLE` dan transfer dilakukan langsung ke alamat penerima yang ditentukan oleh HR, bukan ke alamat HR itu sendiri secara implisit. Event `ComplianceWithdrawn` diterbitkan setelah penarikan berhasil untuk keperluan audit trail on-chain.
-
----
-
-#### 3.2.15. Unduhan Laporan Kepatuhan oleh HR
-
-ID Requirement : FR-PAYANA-804
-
-Deskripsi      : Sistem harus memampukan HR Admin untuk mengunduh laporan kepatuhan bulanan dalam format CSV yang berisi rincian akumulasi dana kepatuhan per karyawan, mencakup total IDRX yang diakumulasikan untuk periode tertentu, estimasi alokasi BPJS Kesehatan, BPJS Ketenagakerjaan, dan PPh21 berdasarkan tarif yang dikonfigurasi, serta saldo komplianse yang belum ditarik. Laporan ini dihasilkan oleh layanan backend berdasarkan data yang diindeks oleh Ponder dari event `SalaryClaimed` dan `ComplianceWithdrawn` on-chain, yang dipadankan dengan data karyawan (nama, NIK terenkripsi) dari basis data off-chain. Data PII karyawan hanya didekripsi sementara pada saat ekspor laporan dan tidak disimpan dalam bentuk plaintext di server, sesuai dengan kewajiban UU PDP No. 27/2022. Laporan yang diekspor harus mencantumkan periode pelaporan dan cap waktu ekspor untuk keperluan audit.
-
----
-
-#### 3.2.16. Pemantauan Status Kepatuhan per Karyawan
-
-ID Requirement : FR-PAYANA-805
-
-Deskripsi      : Sistem harus memampukan HR Admin untuk memantau akumulasi dana kepatuhan per karyawan secara individual melalui dashboard, termasuk total IDRX yang telah diakumulasikan sejak karyawan bergabung (`employeeComplianceAccumulated`) dan estimasi kewajiban BPJS serta PPh21 yang telah terpenuhi. Data ini harus ditampilkan dalam bentuk yang mudah dibandingkan dengan kewajiban nominal yang seharusnya dibayarkan ke DJP dan BPJS, sehingga HR dapat mengidentifikasi selisih jika ada. [Perlu dikonfirmasi] Mekanisme rekonsiliasi otomatis antara saldo `complianceBalance` on-chain dan kewajiban pembayaran aktual ke DJP/BPJS belum diimplementasikan pada versi MVP dan memerlukan spesifikasi lebih lanjut untuk integrasi dengan sistem pemerintah.
-
----
-
-### Kelompok I: Sertifikasi Ketenagakerjaan (SBT)
-
-Kelompok ini mendefinisikan kebutuhan fungsional untuk sistem penerbitan dan pengelolaan Soulbound Token (SBT) berbasis standar ERC-5192, yang berfungsi sebagai sertifikat ketenagakerjaan on-chain yang dapat diverifikasi oleh pihak ketiga tanpa ekspos data pribadi karyawan.
-
----
-
-#### 3.2.17. Penerbitan SBT saat Onboarding Karyawan
-
-ID Requirement : FR-PAYANA-901
-
-Deskripsi      : Sistem harus secara otomatis menerbitkan (mint) Soulbound Token kepada karyawan setiap kali HR Admin berhasil memulai stream gaji melalui fungsi `startStream()` pada kontrak CompanyVault. Proses penerbitan SBT dilakukan oleh CompanyVault yang bertindak sebagai pengemban `MINTER_ROLE` pada kontrak `EmploymentSBT`, dengan memanggil fungsi `mint()` secara otomatis di akhir proses startStream. Jika kontrak EmploymentSBT belum dikonfigurasi atau terjadi error (misalnya MINTER_ROLE belum diberikan), proses startStream harus tetap berhasil — kegagalan penerbitan SBT tidak boleh membatalkan aktivasi stream gaji. Token yang diterbitkan bersifat permanen terkunci (locked) dan tidak dapat dipindahtangankan ke alamat lain, sesuai dengan implementasi ERC-5192 yang memblokir semua transfer peer-to-peer melalui override fungsi `_update`.
-
----
-
-#### 3.2.18. Kandungan Metadata Ketenagakerjaan dalam SBT
-
-ID Requirement : FR-PAYANA-902
-
-Deskripsi      : Sistem harus menyimpan rekaman ketenagakerjaan (employment record) secara on-chain untuk setiap SBT yang diterbitkan, mencakup nama perusahaan (companyName) sebagaimana yang dikonfigurasi pada vault, alamat HR yang mengotorisasi stream (hrAuthority), dan timestamp blok pada saat stream dimulai (startTs). Data ini disimpan dalam mapping `employmentRecords` yang terpetakan dari tokenId, dan dapat diakses secara publik oleh pihak ketiga mana pun yang memiliki tokenId atau alamat karyawan tanpa memerlukan izin khusus. Jabatan (job title) karyawan tidak disimpan on-chain pada versi MVP untuk menghindari ekspos data sensitif di blockchain publik, melainkan disimpan off-chain dan dapat diakses melalui URI metadata token (tokenURI). Sistem harus menjamin bahwa hanya satu SBT aktif yang dapat dimiliki oleh satu alamat karyawan dalam satu waktu; upaya penerbitan SBT kedua ke alamat yang sama akan ditolak dengan error `AlreadyHasToken`.
-
----
-
-#### 3.2.19. Pencabutan SBT saat Offboarding Karyawan
-
-ID Requirement : FR-PAYANA-903
-
-Deskripsi      : Sistem harus secara otomatis mencabut (revoke/burn) Soulbound Token milik karyawan ketika hubungan kerja berakhir, baik melalui proses resign yang diprakarsai HR via `resignEmployee()` maupun melalui eksekusi PHK via `executeTermination()`. Pencabutan SBT dilakukan oleh CompanyVault dengan memanggil fungsi `revoke()` pada kontrak `EmploymentSBT` melalui fungsi internal `_revokeSBT()`. Jika karyawan tidak memiliki SBT aktif (tokenId = 0) atau terjadi error pada proses pencabutan, proses resign atau PHK harus tetap dilanjutkan dan berhasil — kegagalan pencabutan SBT tidak boleh membatalkan proses pemutusan hubungan kerja. Setelah pencabutan, entri `employeeTokenId[employee]` dan `employmentRecords[tokenId]` dihapus dari storage on-chain, dan event `EmploymentRevoked` diterbitkan oleh CompanyVault untuk keperluan indeksasi.
-
----
-
-#### 3.2.20. Akses Karyawan terhadap SBT di Wallet
-
-ID Requirement : FR-PAYANA-904
-
-Deskripsi      : Sistem harus memampukan karyawan untuk melihat Soulbound Token ketenagakerjaan mereka melalui dashboard karyawan, yang menampilkan informasi nama perusahaan, tanggal mulai bekerja berdasarkan startTs yang tersimpan on-chain, dan status keaktifan token. Karena SBT adalah token ERC-721 standar, token ini juga secara otomatis terlihat di dompet Ethereum yang mendukung tampilan NFT (seperti MetaMask dan Rainbow), meskipun token tersebut tidak dapat dipindahtangankan. Sistem frontend harus menggunakan fungsi `employeeTokenId(address)` untuk mengambil tokenId aktif karyawan dan kemudian `employmentRecords(tokenId)` untuk mengambil data ketenagakerjaan yang ditampilkan. Dashboard harus menampilkan pesan yang jelas ketika karyawan tidak memiliki SBT aktif (belum di-onboard atau sudah di-offboard).
-
----
-
-#### 3.2.21. Verifikasi SBT oleh Pihak Ketiga
-
-ID Requirement : FR-PAYANA-905
-
-Deskripsi      : Sistem harus menyediakan mekanisme verifikasi ketenagakerjaan yang dapat digunakan oleh pihak ketiga (seperti institusi keuangan atau calon pemberi kerja) untuk mengkonfirmasi status ketenagakerjaan aktif seorang karyawan tanpa harus mengakses data PII dari basis data terpusat. Verifikasi dapat dilakukan secara on-chain dengan mengquery fungsi `employeeTokenId(address)` pada kontrak `EmploymentSBT`; nilai non-nol mengindikasikan karyawan tersebut saat ini dalam status aktif bekerja. Pihak ketiga juga dapat mengquery `employmentRecords(tokenId)` untuk mendapatkan nama perusahaan dan tanggal mulai kerja, serta menggunakan fungsi `locked(tokenId)` yang selalu mengembalikan nilai true untuk mengkonfirmasi bahwa token adalah SBT yang sah dan tidak dapat dipindahtangankan. Sistem harus mendukung antarmuka `IERC5192` sehingga platform verifikasi pihak ketiga yang mengenal standar ERC-5192 dapat mendeteksi keabsahan SBT secara programatik melalui `supportsInterface`.
-
----
-
-### Kelompok J: Administrasi Platform (Owner SaaS)
+### Kelompok F: Administrasi Platform (Owner SaaS)
 
 Kelompok ini mendefinisikan kebutuhan fungsional untuk operator platform Payana (Super Admin) dalam mengelola seluruh siklus hidup tenant, memonetisasi platform, memantau kondisi keseluruhan sistem, serta menjalankan tindakan darurat apabila diperlukan.
 
@@ -901,16 +770,202 @@ Deskripsi      : Sistem harus memampukan Owner SaaS untuk melihat dan menarik to
 
 ---
 
-> **Catatan (Kelompok M s.d. S):** Ketujuh kelompok di bawah ini memformalkan tujuh modul yang
-> sudah diimplementasikan penuh (backend/frontend berfungsi, diuji nyata — lihat PDHUPL_v2.md
-> KU-21 s.d. KU-27, KU-29). Nomor FR dimulai dari 1101, disamakan dengan penomoran pada
-> `SPESIFIKASI KEBUTUHAN PERANGKAT LUNAK.docx` (lihat Catatan Kelompok U di bawah untuk satu
-> pengecualian).
+> **Catatan (FR-PAYANA-1101 s.d. 1801):** Delapan kelompok fungsional pada rentang FR-PAYANA-1101
+> s.d. 1801 sudah disamakan penomorannya dengan `SPESIFIKASI KEBUTUHAN PERANGKAT LUNAK.docx`.
+> Setelah label huruf Kelompok diselaraskan dengan huruf Modul di §1.2 (§1.2 memakai skema huruf
+> terpisah yang tidak lagi mengikuti urutan penomoran FR — lihat catatan di §1.2), kedelapan
+> kelompok ini kini tersebar sebagai **Kelompok G, M, N, O, P, Q, R, dan S** — bukan blok huruf
+> yang berurutan. Tujuh di antaranya — **Kelompok G, M, N, O, P, Q, dan R** (FR-PAYANA-1101 s.d.
+> 1701) — sudah diimplementasikan penuh (backend/frontend berfungsi, diuji nyata — lihat
+> PDHUPL_v2.md KU-21 s.d. KU-27, KU-29).
 
-> **[FLAG-BARU-VS-DOCX]** Kelompok U (FR-PAYANA-1901 s.d. 1904) tidak memiliki padanan di docx —
-> Kelompok M s.d. T (FR-PAYANA-1101 s.d. 1801) sudah disamakan penomorannya dengan docx. Kelompok
-> U melanjutkan pola penomoran per-ratus docx (blok berikutnya setelah 1801). Pasangan dari
-> UC-22 s.d. UC-30.
+> **[FLAG-BARU-VS-DOCX]** Kelompok H (Deteksi Anomali Keamanan Vault, FR-PAYANA-1901 s.d. 1904)
+> tidak memiliki padanan di docx — seluruh kelompok lain pada rentang FR-PAYANA-1101 s.d. 1801
+> (Kelompok G, M, N, O, P, Q, R, S) sudah disamakan penomorannya dengan docx. Kelompok H
+> melanjutkan pola penomoran per-ratus docx (blok berikutnya setelah FR-PAYANA-1801). Pasangan
+> dari UC-22 s.d. UC-30.
+
+### Kelompok G: Notifikasi
+
+---
+
+#### 3.2.35. Notifikasi Real-Time Berbasis Peristiwa
+
+ID Requirement : FR-PAYANA-1301
+
+Deskripsi      : Sistem harus memampukan setiap pengguna untuk melihat daftar notifikasi miliknya sendiri melalui `GET /notifications` (maksimum 50 notifikasi terbaru, terurut dari yang paling baru), serta menandai satu (`PATCH /notifications/:id/read`) atau seluruh (`PATCH /notifications/read-all`) notifikasi sebagai telah dibaca. Sistem harus menolak (403 Forbidden) upaya menandai notifikasi yang bukan milik pengguna yang sedang login. Notifikasi diterbitkan otomatis oleh backend pada peristiwa signifikan yang relevan bagi penerima (mis. reimbursement disetujui/ditolak).
+
+---
+
+### Kelompok H: Deteksi Anomali Keamanan Vault
+
+Kelompok ini mendefinisikan kebutuhan fungsional untuk pemantauan otomatis terhadap event on-chain setiap `CompanyVault`, mendeteksi pola yang konsisten dengan wallet HR yang dikompromikan, dan menyediakan antarmuka Owner SaaS untuk meninjau serta menindaklanjuti setiap temuan.
+
+---
+
+#### 3.2.41. Deteksi Penarikan Vault Tidak Wajar
+
+ID Requirement : FR-PAYANA-1901
+
+Deskripsi      : Sistem harus memeriksa setiap event `VaultWithdrawn` baru pada siklus 2 menit dan membandingkannya dengan riwayat penarikan vault yang sama. Sistem harus menghasilkan alert `SUSPICIOUS_WITHDRAWAL` apabila: (a) vault belum pernah memiliki riwayat penarikan sebelumnya (penerima secara definisi belum terverifikasi); (b) jumlah penarikan melebihi 3 kali rata-rata historis vault tersebut; atau (c) alamat penerima belum pernah menerima penarikan dari vault tersebut sebelumnya. Tingkat keparahan `critical` diberikan apabila lebih dari satu kondisi terpenuhi sekaligus, selain itu `high`.
+
+Rasional   : `withdrawVault()` hanya dapat dipanggil oleh `HR_ROLE`, sehingga secara kriptografis selalu tampak sah — pembeda antara penarikan legitimate dan penarikan hasil kompromi kunci privat HR hanya bisa dideteksi dari pola perilaku (jumlah dan tujuan), bukan dari validitas tanda tangan.
+
+---
+
+#### 3.2.42. Deteksi Perubahan Peran Tidak Terduga
+
+ID Requirement : FR-PAYANA-1902
+
+Deskripsi      : Sistem harus memeriksa setiap event `RoleGranted` baru pada `CompanyVault` (termasuk peran bawaan `AccessControl` milik OpenZeppelin yang diwarisi kontrak) pada siklus 2 menit. Sistem harus menghasilkan alert `UNEXPECTED_ROLE_GRANT` apabila peran diberikan ke alamat yang bukan `hrAuthority` terdaftar untuk vault tersebut. Tingkat keparahan `critical` diberikan untuk `HR_ROLE` atau `DEFAULT_ADMIN_ROLE` (peran admin inti); tingkat keparahan `medium` diberikan untuk `LEGAL_ROLE` (delegasi ke pihak legal terpisah adalah skenario yang lebih wajar, meski tetap dicatat untuk visibilitas).
+
+Rasional   : Pemberian `HR_ROLE`/`DEFAULT_ADMIN_ROLE` ke alamat baru adalah indikator kompromi yang paling kuat — ini adalah langkah yang secara khas diambil penyerang untuk membangun akses persisten (backdoor) yang bertahan meski kunci HR asli kemudian diputar/dicabut.
+
+---
+
+#### 3.2.43. Deteksi Aktivitas Sensitif Beruntun
+
+ID Requirement : FR-PAYANA-1903
+
+Deskripsi      : Sistem harus menghitung jumlah aksi sensitif (penarikan vault dan perubahan peran yang diberikan) dari satu vault dalam satu siklus pemeriksaan (2 menit). Sistem harus menghasilkan alert `HIGH_FREQUENCY_ACTIVITY` dengan tingkat keparahan `high` apabila jumlah tersebut mencapai atau melebihi 3.
+
+Rasional   : Penyerang yang sudah menguasai kunci HR biasanya bertindak cepat sebelum terdeteksi — rangkaian aksi sensitif dalam waktu singkat adalah sinyal tambahan yang independen dari besaran/tujuan masing-masing transaksi individual.
+
+---
+
+#### 3.2.44. Tinjauan dan Penyelesaian Alert Keamanan oleh Owner SaaS
+
+ID Requirement : FR-PAYANA-1904
+
+Deskripsi      : Sistem harus memampukan Owner SaaS untuk melihat seluruh alert keamanan (aktif dan riwayat) melalui `GET /security/alerts`, terurut dengan alert yang belum ditangani ditampilkan lebih dulu. Owner SaaS harus dapat menandai satu alert sebagai selesai ditangani melalui `PATCH /security/alerts/:id/resolve`. Endpoint ini harus ditolak (403 Forbidden) untuk pemanggil yang bukan Owner SaaS. Setiap alert baru juga didorong sebagai notifikasi in-app real-time (`SECURITY_ANOMALY`) ke Owner SaaS.
+
+Rasional   : Deteksi otomatis tanpa jalur tindak lanjut yang jelas tidak memberikan nilai operasional — Owner SaaS memerlukan satu tempat tunggal untuk meninjau seluruh sinyal keamanan lintas tenant dan mencatat bahwa suatu temuan sudah ditindaklanjuti (baik berupa investigasi manual maupun tindakan lain di luar sistem).
+
+---
+
+#### Kelompok I: Manajemen Stream Gaji Karyawan
+
+#### 3.2.18. Aktivasi Stream Gaji Karyawan
+ID Requirement : FR-PAYANA-301
+Deskripsi      : Sistem harus memampukan HR Admin untuk memulai stream gaji karyawan baru melalui fungsi startStream(employee, flowRate, severanceSplitBps) pada kontrak CompanyVault, dengan menentukan flow rate dalam satuan IDRX wei per detik serta persentase porsi severance (severanceSplitBps, basis poin, maksimum 10.000). Porsi karyawan dan kepatuhan (BPJS/PPh21) tidak ditentukan per-stream, melainkan dihitung dinamis saat klaim gaji berdasarkan konfigurasi `bpjsBps`/`pph21Bps` tingkat perusahaan (lihat FR-PAYANA-204). Sistem secara otomatis mencatat timestamp mulai stream, menginisialisasi vault severance karyawan dalam status Locked, dan menerbitkan Soulbound Token (ERC-5192) sebagai sertifikat ketenagakerjaan on-chain ke alamat Work ID karyawan.
+
+#### 3.2.19. Jeda Stream Gaji
+ID Requirement : FR-PAYANA-302
+Deskripsi      : Sistem harus memampukan HR Admin untuk menjeda stream gaji karyawan yang sedang aktif melalui fungsi pauseStream(). Sebelum menjeda, sistem terlebih dahulu menyelesaikan (settle) saldo yang telah terakumulasi sejak klaim terakhir ke dalam settledBalance karyawan, sehingga tidak ada gaji yang hilang akibat operasi jeda. Stream yang dijeda tidak mengakumulasi gaji baru, namun saldo yang telah tersimpan di settledBalance tetap dapat diklaim oleh karyawan.
+
+#### 3.2.20. Lanjutkan Stream Gaji
+ID Requirement : FR-PAYANA-303
+Deskripsi      : Sistem harus memampukan HR Admin untuk melanjutkan stream gaji karyawan yang sedang dalam status dijeda (Paused) melalui fungsi resumeStream(). Setelah dilanjutkan, akumulasi gaji kembali berjalan berdasarkan flow rate yang telah ditetapkan, dimulai dari waktu dilanjutkan. Sistem memperbarui lastWithdrawnTs ke timestamp saat ini sehingga perhitungan akumulasi berikutnya dimulai dari nol dan tidak ada penghitungan ganda atas periode jeda.
+
+#### 3.2.21. Pembaruan Flow Rate Gaji
+ID Requirement : FR-PAYANA-304
+Deskripsi      : Sistem harus memampukan HR Admin untuk memperbarui flow rate gaji karyawan yang sedang aktif melalui fungsi updateFlowRate(). Sebelum beralih ke flow rate baru, sistem menetapkan (settle) saldo yang telah terakumulasi pada flow rate lama ke dalam settledBalance agar tidak terjadi pembayaran lebih atau kurang pada periode peralihan. Total flow rate vault (totalFlowRate) diperbarui secara atomik bersamaan dengan perubahan flow rate individual karyawan untuk menjaga akurasi penghitungan kebutuhan penggajian bulanan.
+
+#### 3.2.22. Pembaruan Persentase Split Stream
+ID Requirement : FR-PAYANA-305
+Deskripsi      : Sistem harus memampukan HR Admin untuk memperbarui konfigurasi persentase split (employeeBps, complianceBps, severanceBps) pada stream karyawan yang sedang aktif atau dijeda melalui fungsi updateStreamSplits(). Jumlah ketiga persentase harus tetap berjumlah tepat 10.000 basis points; sistem menolak konfigurasi yang tidak memenuhi syarat ini. Apabila stream sedang aktif, sistem terlebih dahulu menetapkan saldo terakumulasi menggunakan persentase split lama sebelum menerapkan konfigurasi baru.
+
+#### 3.2.23. Pembatalan Stream Gaji
+ID Requirement : FR-PAYANA-306
+Deskripsi      : Sistem harus memampukan HR Admin untuk membatalkan stream gaji karyawan melalui fungsi cancelStream() pada kontrak CompanyVault. Jika stream sedang aktif saat pembatalan, sistem menetapkan saldo terakumulasi ke dalam settledBalance karyawan dan mengurangi totalFlowRate vault. Stream yang telah dibatalkan tidak mengakumulasi gaji baru, namun karyawan masih dapat mengklaim saldo yang tersimpan di settledBalance. Pembatalan stream tidak secara otomatis mencabut Soulbound Token karyawan.
+
+---
+
+#### Kelompok J: Penarikan Gaji — Earned Wage Access (EWA)
+
+#### 3.2.24. Klaim Gaji (Earned Wage Access)
+ID Requirement : FR-PAYANA-401
+Deskripsi      : Sistem harus memampukan karyawan untuk menarik seluruh saldo gaji yang telah terakumulasi kapan saja melalui fungsi claimSalary() pada kontrak CompanyVault, tanpa menunggu tanggal gajian bulanan. Sistem melakukan distribusi atomik dalam satu transaksi: platform fee dipotong terlebih dahulu, kemudian apabila karyawan memiliki kasbon aktif, hingga 20% dari total klaim dialokasikan untuk melunasi kasbon secara otomatis (lihat FR-PAYANA-706). Sisanya dipotong PPh21 dan BPJS (dihitung dinamis atau tarif tetap, lihat FR-PAYANA-701/702) ke sub-pool complianceBalance, porsi severance (default 2%) ditambahkan ke vault pesangon karyawan, dan sisa bersih ditransfer langsung ke alamat Work ID karyawan.
+
+#### 3.2.25. Kalkulasi Saldo Gaji Terakumulasi
+ID Requirement : FR-PAYANA-402
+Deskripsi      : Sistem harus memungkinkan pembacaan saldo gaji yang telah terakumulasi secara real-time untuk setiap karyawan melalui fungsi view getAccrued() pada kontrak CompanyVault. Formula kalkulasi adalah: saldo_total = settledBalance + (flowRate x (waktu_sekarang - lastWithdrawnTs)). Fungsi ini dapat dipanggil kapan saja tanpa biaya gas karena bersifat view-only dan mengembalikan saldo dalam satuan IDRX wei dengan presisi penuh.
+
+#### 3.2.26. Relay Transaksi Gasless via ERC-4337
+ID Requirement : FR-PAYANA-403
+Deskripsi      : Sistem harus memampukan karyawan melakukan klaim gaji tanpa membayar biaya gas blockchain melalui mekanisme ERC-4337 (Account Abstraction). Karyawan menandatangani UserOperation menggunakan embedded wallet Privy, kemudian frontend mengirimkannya ke endpoint POST /bundler/relay di backend. Backend memverifikasi kesesuaian alamat JWT dengan sender UserOperation, memeriksa batas laju klaim, lalu meneruskan UserOperation ke Pimlico Bundler yang mensponsori biaya gas melalui Paymaster contract. Hash UserOperation dikembalikan ke klien sebagai referensi pemantauan.
+
+#### 3.2.27. Pembatasan Laju Klaim Gaji
+ID Requirement : FR-PAYANA-404
+Deskripsi      : Sistem harus membatasi frekuensi klaim gaji yang dapat diteruskan oleh backend melalui relayer, dengan batas maksimal 10 kali per jam per alamat karyawan. Permintaan yang melampaui batas ini ditolak oleh backend dengan kode status HTTP 429 sebelum UserOperation diteruskan ke Pimlico, sehingga biaya Paymaster tidak terbuang pada permintaan yang berlebihan.
+
+#### 3.2.28. Pemantauan Status Transaksi
+ID Requirement : FR-PAYANA-405
+Deskripsi      : Sistem harus memampukan pengguna memeriksa status transaksi yang sebelumnya dikirimkan melalui backend relay dengan menggunakan hash UserOperation yang dikembalikan saat pengiriman. Backend meneruskan permintaan ke Pimlico Bundler menggunakan metode eth_getUserOperationReceipt dan mengembalikan receipt transaksi kepada klien, mencakup status keberhasilan dan hash transaksi on-chain yang dihasilkan jika transaksi telah dikonfirmasi.
+
+---
+
+#### Kelompok K: Pemberhentian Karyawan (PHK dan Resign)
+
+#### 3.2.29. Pengajuan Proposal Pemutusan Hubungan Kerja
+ID Requirement : FR-PAYANA-501
+Deskripsi      : Sistem harus memampukan HR Admin untuk mengajukan proposal Pemutusan Hubungan Kerja (PHK) terhadap karyawan melalui fungsi proposeTermination() pada kontrak CompanyVault. Proposal menyimpan hash dari alasan PHK on-chain (alasan lengkap disimpan off-chain untuk menjaga privasi), snapshot flow rate karyawan saat pengajuan untuk keperluan kalkulasi pesangon, serta timestamp kadaluarsa yang ditetapkan 7 hari sejak pengajuan. HR Admin secara otomatis memberikan persetujuan pertama (`hrApproved`) dengan mengajukan proposal; persetujuan `LEGAL_ROLE` (`legalApproved`) masih diperlukan sebagai langkah kedua sebelum eksekusi dapat dilakukan — lihat §3.1 untuk siapa yang menjalankan langkah kedua ini dalam praktik.
+
+#### 3.2.30. Persetujuan Proposal PHK oleh Pemegang LEGAL_ROLE
+ID Requirement : FR-PAYANA-502
+Deskripsi      : Sistem harus memampukan pemegang `LEGAL_ROLE` untuk memberikan persetujuan atas proposal PHK yang aktif melalui fungsi approveTermination() pada kontrak CompanyVault. Sistem memvalidasi bahwa proposal belum kadaluarsa, bahwa pemanggil memiliki `LEGAL_ROLE` pada vault yang bersangkutan, dan bahwa persetujuan dari alamat yang sama belum pernah diberikan sebelumnya. Proposal yang mendapat kedua persetujuan (`hrApproved` dan `legalApproved`) dapat segera dieksekusi oleh HR Admin (`executeTermination()` hanya dapat dipanggil oleh `HR_ROLE`) sebelum masa kadaluarsa berakhir. Dalam operasional saat ini, `LEGAL_ROLE` di-auto-grant ke alamat HR Admin sendiri (lihat §3.1), sehingga langkah persetujuan kedua ini secara de facto juga dijalankan oleh HR Admin — sistem tidak menyediakan dashboard atau alur login terpisah bagi pemegang `LEGAL_ROLE` yang berbeda dari HR Admin.
+
+#### 3.2.31. Eksekusi Pemutusan Hubungan Kerja
+ID Requirement : FR-PAYANA-503
+Deskripsi      : Sistem harus memampukan eksekusi PHK melalui fungsi executeTermination() setelah kedua persetujuan terpenuhi dan proposal belum melewati masa kadaluarsa 7 hari. Eksekusi secara atomik melakukan serangkaian operasi berikut: penghentian stream gaji dengan settlement saldo terakumulasi, penghitungan pesangon wajib sesuai formula UU Cipta Kerja Pasal 156 berdasarkan tenureMonths dan flowRateSnapshot, pengisian kekurangan pesangon dari saldo bebas vault jika dana pesangon karyawan tidak mencukupi, transfer dana pesangon ke Work ID karyawan, pencabutan Soulbound Token ketenagakerjaan, serta pembatalan seluruh cliff vest yang belum matang dengan pengembalian dana ke saldo bebas vault.
+
+#### 3.2.32. Penghitungan Pesangon Sesuai UU Cipta Kerja
+ID Requirement : FR-PAYANA-504
+Deskripsi      : Sistem harus menghitung uang pesangon yang wajib dibayarkan berdasarkan masa kerja karyawan (tenureMonths) menggunakan pengali yang ditetapkan dalam UU Cipta Kerja Pasal 156 melalui fungsi PayrollMath.severanceMultiplier(). Gaji bulanan bruto dihitung dari snapshot flow rate saat pengajuan PHK dikalikan dengan jumlah detik dalam satu bulan (2.592.000 detik). Apabila dana dalam vault pesangon karyawan tidak mencukupi jumlah wajib, sistem mengambil kekurangan dari saldo bebas vault; jika saldo bebas vault pun tidak mencukupi, sistem mentransfer seluruh dana yang tersedia dan memancarkan event SeveranceShortfall on-chain sebagai bukti kekurangan pembayaran.
+
+#### 3.2.33. Proses Pengunduran Diri (Resign) Karyawan
+ID Requirement : FR-PAYANA-505
+Deskripsi      : Sistem harus memampukan HR Admin untuk memproses pengunduran diri sukarela karyawan melalui fungsi resignEmployee() pada kontrak CompanyVault. Saat pengunduran diri diproses, sistem menghentikan stream gaji karyawan dengan terlebih dahulu menetapkan saldo terakumulasi ke settledBalance, mengembalikan seluruh dana pesangon yang pernah terakumulasi ke saldo bebas vault perusahaan (bukan ke karyawan, sesuai ketentuan resign sukarela), membatalkan seluruh cliff vest yang belum matang dengan pengembalian dana ke vault, dan mencabut Soulbound Token ketenagakerjaan karyawan yang bersangkutan.
+
+#### 3.2.34. Pencairan Dana Pesangon Otomatis Pasca-PHK
+ID Requirement : FR-PAYANA-506
+Deskripsi      : Sistem harus memastikan bahwa seluruh dana pesangon yang menjadi hak karyawan setelah eksekusi PHK ditransfer langsung ke alamat Work ID karyawan dalam satu transaksi atomik yang sama dengan eksekusi PHK. Tidak ada langkah manual tambahan yang diperlukan dari karyawan untuk menerima pesangon; sistem secara otomatis mengubah status SeveranceVault dari Locked menjadi Released dan mentransfer dana ke karyawan segera setelah eksekusi dikonfirmasi di blockchain, termasuk dana top-up dari saldo bebas vault jika pesangon yang terakumulasi tidak memenuhi jumlah wajib.
+
+### Kelompok L: Sertifikasi Ketenagakerjaan (SBT)
+
+Kelompok ini mendefinisikan kebutuhan fungsional untuk sistem penerbitan dan pengelolaan Soulbound Token (SBT) berbasis standar ERC-5192, yang berfungsi sebagai sertifikat ketenagakerjaan on-chain yang dapat diverifikasi oleh pihak ketiga tanpa ekspos data pribadi karyawan.
+
+---
+
+#### 3.2.17. Penerbitan SBT saat Onboarding Karyawan
+
+ID Requirement : FR-PAYANA-901
+
+Deskripsi      : Sistem harus secara otomatis menerbitkan (mint) Soulbound Token kepada karyawan setiap kali HR Admin berhasil memulai stream gaji melalui fungsi `startStream()` pada kontrak CompanyVault. Proses penerbitan SBT dilakukan oleh CompanyVault yang bertindak sebagai pengemban `MINTER_ROLE` pada kontrak `EmploymentSBT`, dengan memanggil fungsi `mint()` secara otomatis di akhir proses startStream. Jika kontrak EmploymentSBT belum dikonfigurasi atau terjadi error (misalnya MINTER_ROLE belum diberikan), proses startStream harus tetap berhasil — kegagalan penerbitan SBT tidak boleh membatalkan aktivasi stream gaji. Token yang diterbitkan bersifat permanen terkunci (locked) dan tidak dapat dipindahtangankan ke alamat lain, sesuai dengan implementasi ERC-5192 yang memblokir semua transfer peer-to-peer melalui override fungsi `_update`.
+
+---
+
+#### 3.2.18. Kandungan Metadata Ketenagakerjaan dalam SBT
+
+ID Requirement : FR-PAYANA-902
+
+Deskripsi      : Sistem harus menyimpan rekaman ketenagakerjaan (employment record) secara on-chain untuk setiap SBT yang diterbitkan, mencakup nama perusahaan (companyName) sebagaimana yang dikonfigurasi pada vault, alamat HR yang mengotorisasi stream (hrAuthority), dan timestamp blok pada saat stream dimulai (startTs). Data ini disimpan dalam mapping `employmentRecords` yang terpetakan dari tokenId, dan dapat diakses secara publik oleh pihak ketiga mana pun yang memiliki tokenId atau alamat karyawan tanpa memerlukan izin khusus. Jabatan (job title) karyawan tidak disimpan on-chain pada versi MVP untuk menghindari ekspos data sensitif di blockchain publik, melainkan disimpan off-chain dan dapat diakses melalui URI metadata token (tokenURI). Sistem harus menjamin bahwa hanya satu SBT aktif yang dapat dimiliki oleh satu alamat karyawan dalam satu waktu; upaya penerbitan SBT kedua ke alamat yang sama akan ditolak dengan error `AlreadyHasToken`.
+
+---
+
+#### 3.2.19. Pencabutan SBT saat Offboarding Karyawan
+
+ID Requirement : FR-PAYANA-903
+
+Deskripsi      : Sistem harus secara otomatis mencabut (revoke/burn) Soulbound Token milik karyawan ketika hubungan kerja berakhir, baik melalui proses resign yang diprakarsai HR via `resignEmployee()` maupun melalui eksekusi PHK via `executeTermination()`. Pencabutan SBT dilakukan oleh CompanyVault dengan memanggil fungsi `revoke()` pada kontrak `EmploymentSBT` melalui fungsi internal `_revokeSBT()`. Jika karyawan tidak memiliki SBT aktif (tokenId = 0) atau terjadi error pada proses pencabutan, proses resign atau PHK harus tetap dilanjutkan dan berhasil — kegagalan pencabutan SBT tidak boleh membatalkan proses pemutusan hubungan kerja. Setelah pencabutan, entri `employeeTokenId[employee]` dan `employmentRecords[tokenId]` dihapus dari storage on-chain, dan event `EmploymentRevoked` diterbitkan oleh CompanyVault untuk keperluan indeksasi.
+
+---
+
+#### 3.2.20. Akses Karyawan terhadap SBT di Wallet
+
+ID Requirement : FR-PAYANA-904
+
+Deskripsi      : Sistem harus memampukan karyawan untuk melihat Soulbound Token ketenagakerjaan mereka melalui dashboard karyawan, yang menampilkan informasi nama perusahaan, tanggal mulai bekerja berdasarkan startTs yang tersimpan on-chain, dan status keaktifan token. Karena SBT adalah token ERC-721 standar, token ini juga secara otomatis terlihat di dompet Ethereum yang mendukung tampilan NFT (seperti MetaMask dan Rainbow), meskipun token tersebut tidak dapat dipindahtangankan. Sistem frontend harus menggunakan fungsi `employeeTokenId(address)` untuk mengambil tokenId aktif karyawan dan kemudian `employmentRecords(tokenId)` untuk mengambil data ketenagakerjaan yang ditampilkan. Dashboard harus menampilkan pesan yang jelas ketika karyawan tidak memiliki SBT aktif (belum di-onboard atau sudah di-offboard).
+
+---
+
+#### 3.2.21. Verifikasi SBT oleh Pihak Ketiga
+
+ID Requirement : FR-PAYANA-905
+
+Deskripsi      : Sistem harus menyediakan mekanisme verifikasi ketenagakerjaan yang dapat digunakan oleh pihak ketiga (seperti institusi keuangan atau calon pemberi kerja) untuk mengkonfirmasi status ketenagakerjaan aktif seorang karyawan tanpa harus mengakses data PII dari basis data terpusat. Verifikasi dapat dilakukan secara on-chain dengan mengquery fungsi `employeeTokenId(address)` pada kontrak `EmploymentSBT`; nilai non-nol mengindikasikan karyawan tersebut saat ini dalam status aktif bekerja. Pihak ketiga juga dapat mengquery `employmentRecords(tokenId)` untuk mendapatkan nama perusahaan dan tanggal mulai kerja, serta menggunakan fungsi `locked(tokenId)` yang selalu mengembalikan nilai true untuk mengkonfirmasi bahwa token adalah SBT yang sah dan tidak dapat dipindahtangankan. Sistem harus mendukung antarmuka `IERC5192` sehingga platform verifikasi pihak ketiga yang mengenal standar ERC-5192 dapat mendeteksi keabsahan SBT secara programatik melalui `supportsInterface`.
+
+---
 
 ### Kelompok M: Reimburse Karyawan & HR
 
@@ -964,19 +1019,7 @@ Deskripsi      : Sistem harus memampukan karyawan untuk mencatat pemberian tip I
 
 ---
 
-### Kelompok O: Notifikasi
-
----
-
-#### 3.2.35. Notifikasi Real-Time Berbasis Peristiwa
-
-ID Requirement : FR-PAYANA-1301
-
-Deskripsi      : Sistem harus memampukan setiap pengguna untuk melihat daftar notifikasi miliknya sendiri melalui `GET /notifications` (maksimum 50 notifikasi terbaru, terurut dari yang paling baru), serta menandai satu (`PATCH /notifications/:id/read`) atau seluruh (`PATCH /notifications/read-all`) notifikasi sebagai telah dibaca. Sistem harus menolak (403 Forbidden) upaya menandai notifikasi yang bukan milik pengguna yang sedang login. Notifikasi diterbitkan otomatis oleh backend pada peristiwa signifikan yang relevan bagi penerima (mis. reimbursement disetujui/ditolak).
-
----
-
-### Kelompok P: Slip Gaji (Payslip)
+### Kelompok O: Slip Gaji (Payslip)
 
 ---
 
@@ -988,7 +1031,7 @@ Deskripsi      : Sistem harus memampukan karyawan (atau HR perusahaan terkait) u
 
 ---
 
-### Kelompok Q: Bukti Potong Pajak (Tax Cert)
+### Kelompok P: Bukti Potong Pajak (Tax Cert)
 
 ---
 
@@ -1000,7 +1043,7 @@ Deskripsi      : Sistem harus memampukan karyawan untuk melihat agregasi tahunan
 
 ---
 
-### Kelompok R: Surat Keterangan Kerja
+### Kelompok Q: Surat Keterangan Kerja
 
 ---
 
@@ -1012,7 +1055,7 @@ Deskripsi      : Sistem harus memampukan karyawan dengan status stream `Active` 
 
 ---
 
-### Kelompok S: Direktori Karyawan
+### Kelompok R: Direktori Karyawan
 
 ---
 
@@ -1024,7 +1067,7 @@ Deskripsi      : Sistem harus memampukan HR untuk melihat direktori seluruh kary
 
 ---
 
-### Kelompok T: Pengaturan Perusahaan (Branding)
+### Kelompok S: Pengaturan Perusahaan (Branding)
 
 ---
 
@@ -1033,52 +1076,6 @@ Deskripsi      : Sistem harus memampukan HR untuk melihat direktori seluruh kary
 ID Requirement : FR-PAYANA-1801
 
 Deskripsi      : Sistem harus memampukan HR untuk menyimpan dan memperbarui pengaturan branding serta preferensi perusahaannya melalui `GET`/`PUT /company-settings`, mencakup nama tampilan, negara, URL logo, batas EWA (`ewaLimitBps`), tarif yield (`yieldRateBps`), dan alamat kontak legal. Operasi bersifat upsert — HR yang belum pernah menyimpan pengaturan menerima `null` pada `GET`, dan `PUT` pertama membuat baris baru sementara `PUT` berikutnya memperbarui baris yang sudah ada. Pengaturan ini murni kosmetik/preferensi tampilan dan tidak memengaruhi logika keuangan on-chain.
-
----
-
-### Kelompok U: Deteksi Anomali Keamanan Vault
-
-Kelompok ini mendefinisikan kebutuhan fungsional untuk pemantauan otomatis terhadap event on-chain setiap `CompanyVault`, mendeteksi pola yang konsisten dengan wallet HR yang dikompromikan, dan menyediakan antarmuka Owner SaaS untuk meninjau serta menindaklanjuti setiap temuan.
-
----
-
-#### 3.2.41. Deteksi Penarikan Vault Tidak Wajar
-
-ID Requirement : FR-PAYANA-1901
-
-Deskripsi      : Sistem harus memeriksa setiap event `VaultWithdrawn` baru pada siklus 2 menit dan membandingkannya dengan riwayat penarikan vault yang sama. Sistem harus menghasilkan alert `SUSPICIOUS_WITHDRAWAL` apabila: (a) vault belum pernah memiliki riwayat penarikan sebelumnya (penerima secara definisi belum terverifikasi); (b) jumlah penarikan melebihi 3 kali rata-rata historis vault tersebut; atau (c) alamat penerima belum pernah menerima penarikan dari vault tersebut sebelumnya. Tingkat keparahan `critical` diberikan apabila lebih dari satu kondisi terpenuhi sekaligus, selain itu `high`.
-
-Rasional   : `withdrawVault()` hanya dapat dipanggil oleh `HR_ROLE`, sehingga secara kriptografis selalu tampak sah — pembeda antara penarikan legitimate dan penarikan hasil kompromi kunci privat HR hanya bisa dideteksi dari pola perilaku (jumlah dan tujuan), bukan dari validitas tanda tangan.
-
----
-
-#### 3.2.42. Deteksi Perubahan Peran Tidak Terduga
-
-ID Requirement : FR-PAYANA-1902
-
-Deskripsi      : Sistem harus memeriksa setiap event `RoleGranted` baru pada `CompanyVault` (termasuk peran bawaan `AccessControl` milik OpenZeppelin yang diwarisi kontrak) pada siklus 2 menit. Sistem harus menghasilkan alert `UNEXPECTED_ROLE_GRANT` apabila peran diberikan ke alamat yang bukan `hrAuthority` terdaftar untuk vault tersebut. Tingkat keparahan `critical` diberikan untuk `HR_ROLE` atau `DEFAULT_ADMIN_ROLE` (peran admin inti); tingkat keparahan `medium` diberikan untuk `LEGAL_ROLE` (delegasi ke pihak legal terpisah adalah skenario yang lebih wajar, meski tetap dicatat untuk visibilitas).
-
-Rasional   : Pemberian `HR_ROLE`/`DEFAULT_ADMIN_ROLE` ke alamat baru adalah indikator kompromi yang paling kuat — ini adalah langkah yang secara khas diambil penyerang untuk membangun akses persisten (backdoor) yang bertahan meski kunci HR asli kemudian diputar/dicabut.
-
----
-
-#### 3.2.43. Deteksi Aktivitas Sensitif Beruntun
-
-ID Requirement : FR-PAYANA-1903
-
-Deskripsi      : Sistem harus menghitung jumlah aksi sensitif (penarikan vault dan perubahan peran yang diberikan) dari satu vault dalam satu siklus pemeriksaan (2 menit). Sistem harus menghasilkan alert `HIGH_FREQUENCY_ACTIVITY` dengan tingkat keparahan `high` apabila jumlah tersebut mencapai atau melebihi 3.
-
-Rasional   : Penyerang yang sudah menguasai kunci HR biasanya bertindak cepat sebelum terdeteksi — rangkaian aksi sensitif dalam waktu singkat adalah sinyal tambahan yang independen dari besaran/tujuan masing-masing transaksi individual.
-
----
-
-#### 3.2.44. Tinjauan dan Penyelesaian Alert Keamanan oleh Owner SaaS
-
-ID Requirement : FR-PAYANA-1904
-
-Deskripsi      : Sistem harus memampukan Owner SaaS untuk melihat seluruh alert keamanan (aktif dan riwayat) melalui `GET /security/alerts`, terurut dengan alert yang belum ditangani ditampilkan lebih dulu. Owner SaaS harus dapat menandai satu alert sebagai selesai ditangani melalui `PATCH /security/alerts/:id/resolve`. Endpoint ini harus ditolak (403 Forbidden) untuk pemanggil yang bukan Owner SaaS. Setiap alert baru juga didorong sebagai notifikasi in-app real-time (`SECURITY_ANOMALY`) ke Owner SaaS.
-
-Rasional   : Deteksi otomatis tanpa jalur tindak lanjut yang jelas tidak memberikan nilai operasional — Owner SaaS memerlukan satu tempat tunggal untuk meninjau seluruh sinyal keamanan lintas tenant dan mencatat bahwa suatu temuan sudah ditindaklanjuti (baik berupa investigasi manual maupun tindakan lain di luar sistem).
 
 ---
 
@@ -1807,7 +1804,7 @@ sequenceDiagram
 #### UC-21: Registrasi & Persetujuan Akun
 
 > **Catatan:** UC ini ditambahkan untuk menutup celah nomor use case — FR-PAYANA-107/108/109
-> ("Kelompok A: Autentikasi dan Registrasi") sebelumnya tidak memiliki UC yang sesuai; alur
+> ("Kelompok B: Manajemen Akun dan Autentikasi") sebelumnya tidak memiliki UC yang sesuai; alur
 > registrasinya sempat tercampur (dan sebagian tumpang tindih secara keliru) dengan UC-02.
 > Nomor UC-21 dipilih agar tidak menggeser nomor UC-01 s.d. UC-20 yang sudah dirujuk di tempat
 > lain pada dokumen ini maupun di DPPL/PDHUPL. Mencakup DUA alur registrasi: **company** (oleh
@@ -2217,7 +2214,7 @@ Deskripsi      : Smart contract CompanyVault harus mengimplementasikan pola chec
 Rasional       : Reentrancy adalah vektor serangan paling umum pada smart contract DeFi. Kegagalan mengimplementasikan perlindungan ini pada fungsi yang mentransfer dana dapat menyebabkan pengosongan vault secara tidak sah.
 
 ID Requirement : NFR-PAYANA-19
-Deskripsi      : Sistem harus mendeteksi dan memberi peringatan atas pola aktivitas on-chain yang konsisten dengan wallet HR yang dikompromikan (penarikan vault tidak wajar, pemberian peran admin ke alamat tak dikenal, aktivitas sensitif beruntun) dalam siklus tidak lebih dari 2 menit sejak event terjadi, dan mendorong notifikasi ke Owner SaaS. Lihat FR-PAYANA-1901 s.d. 1904 (Kelompok U) untuk kriteria deteksi rinci.
+Deskripsi      : Sistem harus mendeteksi dan memberi peringatan atas pola aktivitas on-chain yang konsisten dengan wallet HR yang dikompromikan (penarikan vault tidak wajar, pemberian peran admin ke alamat tak dikenal, aktivitas sensitif beruntun) dalam siklus tidak lebih dari 2 menit sejak event terjadi, dan mendorong notifikasi ke Owner SaaS. Lihat FR-PAYANA-1901 s.d. 1904 (Kelompok H) untuk kriteria deteksi rinci.
 Rasional       : Kontrol akses on-chain (`onlyHR`, `AccessControl`) tidak dapat membedakan pemanggil sah dari penyerang yang telah menguasai kunci privat HR — keduanya menghasilkan transaksi yang valid secara kriptografis. Deteksi anomali berbasis pola perilaku adalah lapisan pertahanan kedua yang independen dari validitas tanda tangan, divalidasi dengan simulasi serangan nyata di Base Sepolia (lihat PDHUPL_v2.md KU-32).
 
 #### 3.4.5 Maintainability
@@ -2543,7 +2540,7 @@ Keterangan kolom kunci:
 
 ### 4.1 Simpulan
 
-Dokumen ini telah mendefinisikan dua belas fungsi produk Payana yang dikelompokkan ke dalam delapan modul (Kelompok A s.d. U), mencakup manajemen vault perusahaan, streaming gaji real-time, penarikan gaji mandiri (EWA), PHK multi-tanda tangan, cliff vesting, mesin pajak dan kasbon, sertifikasi ketenagakerjaan berbasis SBT, administrasi platform SaaS, autentikasi berbasis wallet, transaksi gasless, serta deteksi anomali keamanan vault (Kelompok U). Seluruh kebutuhan fungsional (FR-PAYANA-101 s.d. 1904) dan non-fungsional (NFR-PAYANA-01 s.d. 19) telah dirinci dengan kriteria penerimaan yang terukur.
+Dokumen ini telah mendefinisikan dua belas fungsi produk Payana yang dikelompokkan ke dalam delapan modul (Modul A s.d. H, §1.2), yang secara rinci direalisasikan oleh sembilan belas Kelompok kebutuhan fungsional (Kelompok A s.d. S, §3.2) — mencakup manajemen vault perusahaan, streaming gaji real-time, penarikan gaji mandiri (EWA), PHK multi-tanda tangan, cliff vesting, mesin pajak dan kasbon, sertifikasi ketenagakerjaan berbasis SBT, administrasi platform SaaS, autentikasi berbasis wallet, transaksi gasless, serta deteksi anomali keamanan vault (Kelompok H). Seluruh kebutuhan fungsional (FR-PAYANA-101 s.d. 1904) dan non-fungsional (NFR-PAYANA-01 s.d. 19) telah dirinci dengan kriteria penerimaan yang terukur.
 
 Bagian terbesar dari kebutuhan yang didefinisikan telah diimplementasikan dan divalidasi terhadap sistem nyata: tiga kontrak Solidity (`PayrollFactory`, `CompanyVault`, `EmploymentSBT`) sudah di-deploy dan terverifikasi di Base Sepolia, backend dan frontend untuk Kelompok M s.d. U sudah berfungsi penuh (lihat PDHUPL_v2.md KU-21 s.d. KU-32), dan kebutuhan performa (NFR-PAYANA-01) serta reliabilitas (NFR-PAYANA-07) telah dikoreksi dan divalidasi berdasarkan hasil stress test aktual (k6 + InfluxDB + Grafana), bukan sekadar target yang belum diukur.
 
@@ -2561,7 +2558,7 @@ Untuk iterasi produk maupun revisi dokumen SKPL berikutnya, disarankan hal-hal b
 2. **Bangun dashboard Legal Officer yang benar-benar independen** dari HR Admin — menambahkan cabang pemeriksaan `LEGAL_ROLE` pada `useRole.ts` dan jalur akses terpisah pada `useRoleGuard`, sehingga desain multi-tanda tangan PHK (§2.2 Fungsi ke-4) dapat dioperasikan oleh dua pihak independen sesuai rasional aslinya, bukan hanya sebagai kemampuan kontrak yang tidak terpakai di lapisan produk.
 3. **Tutup kelima isu pada `KNOWN_ISSUES.md`** sebelum evaluasi migrasi ke Base Mainnet, khususnya penambahan kuota gas per karyawan pada Paymaster (KI-005) dan pemulihan lapisan pertahanan berlapis pada `/bundler/relay` (KI-004), mengingat keduanya berdampak langsung pada risiko keamanan finansial platform.
 4. **Evaluasi kembali butir-butir di luar ruang lingkup MVP** (§1.2) — integrasi HRIS pihak ketiga, fiat on/off ramp langsung, payroll multi-chain, ESOP dengan secondary market, notifikasi push mobile native, stealth address (EIP-5564), dan private streaming rate on-chain — sebagai kandidat pengembangan lanjutan setelah adopsi awal tervalidasi oleh perusahaan pilot.
-5. **Selaraskan penomoran lampiran pemetaan FR-komponen** antara dokumen ini dengan `SPESIFIKASI KEBUTUHAN PERANGKAT LUNAK.docx` setelah Kelompok U (FR-PAYANA-1901 s.d. 1904) diporting ke docx, agar kedua dokumen konsisten sebagai satu kesatuan kontrak kebutuhan yang dapat ditelusuri balik ke implementasi.
+5. **Selaraskan penomoran lampiran pemetaan FR-komponen** antara dokumen ini dengan `SPESIFIKASI KEBUTUHAN PERANGKAT LUNAK.docx` setelah Kelompok H (FR-PAYANA-1901 s.d. 1904) diporting ke docx, agar kedua dokumen konsisten sebagai satu kesatuan kontrak kebutuhan yang dapat ditelusuri balik ke implementasi.
 
 ---
 
