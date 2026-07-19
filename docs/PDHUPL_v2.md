@@ -2,10 +2,10 @@
 ## Perencanaan dan Deskripsi Hasil Uji Perangkat Lunak
 
 > **Sumber acuan UC/FR:** `payroll-web3-saas/docs/SKPL.md` (UC-01 s.d. UC-27, FR-PAYANA-101
-> s.d. FR-PAYANA-2104, NFR-PAYANA-01 s.d. NFR-PAYANA-19). Nomor KU-17/18/19 tidak digunakan
+> s.d. FR-PAYANA-1904, NFR-PAYANA-01 s.d. NFR-PAYANA-19). Nomor KU-17/18/19 tidak digunakan
 > (dicadangkan, tidak dialokasikan untuk modul mana pun) — penomoran KU-01 s.d. KU-29 lainnya
 > berurutan; KU-30/KU-31 (Bab 6) adalah pengujian non-fungsional (NFR), terpisah dari
-> penomoran fungsional di atas. KU-32 (UC-27, Modul U/Kelompok U — Deteksi Anomali Keamanan
+> penomoran fungsional di atas. KU-32 (UC-27, Modul H/Kelompok H — Deteksi Anomali Keamanan
 > Vault) adalah pengujian fungsional end-to-end/black-box (bukan NFR) meski penomorannya
 > mengikuti KU-30/KU-31 — lihat §3.2 dan Bab 5.
 > Seluruh **103 butir uji fungsional+non-fungsional** dalam dokumen ini (98 fungsional di Bab 5
@@ -328,43 +328,43 @@ tanggal eksekusi sesungguhnya.
 | KU-20 Konfigurasi & Klaim Platform Fee | setPlatformFee ≤ 100 bps sukses | UC-17 | FR-1006 | AU-20-01 | Unit (Foundry) | Functional — Happy Path |
 | KU-20 Konfigurasi & Klaim Platform Fee | setPlatformFee > 100 bps → revert "FeeTooHigh" | UC-17 | FR-1006 | AU-20-02 | Unit (Foundry) | Functional — Negative |
 | KU-20 Konfigurasi & Klaim Platform Fee | setProtocolTreasury alamat baru sukses | UC-17 | FR-1003 | AU-20-03 | Unit (Foundry) | Functional — Happy Path |
-| KU-21 Reimburse Karyawan & HR | Submit klaim reimbursement sukses (status pending) | UC-19 | FR-1301 | AU-21-01 | Integration | Functional — Happy Path |
-| KU-21 Reimburse Karyawan & HR | Approve dengan txHash yang bukan transfer valid → 400 | UC-19 | FR-1302 | AU-21-02 | Integration | Functional — Negative |
-| KU-21 Reimburse Karyawan & HR | Approve oleh HR lain → 403 | UC-19 | FR-1302 | AU-21-03 | Integration | Security — Access Control |
-| KU-21 Reimburse Karyawan & HR | Approve klaim yang sudah direview → 409 | UC-19 | FR-1302 | AU-21-04 | Integration | Functional — Negative |
-| KU-22 Bounty & Tip | HR create bounty sukses | UC-20 | FR-1401 | AU-22-01 | Integration | Functional — Happy Path |
-| KU-22 Bounty & Tip | Claim bounty saat quota penuh → 409 QUOTA_REACHED | UC-20 | FR-1401 | AU-22-02 | Integration | Functional — Negative |
-| KU-22 Bounty & Tip | HR approve claim lalu record txHash pembayaran | UC-20 | FR-1402 | AU-22-03 | Integration | Functional — Happy Path |
-| KU-22 Bounty & Tip | Kirim tip peer-to-peer, tercatat di riwayat | UC-20 | FR-1403 | AU-22-04 | Integration | Functional — Happy Path |
-| KU-23 Notifikasi | GET /notifications daftar milik sendiri, terbaru dulu, maks 50 | UC-21 | FR-1501 | AU-23-01 | Integration | Functional — Happy Path |
-| KU-23 Notifikasi | Tandai notifikasi milik user lain sebagai read → 403 | UC-21 | FR-1501 | AU-23-02 | Integration | Security — Access Control |
-| KU-23 Notifikasi | PATCH read-all menandai semua terbaca | UC-21 | FR-1501 | AU-23-03 | Integration | Functional — Happy Path |
-| KU-24 Slip Gaji (Payslip) | GET /payslip/:claimId oleh employee/HR terkait — breakdown lengkap | UC-22 | FR-1601 | AU-24-01 | Integration | Functional — Happy Path |
-| KU-24 Slip Gaji (Payslip) | Diakses pihak tidak terkait klaim → 403 | UC-22 | FR-1601 | AU-24-02 | Integration | Security — Access Control |
-| KU-24 Slip Gaji (Payslip) | claimId tidak ditemukan → 404 | UC-22 | FR-1601 | AU-24-03 | Integration | Functional — Negative |
-| KU-25 Bukti Potong Pajak | GET /tax-cert/:year employee — agregasi tahunan benar | UC-23 | FR-1701 | AU-25-01 | Integration | Functional — Happy Path |
-| KU-25 Bukti Potong Pajak | GET /tax-cert/hr/:employee/:year oleh HR yang bukan pemilik vault | UC-23 | FR-1701 | AU-25-02 | Integration | Security — Access Control |
-| KU-25 Bukti Potong Pajak | Tahun di luar rentang valid (2020–2100) → 400 | UC-23 | FR-1701 | AU-25-03 | Unit | Functional — Validasi Input |
-| KU-26 Surat Keterangan Kerja | Request dengan purpose valid → 201 | UC-24 | FR-1801 | AU-26-01 | Integration | Functional — Happy Path |
-| KU-26 Surat Keterangan Kerja | purpose di luar whitelist → 400 | UC-24 | FR-1801 | AU-26-02 | Unit | Functional — Validasi Input |
-| KU-26 Surat Keterangan Kerja | Employee tanpa stream aktif di HR tsb mengajukan → 400 NOT_EMPLOYEE | UC-24 | FR-1801 | AU-26-03 | Integration | Functional — Negative |
-| KU-26 Surat Keterangan Kerja | GET document sebelum approved → 400 NOT_APPROVED | UC-24 | FR-1801 | AU-26-04 | Integration | Functional — Negative |
-| KU-27 Direktori Karyawan | GET /directory/:hrAddress oleh HR sendiri — daftar lengkap | UC-25 | FR-1901 | AU-27-01 | Integration | Functional — Happy Path |
-| KU-27 Direktori Karyawan | Diakses HR lain → 403 | UC-25 | FR-1901 | AU-27-02 | Integration | Security — Access Control |
-| KU-27 Direktori Karyawan | PATCH assign department/position sukses | UC-25 | FR-1901 | AU-27-03 | Integration | Functional — Happy Path |
+| KU-21 Reimburse Karyawan & HR | Submit klaim reimbursement sukses (status pending) | UC-19 | FR-1101 | AU-21-01 | Integration | Functional — Happy Path |
+| KU-21 Reimburse Karyawan & HR | Approve dengan txHash yang bukan transfer valid → 400 | UC-19 | FR-1102 | AU-21-02 | Integration | Functional — Negative |
+| KU-21 Reimburse Karyawan & HR | Approve oleh HR lain → 403 | UC-19 | FR-1102 | AU-21-03 | Integration | Security — Access Control |
+| KU-21 Reimburse Karyawan & HR | Approve klaim yang sudah direview → 409 | UC-19 | FR-1102 | AU-21-04 | Integration | Functional — Negative |
+| KU-22 Bounty & Tip | HR create bounty sukses | UC-20 | FR-1201 | AU-22-01 | Integration | Functional — Happy Path |
+| KU-22 Bounty & Tip | Claim bounty saat quota penuh → 409 QUOTA_REACHED | UC-20 | FR-1201 | AU-22-02 | Integration | Functional — Negative |
+| KU-22 Bounty & Tip | HR approve claim lalu record txHash pembayaran | UC-20 | FR-1202 | AU-22-03 | Integration | Functional — Happy Path |
+| KU-22 Bounty & Tip | Kirim tip peer-to-peer, tercatat di riwayat | UC-20 | FR-1203 | AU-22-04 | Integration | Functional — Happy Path |
+| KU-23 Notifikasi | GET /notifications daftar milik sendiri, terbaru dulu, maks 50 | UC-21 | FR-1301 | AU-23-01 | Integration | Functional — Happy Path |
+| KU-23 Notifikasi | Tandai notifikasi milik user lain sebagai read → 403 | UC-21 | FR-1301 | AU-23-02 | Integration | Security — Access Control |
+| KU-23 Notifikasi | PATCH read-all menandai semua terbaca | UC-21 | FR-1301 | AU-23-03 | Integration | Functional — Happy Path |
+| KU-24 Slip Gaji (Payslip) | GET /payslip/:claimId oleh employee/HR terkait — breakdown lengkap | UC-22 | FR-1401 | AU-24-01 | Integration | Functional — Happy Path |
+| KU-24 Slip Gaji (Payslip) | Diakses pihak tidak terkait klaim → 403 | UC-22 | FR-1401 | AU-24-02 | Integration | Security — Access Control |
+| KU-24 Slip Gaji (Payslip) | claimId tidak ditemukan → 404 | UC-22 | FR-1401 | AU-24-03 | Integration | Functional — Negative |
+| KU-25 Bukti Potong Pajak | GET /tax-cert/:year employee — agregasi tahunan benar | UC-23 | FR-1501 | AU-25-01 | Integration | Functional — Happy Path |
+| KU-25 Bukti Potong Pajak | GET /tax-cert/hr/:employee/:year oleh HR yang bukan pemilik vault | UC-23 | FR-1501 | AU-25-02 | Integration | Security — Access Control |
+| KU-25 Bukti Potong Pajak | Tahun di luar rentang valid (2020–2100) → 400 | UC-23 | FR-1501 | AU-25-03 | Unit | Functional — Validasi Input |
+| KU-26 Surat Keterangan Kerja | Request dengan purpose valid → 201 | UC-24 | FR-1601 | AU-26-01 | Integration | Functional — Happy Path |
+| KU-26 Surat Keterangan Kerja | purpose di luar whitelist → 400 | UC-24 | FR-1601 | AU-26-02 | Unit | Functional — Validasi Input |
+| KU-26 Surat Keterangan Kerja | Employee tanpa stream aktif di HR tsb mengajukan → 400 NOT_EMPLOYEE | UC-24 | FR-1601 | AU-26-03 | Integration | Functional — Negative |
+| KU-26 Surat Keterangan Kerja | GET document sebelum approved → 400 NOT_APPROVED | UC-24 | FR-1601 | AU-26-04 | Integration | Functional — Negative |
+| KU-27 Direktori Karyawan | GET /directory/:hrAddress oleh HR sendiri — daftar lengkap | UC-25 | FR-1701 | AU-27-01 | Integration | Functional — Happy Path |
+| KU-27 Direktori Karyawan | Diakses HR lain → 403 | UC-25 | FR-1701 | AU-27-02 | Integration | Security — Access Control |
+| KU-27 Direktori Karyawan | PATCH assign department/position sukses | UC-25 | FR-1701 | AU-27-03 | Integration | Functional — Happy Path |
 | KU-28 Penangguhan Akses Klien | Owner suspend HR — sesi aktif langsung ter-revoke | — (FR-1005 ada, UC tidak ada) | FR-1005 | AU-28-01 | Integration | Functional — Happy Path |
 | KU-28 Penangguhan Akses Klien | HR yang disuspend login ulang → 403 ACCOUNT_SUSPENDED | — | FR-1005 | AU-28-02 | Integration | Functional — Negative |
 | KU-28 Penangguhan Akses Klien | Karyawan tetap bisa claimSalary meski HR-nya disuspend | — | FR-1005 | AU-28-03 | System (manual) | Functional — Konsistensi On-chain/Off-chain |
 | KU-28 Penangguhan Akses Klien | Owner reactivate — HR login ulang sukses dari nol | — | FR-1005 | AU-28-04 | Integration | Functional — Happy Path |
-| KU-29 Pengaturan Perusahaan | GET /company-settings mengembalikan null untuk HR baru | UC-26 | FR-2001 | AU-29-01 | Integration | Functional — Happy Path |
-| KU-29 Pengaturan Perusahaan | PUT /company-settings upsert branding tersimpan | UC-26 | FR-2001 | AU-29-02 | Integration | Functional — Happy Path |
+| KU-29 Pengaturan Perusahaan | GET /company-settings mengembalikan null untuk HR baru | UC-26 | FR-1801 | AU-29-01 | Integration | Functional — Happy Path |
+| KU-29 Pengaturan Perusahaan | PUT /company-settings upsert branding tersimpan | UC-26 | FR-1801 | AU-29-02 | Integration | Functional — Happy Path |
 | KU-30 Performa di Bawah Beban | Latency 3 endpoint inti pada 50→100 concurrent users, ramping ~2 menit (Run 1) | — | NFR-01 | AU-30-01 | System (k6 load test) | Non-Functional — Performance |
 | KU-30 Performa di Bawah Beban | Latency 19 endpoint (hampir seluruh permukaan API publik), 0 error 5xx (Run 2) | — | NFR-01 | AU-30-02 | System (k6 load test) | Non-Functional — Performance |
 | KU-30 Performa di Bawah Beban | Soak test 40 concurrent sustained 14 menit — cek degradasi bertahap/connection pool exhaustion (Run 3) | — | NFR-01,06 | AU-30-03 | System (k6 soak test) | Non-Functional — Performance/Reliability |
 | KU-31 Ketahanan RPC & Lonjakan Beban | Spike test instan 0→100 VU dalam 5 detik, tahan 60 detik — cek pemulihan bersih (Run 4) | — | NFR-07 | AU-31-01 | System (k6 spike test) | Non-Functional — Reliability |
 | KU-31 Ketahanan RPC & Lonjakan Beban | Probe ceiling `eth_call` bersamaan RPC Alchemy free-tier, validasi retry+backoff+fallback | — | NFR-07 | AU-31-02 | System (k6 RPC probe) | Non-Functional — Reliability |
-| KU-32 Deteksi Anomali Keamanan Vault | Simulasi serangan nyata (`attacker-sim.mjs`) — `withdrawVault()` ke alamat baru, cek alert `SUSPICIOUS_WITHDRAWAL` di `GET /security/alerts` | UC-27 | FR-PAYANA-2101,2104 | AU-32-01 | System (real attack simulation, Base Sepolia) | Functional — Security (End-to-End) |
-| KU-32 Deteksi Anomali Keamanan Vault | Simulasi serangan nyata (`attacker-sim.mjs`) — `grantRole(HR_ROLE, ...)` ke alamat baru, cek alert `UNEXPECTED_ROLE_GRANT` di `GET /security/alerts` | UC-27 | FR-PAYANA-2102,2104 | AU-32-02 | System (real attack simulation, Base Sepolia) | Functional — Security (End-to-End) |
+| KU-32 Deteksi Anomali Keamanan Vault | Simulasi serangan nyata (`attacker-sim.mjs`) — `withdrawVault()` ke alamat baru, cek alert `SUSPICIOUS_WITHDRAWAL` di `GET /security/alerts` | UC-27 | FR-PAYANA-1901,1904 | AU-32-01 | System (real attack simulation, Base Sepolia) | Functional — Security (End-to-End) |
+| KU-32 Deteksi Anomali Keamanan Vault | Simulasi serangan nyata (`attacker-sim.mjs`) — `grantRole(HR_ROLE, ...)` ke alamat baru, cek alert `UNEXPECTED_ROLE_GRANT` di `GET /security/alerts` | UC-27 | FR-PAYANA-1902,1904 | AU-32-02 | System (real attack simulation, Base Sepolia) | Functional — Security (End-to-End) |
 
 ### 3.2 Rencana Pengujian
 
@@ -558,46 +558,46 @@ Rincian lengkap ada di 2.3 (Material Pengujian); ringkasannya per kategori:
 - **AU-20-02** — Input: `setPlatformFee(150)` (>1%). Harapan: revert `"FeeTooHigh"`.
 - **AU-20-03** — Input: `setProtocolTreasury(0xNewTreasury)`. Harapan: `protocolTreasury` ter-update, event `ProtocolTreasuryUpdated`.
 
-### KU-21 — Reimburse Karyawan & HR (UC-19, FR-1301/1302)
+### KU-21 — Reimburse Karyawan & HR (UC-19, FR-1101/1102)
 **Antarmuka:** `POST /reimburse`, `PATCH /reimburse/:id/approve|reject` (`backend/src/routes/reimburse.ts`); halaman `/employee/reimburse`, `/hr/reimburse`.
 - **AU-21-01** — Input: `{hrAddress, category, amount, description}`. Harapan: `200`, klaim tersimpan status `pending`.
 - **AU-21-02** — Input: `PATCH /reimburse/:id/approve {txHash}` dengan `txHash` yang bukan transfer IDRX sejumlah `amount` ke `employeeAddress` (diverifikasi `verifyIdrxTransfer`). Harapan: `400 TRANSFER_NOT_VERIFIED`.
 - **AU-21-03** — Input: HR B approve klaim milik karyawan HR A. Harapan: `403 FORBIDDEN`.
 - **AU-21-04** — Input: approve klaim yang `status` sudah bukan `pending`. Harapan: `409 ALREADY_REVIEWED`.
 
-### KU-22 — Bounty & Tip (UC-20, FR-1401/1402/1403)
+### KU-22 — Bounty & Tip (UC-20, FR-1201/1202/1203)
 **Antarmuka:** `POST /bounty`, `POST /bounty/:id/claim`, `PATCH /bounty/claim/:id/approve|reject|paid`, `POST /bounty/tip` (`backend/src/routes/bounty.ts`); halaman `/employee/bounty`, `/hr/bounty`.
 - **AU-22-01** — Input: `{title, description, rewardIdrx, quota}`. Harapan: `200`, bounty tersimpan status `open`.
 - **AU-22-02** — Input: `POST /bounty/:id/claim` saat `claimedCount >= quota`. Harapan: `409 QUOTA_REACHED`.
 - **AU-22-03** — Input: `PATCH /bounty/claim/:id/paid {txHash}` dengan transfer IDRX terverifikasi sejumlah `rewardIdrx`. Harapan: status `paid`, `paidTxHash` tersimpan.
 - **AU-22-04** — Input: `POST /bounty/tip {toAddress, amount, txHash}`. Harapan: tercatat, muncul di `GET /bounty/tips/:address` untuk pengirim maupun penerima.
 
-### KU-23 — Notifikasi (UC-21, FR-1501)
+### KU-23 — Notifikasi (UC-21, FR-1301)
 **Antarmuka:** `GET /notifications`, `PATCH /notifications/:id/read`, `PATCH /notifications/read-all` (`backend/src/routes/notifications.ts`); halaman `/employee/notifications`.
 - **AU-23-01** — Input: `GET /notifications` oleh user dengan >50 notifikasi. Harapan: hanya 50 terbaru, urut `createdAt` desc.
 - **AU-23-02** — Input: `PATCH /notifications/:id/read` untuk `id` milik `recipientAddress` lain. Harapan: `403 FORBIDDEN`.
 - **AU-23-03** — Input: `PATCH /notifications/read-all`. Harapan: seluruh notifikasi milik caller `read = true`.
 
-### KU-24 — Slip Gaji (Payslip) (UC-22, FR-1601)
+### KU-24 — Slip Gaji (Payslip) (UC-22, FR-1401)
 **Antarmuka:** `GET /payslip/:claimId` (`backend/src/routes/payslip.ts`); halaman `/employee/payslip`.
 - **AU-24-01** — Input: `claimId` valid milik employee yang login (atau HR-nya). Harapan: breakdown `grossAccrued`/`platformFee`/`kasbonRepaid`/`taxAndBpjs`/`severance`/`netToEmployee` sesuai `salary_claim` Ponder.
 - **AU-24-02** — Input: `claimId` valid tapi caller bukan employee maupun HR terkait. Harapan: `403 FORBIDDEN`.
 - **AU-24-03** — Input: `claimId` yang tidak ada di `salary_claim`. Harapan: `404 NOT_FOUND`.
 
-### KU-25 — Bukti Potong Pajak (Tax Cert) (UC-23, FR-1701)
+### KU-25 — Bukti Potong Pajak (Tax Cert) (UC-23, FR-1501)
 **Antarmuka:** `GET /tax-cert/:year`, `GET /tax-cert/hr/:employee/:year` (`backend/src/routes/taxcert.ts`); halaman `/employee/tax-cert`.
 - **AU-25-01** — Input: `GET /tax-cert/2026` oleh employee. Harapan: agregat tahunan `totalGrossAccrued`/`totalCompliance`/`totalSeverance`/`totalNet` + breakdown bulanan.
 - **AU-25-02** — Input: `GET /tax-cert/hr/:employee/2026` oleh HR yang bukan `hr_authority` employee tsb di `salary_claim`. Harapan: `403 FORBIDDEN`.
 - **AU-25-03** — Input: `:year` = `1999` atau `2200`. Harapan: `400 BAD_REQUEST`, "Invalid year".
 
-### KU-26 — Surat Keterangan Kerja (UC-24, FR-1801)
+### KU-26 — Surat Keterangan Kerja (UC-24, FR-1601)
 **Antarmuka:** `POST /employment-letter/request`, `PATCH /employment-letter/:id/approve|reject`, `GET /employment-letter/:id/document` (`backend/src/routes/employmentLetter.ts`); halaman `/employee/employment-letter`, `/hr/employment-letters`.
 - **AU-26-01** — Input: `{hrAddress, purpose:"KPR"}`. Harapan: `201`, status `pending`.
 - **AU-26-02** — Input: `purpose:"Lainnya123"` (di luar whitelist `KPR|Kredit|Visa|Umum|Lainnya`). Harapan: `400 BAD_REQUEST`.
 - **AU-26-03** — Input: karyawan tanpa `employee_stream` berstatus `Active` di bawah `hrAddress` tsb. Harapan: `400 NOT_EMPLOYEE`.
 - **AU-26-04** — Input: `GET /employment-letter/:id/document` untuk surat yang `status` masih `pending`. Harapan: `400 NOT_APPROVED`.
 
-### KU-27 — Direktori Karyawan (UC-25, FR-1901)
+### KU-27 — Direktori Karyawan (UC-25, FR-1701)
 **Antarmuka:** `GET /directory/:hrAddress`, `PATCH /directory/:address` (`backend/src/routes/directory.ts`); halaman `/hr/directory`.
 - **AU-27-01** — Input: `GET /directory/:hrAddress` oleh HR itu sendiri. Harapan: daftar karyawan dengan `name`/`department`/`position`/`status`/`flowRate`.
 - **AU-27-02** — Input: HR B memanggil `GET /directory/:hrAddressA`. Harapan: `403 FORBIDDEN`.
@@ -610,7 +610,7 @@ Rincian lengkap ada di 2.3 (Material Pengujian); ringkasannya per kategori:
 - **AU-28-03** — Input: karyawan di bawah HR yang disuspend memanggil `claimSalary()` langsung (bukan lewat interface HR). Harapan: klaim tetap berhasil — vault tetap `Active` on-chain, suspensi murni gerbang login interface HR.
 - **AU-28-04** — Input: `DELETE /suspension/:hrAddress` oleh Owner, lalu HR login ulang. Harapan: baris blocklist terhapus, login sukses dari sesi baru (bukan pemulihan sesi lama).
 
-### KU-29 — Pengaturan Perusahaan (UC-26, FR-2001)
+### KU-29 — Pengaturan Perusahaan (UC-26, FR-1801)
 **Antarmuka:** `GET|PUT /company-settings` (`backend/src/routes/companySettings.ts`); halaman `/hr/settings`.
 - **AU-29-01** — Input: `GET /company-settings` oleh HR yang belum pernah menyimpan setting. Harapan: `200 null`.
 - **AU-29-02** — Input: `PUT /company-settings {name, country, logoUrl, ewaLimitBps, yieldRateBps, legalAddress}`. Harapan: tersimpan (insert atau update), terbaca kembali via `GET`.
@@ -630,11 +630,11 @@ Rincian lengkap ada di 2.3 (Material Pengujian); ringkasannya per kategori:
 
 ---
 
-### KU-32 — Deteksi Anomali Keamanan Vault (UC-27, FR-PAYANA-2101/2102/2104)
+### KU-32 — Deteksi Anomali Keamanan Vault (UC-27, FR-PAYANA-1901/1902/1904)
 
 **Catatan kategori:** berbeda dari KU-30/KU-31 di atas, KU-32 BUKAN pengujian non-fungsional
-— ini adalah pengujian fungsional *end-to-end*/*black-box* murni terhadap Modul U (lihat
-`SKPL.md` Kelompok U, `DPPL.md` §D.4 dan §B.6/B.17), memvalidasi bahwa `anomalyDetector.ts`
+— ini adalah pengujian fungsional *end-to-end*/*black-box* murni terhadap Modul H (lihat
+`SKPL.md` Kelompok H, `DPPL.md` §D.4 dan §B.6/B.17), memvalidasi bahwa `anomalyDetector.ts`
 benar-benar mendeteksi pola kompromi wallet HR pada rangkaian sistem nyata (kontrak → Ponder
 → cron backend → `app.anomaly_alerts` → `GET /security/alerts`), bukan mengukur performa atau
 ketahanan. Nomornya mengikuti KU-30/KU-31 (bukan KU-01 s.d. KU-29) murni karena ditambahkan
@@ -646,8 +646,8 @@ dengan `HR_ROLE` asli pada vault demo `0xEc2B154789C3E7B393f2c9E4bfa06b6cfd57F09
 diverifikasi lewat `GET /security/alerts` (Owner JWT) terhadap backend produksi
 (`BACKEND_URL` di `testing-scripts/.env`, Azure App Service `payana-backend`).
 
-- **AU-32-01** — Input: `attacker-sim.mjs` Aksi 1 — `withdrawVault(5.000.000 IDRX, <alamat baru>)` dari wallet HR "dikompromikan", ke alamat yang belum pernah menerima penarikan dari vault ini. Harapan: baris `SUSPICIOUS_WITHDRAWAL` (severity `high`, sesuai FR-PAYANA-2101 kondisi "penarikan pertama/penerima baru") muncul di `app.anomaly_alerts` dan terbaca via `GET /security/alerts` dalam ≤2 menit sejak transaksi terindeks Ponder (NFR-PAYANA-19).
-- **AU-32-02** — Input: `attacker-sim.mjs` Aksi 2 — `grantRole(HR_ROLE, <alamat baru>)` dari wallet HR yang sama, ke alamat yang bukan `hrAuthority` terdaftar untuk vault tsb (skenario backdoor/persistence). Harapan: baris `UNEXPECTED_ROLE_GRANT` (severity `critical`, peran inti sesuai FR-PAYANA-2102) muncul di `app.anomaly_alerts` dan terbaca via `GET /security/alerts` dalam ≤2 menit.
+- **AU-32-01** — Input: `attacker-sim.mjs` Aksi 1 — `withdrawVault(5.000.000 IDRX, <alamat baru>)` dari wallet HR "dikompromikan", ke alamat yang belum pernah menerima penarikan dari vault ini. Harapan: baris `SUSPICIOUS_WITHDRAWAL` (severity `high`, sesuai FR-PAYANA-1901 kondisi "penarikan pertama/penerima baru") muncul di `app.anomaly_alerts` dan terbaca via `GET /security/alerts` dalam ≤2 menit sejak transaksi terindeks Ponder (NFR-PAYANA-19).
+- **AU-32-02** — Input: `attacker-sim.mjs` Aksi 2 — `grantRole(HR_ROLE, <alamat baru>)` dari wallet HR yang sama, ke alamat yang bukan `hrAuthority` terdaftar untuk vault tsb (skenario backdoor/persistence). Harapan: baris `UNEXPECTED_ROLE_GRANT` (severity `critical`, peran inti sesuai FR-PAYANA-1902) muncul di `app.anomaly_alerts` dan terbaca via `GET /security/alerts` dalam ≤2 menit.
 
 **Eksekusi nyata (bukan simulasi/mock) — Run 1, 2026-07-17:**
 
@@ -729,7 +729,7 @@ polling), endpoint mengembalikan **2 baris alert baru**, keduanya `resolved: fal
 - `type: "UNEXPECTED_ROLE_GRANT"`, severity `critical`, `txHash` cocok dengan transaksi Aksi 2,
   `detectedAt: 2026-07-18T07:46:00.086Z`.
 
-Kedua alert muncul dalam window ≤2 menit yang disyaratkan FR-PAYANA-2101/2102/2104, dengan
+Kedua alert muncul dalam window ≤2 menit yang disyaratkan FR-PAYANA-1901/1902/1904, dengan
 `detail` dan `meta` yang secara akurat mendeskripsikan pola serangan (penerima/akun baru yang
 belum pernah berinteraksi dengan vault ini sebelumnya) sesuai desain `anomalyDetector.ts`.
 
