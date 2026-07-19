@@ -167,6 +167,8 @@ Dokumen SKPL Payana disusun dalam empat bab utama dan satu lampiran, dengan urai
 
 **Bab 3 — Kebutuhan Rinci** merinci seluruh kebutuhan fungsional dalam format Use Case dan daftar FR berpenomoran, disertai kebutuhan non-fungsional (performa, keamanan, kepatuhan, kebergunaan, skalabilitas, privasi, dan observabilitas) dengan kriteria penerimaan yang terukur.
 
+**Bab 4 — Penutup** menyajikan simpulan atas keseluruhan spesifikasi kebutuhan yang telah didefinisikan, mencakup status implementasi dan validasi tiap modul terhadap sistem yang sudah berjalan, serta saran dan catatan pengembangan lanjutan untuk revisi dokumen dan iterasi produk di masa mendatang.
+
 **Lampiran** menyediakan materi pendukung seperti diagram alur data, diagram urutan interaksi, dan pemetaan antara kebutuhan fungsional dengan komponen implementasi.
 
 ---
@@ -2534,6 +2536,32 @@ Keterangan kolom kunci:
 - `company.vault_address` — alamat kontrak `CompanyVault` (bukan `hrAuthority`); ditambahkan agar `role_change` (yang hanya membawa alamat vault, bukan `hrAuthority`, pada event `RoleGranted`/`RoleRevoked`) dapat di-resolve kembali ke perusahaan yang bersangkutan. Lihat FR-PAYANA-1901 s.d. 1904.
 - `vault_withdrawal.id` / `role_change.id` — komposit `${txHash}-${logIndex}`, mengikuti pola tabel event-log lain di atas. Kedua tabel ini adalah sumber data untuk `anomalyDetector.ts` (lihat DPPL.md Lampiran B untuk detail layanan).
 - `role_change.role` — hash `bytes32` mentah (`keccak256("HR_ROLE")`, `keccak256("LEGAL_ROLE")`, atau `0x00...00` untuk `DEFAULT_ADMIN_ROLE`), bukan nama peran dalam teks — interpretasi dilakukan di lapisan aplikasi (backend), bukan di Ponder.
+
+---
+
+## 4. Penutup
+
+### 4.1 Simpulan
+
+Dokumen ini telah mendefinisikan dua belas fungsi produk Payana yang dikelompokkan ke dalam delapan modul (Kelompok A s.d. U), mencakup manajemen vault perusahaan, streaming gaji real-time, penarikan gaji mandiri (EWA), PHK multi-tanda tangan, cliff vesting, mesin pajak dan kasbon, sertifikasi ketenagakerjaan berbasis SBT, administrasi platform SaaS, autentikasi berbasis wallet, transaksi gasless, serta deteksi anomali keamanan vault (Kelompok U). Seluruh kebutuhan fungsional (FR-PAYANA-101 s.d. 1904) dan non-fungsional (NFR-PAYANA-01 s.d. 19) telah dirinci dengan kriteria penerimaan yang terukur.
+
+Bagian terbesar dari kebutuhan yang didefinisikan telah diimplementasikan dan divalidasi terhadap sistem nyata: tiga kontrak Solidity (`PayrollFactory`, `CompanyVault`, `EmploymentSBT`) sudah di-deploy dan terverifikasi di Base Sepolia, backend dan frontend untuk Kelompok M s.d. U sudah berfungsi penuh (lihat PDHUPL_v2.md KU-21 s.d. KU-32), dan kebutuhan performa (NFR-PAYANA-01) serta reliabilitas (NFR-PAYANA-07) telah dikoreksi dan divalidasi berdasarkan hasil stress test aktual (k6 + InfluxDB + Grafana), bukan sekadar target yang belum diukur.
+
+Beberapa keterbatasan penting perlu digarisbawahi sebagai bagian dari simpulan ini:
+
+1. **`LEGAL_ROLE` belum menjadi persona pengguna terpisah dalam praktik** — meskipun kontrak `CompanyVault` mendukung `LEGAL_ROLE` sebagai peran `AccessControl` independen dari `HR_ROLE`, dalam operasional saat ini peran tersebut di-auto-grant ke alamat HR Admin yang sama (lihat §2.3), dan belum ada jalur produk (UI) bagi Legal Officer yang benar-benar terpisah untuk mengakses dashboard PHK.
+2. **Sejumlah isu teknis minor telah teridentifikasi namun belum ditutup**, terdokumentasi lengkap di `KNOWN_ISSUES.md`: potensi guard coupling pada `cancelProposal()`, kesalahan interpretasi nilai null dari Ponder pada `getStream()`, perbandingan alamat mentah untuk deteksi HR-vs-Legal pada indexer, hilangnya lapisan pertahanan berlapis di backend untuk validasi `execute()` Kernel, serta belum adanya kuota gas on-chain per karyawan pada mekanisme Paymaster.
+3. **Satu requirement yatim (`FR-PAYANA-1103`, dekripsi mandiri gaji melalui viewing key)** yang tercantum pada draf awal dokumen ini terkait dengan rancangan `ConfidentialCompanyVault` berbasis Fully Homomorphic Encryption (FHE) yang pada akhirnya tidak dilanjutkan ke implementasi produksi — kontrak tersebut tidak lagi menjadi bagian dari basis kode aktif (`src/`) dan requirement ini secara eksplisit tidak divalidasi (`[Perlu dikonfirmasi]`).
+
+### 4.2 Saran dan Pengembangan Lanjutan
+
+Untuk iterasi produk maupun revisi dokumen SKPL berikutnya, disarankan hal-hal berikut:
+
+1. **Formalkan status `FR-PAYANA-1103`** sebagai *out of scope* atau *future work* secara eksplisit, alih-alih dibiarkan sebagai kebutuhan aktif tanpa bukti implementasi — mengingat kontrak confidential vault yang mendasarinya sudah ditinggalkan.
+2. **Bangun dashboard Legal Officer yang benar-benar independen** dari HR Admin — menambahkan cabang pemeriksaan `LEGAL_ROLE` pada `useRole.ts` dan jalur akses terpisah pada `useRoleGuard`, sehingga desain multi-tanda tangan PHK (§2.2 Fungsi ke-4) dapat dioperasikan oleh dua pihak independen sesuai rasional aslinya, bukan hanya sebagai kemampuan kontrak yang tidak terpakai di lapisan produk.
+3. **Tutup kelima isu pada `KNOWN_ISSUES.md`** sebelum evaluasi migrasi ke Base Mainnet, khususnya penambahan kuota gas per karyawan pada Paymaster (KI-005) dan pemulihan lapisan pertahanan berlapis pada `/bundler/relay` (KI-004), mengingat keduanya berdampak langsung pada risiko keamanan finansial platform.
+4. **Evaluasi kembali butir-butir di luar ruang lingkup MVP** (§1.2) — integrasi HRIS pihak ketiga, fiat on/off ramp langsung, payroll multi-chain, ESOP dengan secondary market, notifikasi push mobile native, stealth address (EIP-5564), dan private streaming rate on-chain — sebagai kandidat pengembangan lanjutan setelah adopsi awal tervalidasi oleh perusahaan pilot.
+5. **Selaraskan penomoran lampiran pemetaan FR-komponen** antara dokumen ini dengan `SPESIFIKASI KEBUTUHAN PERANGKAT LUNAK.docx` setelah Kelompok U (FR-PAYANA-1901 s.d. 1904) diporting ke docx, agar kedua dokumen konsisten sebagai satu kesatuan kontrak kebutuhan yang dapat ditelusuri balik ke implementasi.
 
 ---
 
