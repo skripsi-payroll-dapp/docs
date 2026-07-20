@@ -195,6 +195,8 @@ Rancangan yang berada **di luar ruang lingkup** dokumen ini mengikuti batasan SK
 
 ### 2.1 Perancangan Arsitektur
 
+Subbagian ini berisi gambaran arsitektur sistem. Bagian ini menggambarkan bagaimana sistem diperinci dalam komponen-komponen penyusun: overview sistem dan konteksnya (2.1.1), arsitektur perangkat lunak/n-layer beserta package dependency (2.1.2), dan deployment diagram (2.1.3).
+
 #### 2.1.1 Overview Sistem
 
 Sistem Payana dibangun di atas empat lapisan arsitektur yang saling bergantung, dilengkapi sejumlah layanan eksternal. Lapisan paling fundamental adalah Smart Contract di jaringan Base; di atasnya berdiri Ponder Indexer yang membaca event on-chain; lapisan Backend API menangani autentikasi, relay gasless, dan logika off-chain; dan lapisan Frontend menyajikan antarmuka pengguna per peran.
@@ -268,6 +270,65 @@ graph TD
 ```
 
 **Narasi Alur EWA Gasless End-to-End.** Ketika seorang karyawan menekan tombol "Tarik Gaji", frontend memanggil hook `useAuth` untuk memastikan sesi JWT aktif (atau melakukan tanda tangan EIP-191 baru melalui embedded wallet Privy). Karyawan kemudian menandatangani sebuah `UserOperation` ERC-4337 yang berisi calldata `claimSalary()`. UserOperation tersebut dikirim ke endpoint `POST /bundler/relay`. Backend memeriksa batas laju klaim (maksimum 10 per jam per karyawan) lalu meneruskan UserOperation ke Pimlico Bundler tanpa decode calldata tambahan — enforcement otoritatif (kecocokan JWT/sender, selektor, dan target) berada di `CompanyVault._validatePaymasterUserOp()` on-chain yang dipanggil EntryPoint saat validasi (lihat KI-004 di `KNOWN_ISSUES.md`). Pimlico melampirkan sponsor Paymaster dan mengirimkannya ke `EntryPoint` contract di Base. Kontrak `CompanyVault.claimSalary()` mengeksekusi distribusi atomik (platform fee → cicilan kasbon jika ada → PPh21/BPJS → severance → sisa ke karyawan), memancarkan event `SalaryClaimed` dan `PlatformFeePaid`. Alchemy mendeteksi event tersebut dan mengirimkannya ke `POST /webhook/alchemy`; backend memverifikasi tanda tangan HMAC, mencatat audit log, dan mem-broadcast pesan `SALARY_CLAIMED` melalui WebSocket ke dashboard karyawan, yang langsung menampilkan konfirmasi real-time. Secara paralel, Ponder mengindeks event tersebut ke tabel `salary_claim` untuk keperluan historis dan pelaporan kepatuhan.
+
+#### 2.1.3 Deployment Diagram
+
+Diagram berikut memetakan setiap komponen logis (lihat 2.1.2) ke node infrastruktur fisik tempat komponen tersebut benar-benar berjalan, beserta protokol komunikasi antar node.
+
+```mermaid
+graph TB
+    subgraph ClientDevice["Perangkat Pengguna"]
+        BROWSER["Browser — HR / Karyawan / Owner"]
+    end
+
+    subgraph Vercel["Vercel (Edge/Global CDN)"]
+        FRONTEND["payana-frontend\nNext.js 16 (SSR + Static)"]
+    end
+
+    subgraph AzureID["Azure App Service — Indonesia Central"]
+        BACKEND["payana-backend\nExpress 5 (Node.js)\napp-name: payana-backend"]
+        INDEXER["payana-indexer\nPonder 0.16 + Hono\napp-name: payana-indexer"]
+    end
+
+    subgraph AzurePG["Azure Database for PostgreSQL — Flexible Server"]
+        DB_APP[("Skema app\n(dikelola payana-backend/Drizzle)")]
+        DB_PUBLIC[("Skema public\n(dikelola payana-indexer/Ponder)")]
+    end
+
+    subgraph ThirdParty["Layanan Pihak Ketiga"]
+        PRIVY["Privy WaaS\n(embedded wallet)"]
+        ALCHEMY["Alchemy\nRPC + Webhook (Base Sepolia)"]
+        PIMLICO["Pimlico\nERC-4337 Bundler + Paymaster"]
+    end
+
+    subgraph BaseChain["Base Sepolia (Chain ID 84532)"]
+        CONTRACTS["PayrollFactory / CompanyVault\n/ EmploymentSBT / IDRX"]
+    end
+
+    BROWSER -- HTTPS --> FRONTEND
+    FRONTEND -- HTTPS/REST --> BACKEND
+    FRONTEND -- HTTPS --> PRIVY
+    FRONTEND -- JSON-RPC (read) --> ALCHEMY
+
+    BACKEND -- SQL --> DB_APP
+    BACKEND -- HTTPS --> PIMLICO
+    BACKEND -- Webhook (HMAC) --> ALCHEMY
+    BACKEND -- JSON-RPC (read, comma-separated fallback) --> ALCHEMY
+
+    INDEXER -- SQL --> DB_PUBLIC
+    INDEXER -- JSON-RPC subscribe (event log) --> ALCHEMY
+
+    PIMLICO -- UserOperation --> BaseChain
+    ALCHEMY -- RPC --> BaseChain
+
+    ALCHEMY -.->|deteksi event on-chain| CONTRACTS
+```
+
+**Catatan penempatan:**
+- `payana-backend` dan `payana-indexer` sama-sama di-deploy sebagai Azure App Service terpisah di region Indonesia Central (dekat basis pengguna, latensi rendah untuk HR/karyawan Indonesia), masing-masing lewat GitHub Actions (`azure-deploy.yml`, `azure/webapps-deploy@v3`).
+- `payana-frontend` di-deploy ke Vercel (bukan Azure) — memanfaatkan edge network global Vercel untuk aset statis/SSR Next.js, terpisah dari region backend.
+- Database PostgreSQL produksi memakai satu instance Azure Flexible Server dengan dua skema terisolasi (`app` untuk backend, `public` untuk indexer) — bukan dua database fisik terpisah. Environment lokal pengembangan memakai PostgreSQL via Docker Compose (lihat `docker-compose.yml` di root repo).
+- Tidak ada komponen yang di-deploy sendiri oleh tim Payana di jaringan Base — kontrak berjalan di infrastruktur node Base Sepolia publik, diakses via RPC Alchemy (mendukung daftar RPC dipisah koma untuk load spreading saat backfill indexer).
 
 ### 2.2 Perancangan Rinci
 
