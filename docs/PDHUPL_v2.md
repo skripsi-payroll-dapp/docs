@@ -646,7 +646,7 @@ dengan `HR_ROLE` asli pada vault demo `0xEc2B154789C3E7B393f2c9E4bfa06b6cfd57F09
 diverifikasi lewat `GET /security/alerts` (Owner JWT) terhadap backend produksi
 (`BACKEND_URL` di `testing-scripts/.env`, Azure App Service `payana-backend`).
 
-- **AU-32-01** — Input: `attacker-sim.mjs` Aksi 1 — `withdrawVault(5.000.000 IDRX, <alamat baru>)` dari wallet HR "dikompromikan", ke alamat yang belum pernah menerima penarikan dari vault ini. Harapan: baris `SUSPICIOUS_WITHDRAWAL` (severity `high`, sesuai FR-PAYANA-1901 kondisi "penarikan pertama/penerima baru") muncul di `app.anomaly_alerts` dan terbaca via `GET /security/alerts` dalam ≤2 menit sejak transaksi terindeks Ponder (NFR-PAYANA-19).
+- **AU-32-01** — Input: `attacker-sim.mjs` Aksi 1 — `withdrawVault(5.000.000 IDRX, <alamat baru>)` dari wallet HR "dikompromikan", ke alamat yang belum pernah menerima penarikan dari vault ini. Harapan: baris `SUSPICIOUS_WITHDRAWAL` (severity `high`, sesuai FR-PAYANA-1901 kondisi "penarikan pertama/penerima baru") muncul di `app.anomaly_alerts` dan terbaca via `GET /security/alerts` dalam ≤2 menit sejak transaksi terindeks Ponder (NFR-PAYANA-17).
 - **AU-32-02** — Input: `attacker-sim.mjs` Aksi 2 — `grantRole(HR_ROLE, <alamat baru>)` dari wallet HR yang sama, ke alamat yang bukan `hrAuthority` terdaftar untuk vault tsb (skenario backdoor/persistence). Harapan: baris `UNEXPECTED_ROLE_GRANT` (severity `critical`, peran inti sesuai FR-PAYANA-1902) muncul di `app.anomaly_alerts` dan terbaca via `GET /security/alerts` dalam ≤2 menit.
 
 **Eksekusi nyata (bukan simulasi/mock) — Run 1, 2026-07-17:**

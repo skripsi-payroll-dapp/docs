@@ -541,34 +541,35 @@ classDiagram
         +bytes32 SUPERADMIN_ROLE
         +uint16 MAX_PLATFORM_FEE_BPS = 100
         +address IDRX
+        +address ENTRY_POINT
         +address protocolTreasury
         +uint16 platformFeeBps
         +mapping companyVaults
         +address[] allVaults
-        +constructor(idrx, superAdmin, protocolTreasury)
+        +constructor(idrx, superAdmin, protocolTreasury, entryPoint)
         +setPlatformFee(uint16 bps)
         +setProtocolTreasury(address newTreasury)
-        +deployVault(hrAuthority, companyName, liquidityContract, sbtContract) address
+        +deployVault(hrAuthority, companyName, sbtContract) address
         +emergencyFreezeAll()
         +getTotalVaults() uint256
     }
 ```
 
-**State Variables:** `IDRX` (immutable), `protocolTreasury`, `platformFeeBps`, `companyVaults` (HR → vault), `allVaults` (array seluruh vault).
+**State Variables:** `IDRX` (immutable), `ENTRY_POINT` (immutable, canonical ERC-4337 EntryPoint v0.7 — diteruskan ke setiap vault yang di-deploy), `protocolTreasury`, `platformFeeBps`, `companyVaults` (HR → vault), `allVaults` (array seluruh vault).
 
 **Events:** `VaultDeployed(hrAuthority, vaultAddress, companyName)`, `PlatformFeeUpdated(newBps)`, `ProtocolTreasuryUpdated(newTreasury)`.
 
-**[deployVault(hrAuthority, companyName, liquidityContract, sbtContract)]**
+**[deployVault(hrAuthority, companyName, sbtContract)]**
 | | |
 |---|---|
-| Input | hrAuthority: address, companyName: string, liquidityContract: address, sbtContract: address |
+| Input | hrAuthority: address, companyName: string, sbtContract: address |
 | Output | `address` (alamat vault baru) |
-| Deskripsi | external; modifier `onlyRole(SUPERADMIN_ROLE)`; sesuai FR-PAYANA-201, FR-PAYANA-1001 |
+| Deskripsi | external; callable oleh `hrAuthority` itu sendiri ATAU pemegang `SUPERADMIN_ROLE` (dicek via `require` inline, bukan modifier `onlyRole`); sesuai FR-PAYANA-201, FR-PAYANA-1001 |
 
 **Algoritma (Check → Effect → Interaction):**
 
-1. **Check:** tolak `hrAuthority == address(0)` (`InvalidHRAddress`); tolak jika `companyVaults[hrAuthority] != 0` (`HRAlreadyHasVault`).
-2. **Effect/Interaction:** deploy `new CompanyVault(IDRX, hrAuthority, companyName, liquidityContract, sbtContract)`.
+1. **Check:** tolak jika `msg.sender != hrAuthority` dan bukan pemegang `SUPERADMIN_ROLE` (`OnlyHRorSuperAdmin`); tolak `hrAuthority == address(0)` (`InvalidHRAddress`); tolak jika `companyVaults[hrAuthority] != 0` (`HRAlreadyHasVault`).
+2. **Effect/Interaction:** deploy `new CompanyVault(IDRX, hrAuthority, companyName, sbtContract, ENTRY_POINT)`.
 3. **Effect:** catat alamat ke `companyVaults[hrAuthority]` dan `allVaults.push(vault)`.
 4. **Effect:** emit `VaultDeployed(hrAuthority, vault, companyName)`; kembalikan alamat vault.
 
@@ -1510,6 +1511,57 @@ Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh
 | `yield_rate_bps` | `integer` | NULL | — | 0–10000 | `NULL` | Tarif yield (kosmetik/preferensi) |
 | `legal_address` | `text` | NULL | — | Hex 0x + 40 char | `NULL` | Cermin tampilan dari `LEGAL_ROLE` on-chain — bukan sumber otoritatif |
 | `updated_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu terakhir diperbarui |
+
+**Tabel `suspended_clients`** `[BARU — lihat FR-PAYANA-1005]`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `hr_address` | `text` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | HR yang disuspend (lowercase) |
+| `reason` | `text` | NULL | — | — | `NULL` | Alasan suspend, mis. "Menunggak biaya SaaS bulan Juni" |
+| `suspended_by` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Alamat Owner yang men-suspend |
+| `suspended_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu suspend |
+
+> **Catatan:** blocklist murni sisi backend — tidak menyentuh status vault on-chain (vault tetap `Active`, karyawan tetap bisa klaim gaji normal). Dicek di `/auth/login` dan di dalam middleware `requireAuth`.
+
+**Tabel `compliance_reconciliations`** `[BARU — lihat FR-PAYANA-805]`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `hr_address` | `text` | NOT NULL | PRIMARY KEY (composite dengan `month`) | Hex 0x + 40 char | — | HR pelapor (lowercase) |
+| `month` | `text` | NOT NULL | PRIMARY KEY (composite dengan `hr_address`) | `YYYY-MM` | — | Bulan pelaporan |
+| `bpjs_paid` | `text` | NOT NULL | — | IDRX wei (string) | — | Jumlah BPJS yang disetor |
+| `pph21_paid` | `text` | NOT NULL | — | IDRX wei (string) | — | Jumlah PPh21 yang disetor |
+| `notes` | `text` | NULL | — | — | `NULL` | Catatan HR |
+| `recorded_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu dicatat |
+
+> **Catatan:** tidak ada API pemerintah untuk verifikasi otomatis di MVP — ini sisi "dikonfirmasi manual oleh HR" dari rekonsiliasi; sisi lain adalah estimasi `complianceBalance`/`employeeComplianceAccumulated` on-chain yang dibaca live oleh frontend. Selisih di-diff di UI, bukan di backend — tabel ini hanya menyimpan apa yang HR konfirmasi sudah benar-benar disetor.
+
+**Tabel `salary_advances`** `[BARU — catatan + audit trail kasbon sisi backend, berbeda dari tabel `salary_advance` Ponder]`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `employee_address` | `text` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Karyawan pengaju (lowercase) |
+| `hr_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | HR/perusahaan (lowercase) |
+| `vault_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Alamat `CompanyVault` |
+| `amount` | `text` | NOT NULL | — | IDRX wei (string) | — | Jumlah kasbon diajukan |
+| `note` | `text` | NULL | — | — | `NULL` | Catatan opsional dari karyawan |
+| `status` | `text` | NOT NULL | — | `Pending` \| `Active` \| `Rejected` | `'Pending'` | Status |
+| `tx_hash_request` | `text` | NULL | — | Hex 0x + 64 char | `NULL` | Tx hash `requestAdvance()` on-chain |
+| `requested_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu pengajuan |
+| `updated_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu update terakhir |
+
+> **Catatan:** data finansial (jumlah, status) sepenuhnya on-chain dan diindeks real-time via Ponder (tabel `salary_advance`). Tabel ini hanya menambahkan hal yang tak bisa hidup on-chain: catatan opsional karyawan + jejak audit sisi backend. Primary key alamat karyawan — hanya satu kasbon aktif per karyawan (dipaksa kontrak `CompanyVault`).
+
+**Tabel `phk_reasons`** `[BARU — lihat modul PHK/Termination]`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `employee_address` | `text` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Karyawan yang diusulkan PHK (lowercase) |
+| `hr_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | HR pengusul (lowercase) |
+| `reason` | `text` | NOT NULL | — | — | — | Alasan PHK (plaintext) |
+| `created_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu diajukan |
+
+> **Catatan:** on-chain `proposeTermination()` hanya menyimpan `keccak256(reason)` (hemat gas + hindari PII di chain) — plaintext-nya disimpan di sini supaya Legal Officer punya konteks sebelum approve, bukan approve buta hanya berdasarkan alamat. Di-key per alamat karyawan; re-propose (setelah cancel/expiry) menimpa baris ini.
 
 **Tabel `anomaly_alerts`** `[BARU — lihat SKPL Kelompok H, FR-PAYANA-1901 s.d. 1904]`
 

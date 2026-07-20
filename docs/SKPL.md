@@ -2217,17 +2217,17 @@ ID Requirement : NFR-PAYANA-16
 Deskripsi      : Smart contract CompanyVault harus mengimplementasikan pola checks-effects-interactions dan menggunakan modifier nonReentrant (OpenZeppelin ReentrancyGuard) pada seluruh fungsi yang melakukan transfer token ERC-20 eksternal, yaitu claimSalary(), withdrawVault(), withdrawCompliance(), executeTermination(), dan claimCliffVest().
 Rasional       : Reentrancy adalah vektor serangan paling umum pada smart contract DeFi. Kegagalan mengimplementasikan perlindungan ini pada fungsi yang mentransfer dana dapat menyebabkan pengosongan vault secara tidak sah.
 
-ID Requirement : NFR-PAYANA-19
+ID Requirement : NFR-PAYANA-17
 Deskripsi      : Sistem harus mendeteksi dan memberi peringatan atas pola aktivitas on-chain yang konsisten dengan wallet HR yang dikompromikan (penarikan vault tidak wajar, pemberian peran admin ke alamat tak dikenal, aktivitas sensitif beruntun) dalam siklus tidak lebih dari 2 menit sejak event terjadi, dan mendorong notifikasi ke Owner SaaS. Lihat FR-PAYANA-1901 s.d. 1904 (Kelompok H) untuk kriteria deteksi rinci.
 Rasional       : Kontrol akses on-chain (`onlyHR`, `AccessControl`) tidak dapat membedakan pemanggil sah dari penyerang yang telah menguasai kunci privat HR — keduanya menghasilkan transaksi yang valid secara kriptografis. Deteksi anomali berbasis pola perilaku adalah lapisan pertahanan kedua yang independen dari validitas tanda tangan, divalidasi dengan simulasi serangan nyata di Base Sepolia (lihat PDHUPL_v2.md KU-32).
 
 #### 3.4.5 Maintainability
 
-ID Requirement : NFR-PAYANA-17
+ID Requirement : NFR-PAYANA-18
 Deskripsi      : Seluruh fungsi smart contract yang memiliki lebih dari satu kemungkinan kondisi revert harus menggunakan custom error Solidity (bukan string revert) untuk menghemat gas dan memudahkan identifikasi kegagalan. Setiap custom error harus terdokumentasi dalam NatSpec.
 Rasional       : Custom error menghemat gas dibandingkan revert string karena tidak menyimpan string karakter di bytecode. Selain itu, custom error memungkinkan frontend menampilkan pesan yang spesifik berdasarkan tipe error.
 
-ID Requirement : NFR-PAYANA-18
+ID Requirement : NFR-PAYANA-19
 Deskripsi      : Seluruh endpoint API backend harus terdokumentasi dalam spesifikasi OpenAPI 3.0 yang diperbarui secara sinkron dengan perubahan kode. Dokumentasi harus mencakup semua parameter, skema request/response, dan kode status HTTP yang mungkin dikembalikan.
 Rasional       : Dokumentasi API yang akurat mempersingkat waktu onboarding developer baru dan meminimalkan kesalahpahaman antara tim frontend dan backend saat integrasi.
 
