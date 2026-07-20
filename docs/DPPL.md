@@ -3551,15 +3551,21 @@ sequenceDiagram
 
 #### 2.4.4 Portal Owner SaaS (`/owner`)
 
-##### 31. Antar Muka Dashboard Owner SaaS (`/owner`)
+> **[Diperbaiki]** Subbab ini sebelumnya mendeskripsikan satu halaman `/owner` yang menggabungkan
+> metrik, antrian registrasi, dan konfigurasi platform fee/freeze sekaligus. Frontend sebenarnya
+> memecah kapabilitas ini menjadi **6 halaman terpisah** di bawah navigasi portal Owner
+> (`app/owner/layout.tsx`): Overview, Tenants, Detail Perusahaan (drill-down dari Tenants),
+> Pendaftaran, Keamanan, dan Monetisasi & Freeze — didokumentasikan satu per satu di bawah.
 
-**Deskripsi :** Dashboard agregat operator platform: TVL, jumlah tenant aktif, estimasi pendapatan platform fee, antrian registrasi HR, serta konfigurasi platform fee dan fungsi darurat.
+##### 31. Antar Muka Overview Owner SaaS (`/owner`)
 
-**Input :** Persetujuan/penolakan registrasi HR; nilai platform fee baru; klik "Emergency Freeze".
+**Deskripsi :** Dashboard agregat operator platform: Total Value Locked (TVL), platform fee terkumpul + tren bulanan, jumlah klien aktif, total karyawan lintas tenant, saldo gas Paymaster gabungan, grafik pertumbuhan pendapatan, daftar tenant terbaru, dan panel "Perlu Perhatian" (vault Paused/Frozen atau gas Paymaster rendah).
 
-**Output :** TVL, jumlah tenant aktif, estimasi pendapatan platform fee, antrian registrasi HR.
+**Input :** — (halaman baca saja; navigasi ke `/owner/tenants` atau detail perusahaan via klik).
 
-**Aktor:** Owner SaaS. **FR Terkait:** FR-PAYANA-1002, FR-PAYANA-1004, FR-PAYANA-1006, FR-PAYANA-1008, FR-PAYANA-108, FR-PAYANA-109.
+**Output :** TVL, platform fee terkumpul (+ tren MoM), jumlah klien aktif, total karyawan aktif, saldo gas Paymaster gabungan, grafik pendapatan 6 bulan terakhir, daftar 4 tenant terbaru, daftar item perlu perhatian.
+
+**Aktor:** Owner SaaS. **FR Terkait:** FR-PAYANA-1002, FR-PAYANA-108, FR-PAYANA-109.
 
 **Alur Interaksi:**
 
@@ -3567,46 +3573,182 @@ sequenceDiagram
 sequenceDiagram
     actor O as Owner
     participant FE as Frontend /owner
-    participant BE as Backend /registration
     participant PO as Ponder
-    participant F as PayrollFactory
+    participant SC as CompanyVault (per tenant)
     FE->>FE: Owner guard (address == OWNER_ADDRESS)
-    FE->>BE: GET /registration/pending (Bearer JWT)
-    BE-->>FE: antrian registrasi
-    FE->>PO: getCompanies / getPlatformFees
-    PO-->>FE: tenant + estimasi pendapatan
-    O->>FE: Setujui registrasi
-    FE->>BE: PATCH /registration/:address/approve
-    O->>FE: Tolak registrasi
-    FE->>BE: DELETE /registration/:address
-    O->>FE: Set platform fee / freeze
-    FE->>F: setPlatformFee(bps) / emergencyFreezeAll()
+    FE->>PO: getCompanies() / getPlatformFees()
+    PO-->>FE: daftar tenant + riwayat platform_fee_payment
+    loop tiap company
+        FE->>SC: getGasBalance() (via PayrollFactory.companyVaults lookup)
+        SC-->>FE: saldo EntryPoint deposit
+    end
+    FE->>FE: Hitung TVL, tren pendapatan bulanan, item perlu perhatian
+    FE-->>O: Render kartu metrik + grafik + daftar tenant terbaru
 ```
 
 **Deskripsi Antarmuka:**
 
 | Komponen | Tipe | Deskripsi |
 |----------|------|-----------|
-| Kartu metrik | Panel data | TVL, jumlah tenant (`getCompanies`/`getTotalVaults`), estimasi fee. |
-| Grafik pendapatan | AreaChart | Tren pendapatan platform. |
-| Tab registrasi | Tab + tabel | Pending / Approved / Rejected. |
-| Tombol setujui/tolak | Grup tombol | `approve` / `reject` registrasi. |
-| Form platform fee | Field + tombol | `setPlatformFee(bps)` (maks 100 bps). |
-| Tombol freeze darurat | Tombol tulis | `emergencyFreezeAll()`. |
+| Panel "Perlu Perhatian" | Alert grid | Tenant dengan vault Paused/Frozen atau gas Paymaster di bawah ambang, tautan ke detail. |
+| Kartu TVL | Panel data | Total `vaultBalance` seluruh tenant, dikonversi Rupiah. |
+| Kartu Platform Fee | Panel data | Total `platform_fee_payment`, jumlah klaim, tren MoM. |
+| Kartu Klien Aktif | Panel data | Jumlah company, pertumbuhan bulan berjalan. |
+| Kartu Total Karyawan | Panel data | Jumlah stream `Active` lintas tenant. |
+| Kartu Gas Paymaster | Panel data (dark) | Total saldo EntryPoint seluruh vault (ETH). |
+| Grafik pendapatan | AreaChart | Tren `platform_fee_payment` 6 bulan terakhir. |
+| Daftar tenant terbaru | List + tautan | 4 tenant terbaru, tautan "Lihat semua" ke `/owner/tenants`. |
 
 **Method/Algoritma :**
 
 *On 'Buka Halaman'*
-1. Owner guard: bandingkan `address` dengan `NEXT_PUBLIC_OWNER_ADDRESS`; jika tidak cocok, redirect ke `/login`.
-2. Muat `registration.getPending(token)` dan `ponder.getCompanies()`/`ponder.getPlatformFees()`.
+1. Owner guard: bandingkan `address` dengan `NEXT_PUBLIC_OWNER_ADDRESS`.
+2. Muat `useCompanies()` dan `usePlatformFees()` dari Ponder; hitung TVL = jumlah `vaultBalance` seluruh company.
+3. Untuk tiap company, resolve alamat vault via `PayrollFactory.companyVaults()` lalu baca `getGasBalance()`; akumulasi total gas dan tandai company dengan status non-`Active` atau gas di bawah `GAS_POOL_MIN_WEI` sebagai item "Perlu Perhatian".
+4. Hitung tren pendapatan bulanan dari `platform_fee_payment` yang di-bucket per bulan, dan pertumbuhan klien dari `company.createdAt`.
 
-*On 'Klik Setujui/Tolak Registrasi'*
-1. `handleApprove`/`handleReject` memanggil endpoint registrasi lalu refresh.
+##### 32. Antar Muka Tenants (`/owner/tenants`)
 
-*On 'Submit Platform Fee / Freeze'*
-1. Konfigurasi fee via `setPlatformFee(bps)`; pembekuan via `emergencyFreezeAll()`.
+**Deskripsi :** Daftar seluruh perusahaan (tenant) yang memiliki vault on-chain, dengan saldo dan status masing-masing, sebagai pintu masuk ke halaman detail per perusahaan.
 
-##### 32. Antar Muka Portal Owner — Keamanan Vault (`/owner/security`) `[BARU — lihat SKPL UC-27, FR-PAYANA-1901 s.d. 1904]`
+**Input :** Klik satu baris tenant untuk membuka detail.
+
+**Output :** Daftar tenant (nama, alamat vault, saldo IDRX, status).
+
+**Aktor:** Owner SaaS. **FR Terkait:** FR-PAYANA-1002.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor O as Owner
+    participant FE as Frontend /owner/tenants
+    participant PO as Ponder
+    FE->>PO: getCompanies()
+    PO-->>FE: daftar company (nama, id/vault, vaultBalance, status)
+    O->>FE: Klik salah satu tenant
+    FE-->>O: Navigasi ke /owner/companies/:hrAddress
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Daftar tenant | List item bertaut | Nama, alamat, saldo IDRX, badge status (Active/Paused/Frozen). |
+
+**Method/Algoritma :**
+
+*On 'Buka Halaman'*
+1. Muat `useCompanies()` dari Ponder; render seluruh tenant terurut.
+
+*On 'Klik Tenant'*
+1. Navigasi ke `/owner/companies/[hrAddress]`.
+
+##### 33. Antar Muka Detail Perusahaan (`/owner/companies/[hrAddress]`)
+
+**Deskripsi :** Detail satu tenant: KPI (saldo vault, jumlah karyawan, platform fee terbayar, gas Paymaster), alamat vault on-chain, tabel karyawan/stream, riwayat platform fee, serta kontrol penangguhan akses HR ke antarmuka (tidak memengaruhi status vault on-chain).
+
+**Input :** Alasan penangguhan (opsional, saat menangguhkan akses HR); klik "Tangguhkan Akses" / "Aktifkan Kembali".
+
+**Output :** KPI perusahaan, alamat vault, tabel karyawan & stream, riwayat platform fee, status penangguhan akses HR terkini.
+
+**Aktor:** Owner SaaS. **FR Terkait:** FR-PAYANA-1005, FR-PAYANA-1002.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor O as Owner
+    participant FE as Frontend /owner/companies/[hrAddress]
+    participant PO as Ponder
+    participant BE as Backend /suspension
+    FE->>PO: getCompany / getEmployeeStreams / getPlatformFees / getGasBalance
+    PO-->>FE: KPI + tabel karyawan + riwayat fee
+    FE->>BE: GET /suspension/:hrAddress
+    BE-->>FE: {suspended, reason, suspendedAt}
+    alt Owner menangguhkan
+        O->>FE: Isi alasan (opsional), klik "Tangguhkan Akses"
+        FE->>BE: POST /suspension/:hrAddress {reason}
+        BE-->>FE: {ok:true} — sesi JWT HR aktif langsung dicabut
+    else Owner mengaktifkan kembali
+        O->>FE: Klik "Aktifkan Kembali"
+        FE->>BE: DELETE /suspension/:hrAddress
+        BE-->>FE: {ok:true}
+    end
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Header perusahaan | Panel | Nama, alamat vault (salin), badge status on-chain. |
+| Panel penangguhan akses | Panel + form | Status suspend, tombol "Tangguhkan Akses"/"Aktifkan Kembali", field alasan. |
+| Kartu KPI | Grid panel data | Saldo vault, jumlah karyawan (aktif), platform fee terbayar, gas Paymaster. |
+| Info vault on-chain | Panel | Alamat `CompanyVault`, catatan tidak ada freeze per-perusahaan (hanya `emergencyFreezeAll()` global). |
+| Tabel karyawan & stream | Tabel data | Alamat, flow rate, tanggal mulai, status. |
+| Riwayat platform fee | List | Karyawan pemicu, waktu, jumlah fee. |
+
+**Method/Algoritma :**
+
+*On 'Buka Halaman'*
+1. Muat `useCompany`, `useEmployeeStreams`, `usePlatformFees`, `useVaultAddress`, `useGasBalance`, dan `useClientSuspension` untuk `hrAddress` dari route param.
+
+*On 'Klik Tangguhkan Akses'*
+1. `POST /suspension/:hrAddress {reason}` — backend meng-upsert baris `suspended_clients` dan mencabut seluruh sesi JWT aktif milik HR tersebut; status vault on-chain tidak disentuh (karyawan tetap bisa klaim gaji).
+
+*On 'Klik Aktifkan Kembali'*
+1. `DELETE /suspension/:hrAddress` — menghapus baris blocklist; HR harus login ulang karena sesi lamanya sudah dicabut saat suspend.
+
+##### 34. Antar Muka Pendaftaran Perusahaan Baru (`/owner/registrations`)
+
+**Deskripsi :** Antrian tinjauan pendaftaran perusahaan baru (bukan karyawan — itu ditangani HR masing-masing), dengan tab Pending/Approved/Rejected, pencarian, modal detail dokumen perusahaan, dan aksi setujui/tolak.
+
+**Input :** Kata kunci pencarian (nama/wallet/email/NPWP/NIB/direktur); keputusan setujui/tolak per pendaftaran.
+
+**Output :** Daftar pendaftaran per tab status; detail dokumen perusahaan (NPWP, NIB, direktur, akta, email) dalam modal.
+
+**Aktor:** Owner SaaS. **FR Terkait:** FR-PAYANA-108, FR-PAYANA-109.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor O as Owner
+    participant FE as Frontend /owner/registrations
+    participant BE as Backend /registration
+    FE->>BE: GET /registration/pending?type=company (Bearer JWT)
+    BE-->>FE: daftar pendaftaran (pending/approved/rejected)
+    O->>FE: Cari / filter tab
+    O->>FE: Buka detail, klik Setujui
+    FE->>BE: PATCH /registration/:address/approve
+    BE-->>FE: status approved
+    O->>FE: Klik Tolak
+    FE->>BE: DELETE /registration/:address
+    BE-->>FE: status rejected
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Tab status | Tab | Pending (dengan counter) / Approved / Rejected. |
+| Kolom pencarian | Field teks | Omnisearch nama, wallet, email, NPWP, NIB, direktur. |
+| Kartu pendaftaran | List item | Nama, alamat, email, waktu pengajuan, badge kelengkapan data. |
+| Modal detail | Panel modal | Alamat wallet, NPWP, NIB, direktur/PIC, akta pendirian (tautan), email, waktu; tombol Setujui/Tolak. |
+| Tombol Setujui/Tolak | Grup tombol | `PATCH /registration/:address/approve` / `DELETE /registration/:address`. |
+
+**Method/Algoritma :**
+
+*On 'Buka Halaman'*
+1. `GET /registration/pending?type=company` memuat seluruh pendaftaran; filter client-side per tab dan kata kunci pencarian.
+
+*On 'Klik Setujui'*
+1. `PATCH /registration/:address/approve`; refresh daftar, tampilkan animasi konfirmasi.
+
+*On 'Klik Tolak'*
+1. `DELETE /registration/:address`; refresh daftar.
+
+##### 35. Antar Muka Portal Owner — Keamanan Vault (`/owner/security`) `[BARU — lihat SKPL UC-27, FR-PAYANA-1901 s.d. 1904]`
 
 **Deskripsi :** Daftar alert keamanan yang dihasilkan `anomalyDetector.ts` (lihat Lampiran B.6) lintas seluruh tenant — penarikan vault tidak wajar, perubahan peran tak terduga, dan aktivitas beruntun — dengan tab "Belum Ditangani"/"Semua" dan tombol tandai selesai per alert.
 
@@ -3648,6 +3790,55 @@ sequenceDiagram
 
 *On 'Klik Tandai Selesai'*
 1. `useResolveAlert(token)` — `PATCH` lalu `invalidateQueries(["securityAlerts"])`.
+
+##### 36. Antar Muka Monetisasi & Freeze (`/owner/fees`)
+
+**Deskripsi :** Konfigurasi platform fee protokol (basis poin dipotong dari setiap klaim gaji, maks 100 bps/1%) dan kontrol darurat `emergencyFreezeAll()` yang membekukan seluruh tenant sekaligus secara permanen.
+
+**Input :** Nilai platform fee baru (bps, 0–100); klik "Bekukan Semua Vault" + konfirmasi pada modal.
+
+**Output :** Fee aktif saat ini (%  dan bps), alamat protocol treasury; konfirmasi setelah fee diperbarui atau freeze dijalankan.
+
+**Aktor:** Owner SaaS. **FR Terkait:** FR-PAYANA-1006, FR-PAYANA-1004, FR-PAYANA-1008.
+
+**Alur Interaksi:**
+
+```mermaid
+sequenceDiagram
+    actor O as Owner
+    participant FE as Frontend /owner/fees
+    participant F as PayrollFactory
+    FE->>F: platformFeeBps() / protocolTreasury()
+    F-->>FE: konfigurasi fee aktif
+    O->>FE: Isi bps baru, klik Simpan
+    FE->>F: setPlatformFee(bps)
+    F-->>FE: PlatformFeeUpdated
+    O->>FE: Klik "Bekukan Semua Vault", konfirmasi modal
+    FE->>F: emergencyFreezeAll()
+    F-->>FE: seluruh vault berstatus Frozen (irreversible)
+```
+
+**Deskripsi Antarmuka:**
+
+| Komponen | Tipe | Deskripsi |
+|----------|------|-----------|
+| Kartu Fee Aktif | Panel data | `platformFeeBps` saat ini, ditampilkan sebagai persen dan bps. |
+| Kartu Protocol Treasury | Panel data | Alamat treasury penerima fee. |
+| Form ubah fee | Field angka + tombol | Input 0–100 bps, tombol "Simpan" → `setPlatformFee(bps)`. |
+| Panel Emergency Freeze | Panel peringatan + tombol | Penjelasan dampak (seluruh vault dibekukan permanen), tombol "Bekukan Semua Vault". |
+| Modal konfirmasi freeze | Modal | Peringatan eksplisit + tombol "Ya, Bekukan Semua Vault" / "Batal", wajib dikonfirmasi sebelum eksekusi. |
+
+**Method/Algoritma :**
+
+*On 'Buka Halaman'*
+1. Muat `usePlatformFeeConfig()` untuk prapengisian fee aktif dan alamat treasury.
+
+*On 'Submit Ubah Fee'*
+1. Validasi `0 <= bps <= 100`; panggil `setPlatformFee(bps)` via `useOwnerActions`.
+
+*On 'Klik Bekukan Semua Vault'*
+1. Tampilkan modal konfirmasi (aksi irreversible, membekukan seluruh tenant).
+2. Setelah konfirmasi, panggil `emergencyFreezeAll()`.
 
 #### 2.4.5 Portal Legal Officer — TIDAK DIIMPLEMENTASIKAN (dokumentasi status & keterbatasan)
 
