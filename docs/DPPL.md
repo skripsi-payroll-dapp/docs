@@ -2179,7 +2179,7 @@ Pembacaan data terbagi menjadi dua sumber: (a) pembacaan agregat historis melalu
 
 #### 2.4.1 Halaman Autentikasi dan Onboarding
 
-##### 1. Antar Muka Halaman Landing (`/`)
+##### 2.4.1.1 Antar Muka Halaman Landing (`/`)
 
 **Deskripsi :** Halaman pemasaran publik yang memperkenalkan proposisi nilai Payana (penggajian real-time, gasless, zero Web3 knowledge) dan menyediakan jalur masuk ke aplikasi.
 
@@ -2217,7 +2217,7 @@ sequenceDiagram
 *On 'Klik Masuk'*
 1. Navigasi App Router ke `/login`.
 
-##### 2. Antar Muka Halaman Login (`/login`)
+##### 2.4.1.2 Antar Muka Halaman Login (`/login`)
 
 **Deskripsi :** Autentikasi tanpa kata sandi berbasis tanda tangan kriptografi EIP-191 menggunakan embedded wallet Privy.
 
@@ -2270,7 +2270,7 @@ sequenceDiagram
 4. Kirim `{address, message, signature, timestamp}` ke `POST /auth/login`; simpan `token` (akses) dan `refreshToken`.
 5. Jalankan `useRole()` untuk menentukan peran dan mengarahkan ke `/owner`, `/hr/vault` (termasuk akses ke `/hr/phk` untuk langkah persetujuan LEGAL_ROLE, lihat §2.4.5), atau `/employee/ewa`.
 
-##### 3. Antar Muka Halaman Onboarding Karyawan (`/onboarding`) — invitation-only
+##### 2.4.1.3 Antar Muka Halaman Onboarding Karyawan (`/onboarding`) — invitation-only
 
 > **[Diperbaiki]** Subbab ini sebelumnya mendeskripsikan `/onboarding` sebagai formulir
 > registrasi HR/company (arsitektur lama, sebelum invitation-only). Sejak perubahan arsitektur
@@ -2332,7 +2332,7 @@ sequenceDiagram
 1. Submit `POST /registration/request {address, type:"employee", inviteToken}` — backend me-resolve `hrAddress` dari token, lalu menandai token `used` (sekali pakai, tidak bisa dipakai ulang oleh pendaftar lain).
 2. Polling `GET /registration/status/:address` untuk menampilkan status terkini setelah submit.
 
-##### 4. Antar Muka Halaman Verifikasi SBT (`/verify`)
+##### 2.4.1.4 Antar Muka Halaman Verifikasi SBT (`/verify`)
 
 **Deskripsi :** Verifikasi publik keaslian Sertifikat Ketenagakerjaan (Employment SBT) oleh pihak ketiga.
 
@@ -2390,7 +2390,7 @@ sequenceDiagram
 
 Seluruh halaman portal HR dibungkus oleh layout `hr/layout.tsx` yang menyediakan navigasi sisi dan role guard berbasis `useRole`. Pengguna yang bukan HR diarahkan keluar dari portal ini.
 
-##### 5. Antar Muka Dashboard HR Onboarding (`/hr/onboarding`)
+##### 2.4.2.1 Antar Muka Dashboard HR Onboarding (`/hr/onboarding`)
 
 > Signature saat ini: `deployVault(hrAuthority, companyName, sbtContract)`, 3 parameter. Lihat
 > SKPL UC-18 untuk spesifikasi penuh alur registrasi company yang mendahului wizard ini.
@@ -2458,7 +2458,7 @@ sequenceDiagram
 1. `handleDeposit`: konversi nominal ke wei (`BigInt(amount) * 1e18`), panggil `approve(deployedVault, amountWei)` pada IDRX, lalu `fundVault(amountWei)` pada vault.
 2. Tampilkan langkah selesai dengan tautan ke `/hr/vault`.
 
-##### 6. Antar Muka Manajemen Karyawan (`/hr/employees` dan `/hr/employees/[id]`)
+##### 2.4.2.2 Antar Muka Manajemen Karyawan (`/hr/employees` dan `/hr/employees/[id]`)
 
 **Deskripsi :** Daftar seluruh karyawan beserta status stream, flow rate, dan saldo terakumulasi; halaman detail menyediakan kontrol penuh atas stream individual.
 
@@ -2507,7 +2507,7 @@ sequenceDiagram
 *On 'Klik Aksi Kontrol'*
 1. Aksi kontrol memanggil fungsi kontrak terkait melalui `useContractWrite`; validasi split = 10.000 bps sebelum `updateStreamSplits`.
 
-##### 7. Antar Muka Manajemen Vault (`/hr/vault`)
+##### 2.4.2.3 Antar Muka Manajemen Vault (`/hr/vault`)
 
 **Deskripsi :** Manajemen treasury perusahaan: pemantauan saldo, peringatan saldo rendah real-time, deposit, dan penarikan.
 
@@ -2556,7 +2556,7 @@ sequenceDiagram
 *On 'Submit Deposit/Penarikan'*
 1. Deposit: `approve(vault, amount)` → `fundVault(amount)`. Penarikan: `withdrawVault(amount, recipient)`.
 
-##### 8. Antar Muka Reimburse HR (`/hr/reimburse`)
+##### 2.4.2.4 Antar Muka Reimburse HR (`/hr/reimburse`)
 
 **Deskripsi :** Manajemen klaim reimbursement yang diajukan karyawan: daftar, persetujuan, dan pencatatan pembayaran.
 
@@ -2592,7 +2592,7 @@ sequenceDiagram
 *On 'Klik Setujui/Tolak'*
 1. Aksi persetujuan/penolakan memperbarui status klaim dan mencatat pembayaran.
 
-##### 9. Antar Muka Bounty HR (`/hr/bounty`)
+##### 2.4.2.5 Antar Muka Bounty HR (`/hr/bounty`)
 
 **Deskripsi :** Manajemen program bounty/insentif kinerja: pembuatan papan bounty, penetapan hadiah IDRX, dan pencatatan klaim disetujui.
 
@@ -2628,7 +2628,7 @@ sequenceDiagram
 *On 'Tinjau Klaim'*
 1. Tinjau klaim penyelesaian dan catat pembayaran hadiah.
 
-##### 10. Antar Muka Compliance HR (`/hr/compliance`)
+##### 2.4.2.6 Antar Muka Compliance HR (`/hr/compliance`)
 
 **Deskripsi :** Laporan kepatuhan BPJS/PPh21: pratinjau ringkasan bulanan, unduhan CSV, dan penarikan akumulasi dana kepatuhan.
 
@@ -2680,7 +2680,7 @@ sequenceDiagram
 *On 'Submit Penarikan'*
 1. Penarikan memanggil `withdrawCompliance(amount, recipient)` (hanya `complianceBalance`).
 
-##### 11. Antar Muka Kasbon HR (`/hr/kasbon`)
+##### 2.4.2.7 Antar Muka Kasbon HR (`/hr/kasbon`)
 
 **Deskripsi :** Daftar pengajuan kasbon karyawan (Pending/Active/Rejected/Repaid), tombol setujui/tolak, dan riwayat pemotongan pajak (PPh21 + BPJS) per klaim gaji.
 
@@ -2729,7 +2729,7 @@ sequenceDiagram
 *On 'Klik Setujui/Tolak'*
 1. Tombol Setujui memanggil `approveAdvance(employee)`; Tolak memanggil `rejectAdvance(employee)`.
 
-##### 12. Antar Muka Vesting HR (`/hr/vesting`)
+##### 2.4.2.8 Antar Muka Vesting HR (`/hr/vesting`)
 
 **Deskripsi :** Manajemen cliff vest: pembuatan vest baru bertipe Retention/Probation/ESOP dan pembatalan vest yang belum matang.
 
@@ -2778,7 +2778,7 @@ sequenceDiagram
 *On 'Klik Batalkan'*
 1. Pembatalan memanggil `cancelCliffVest`.
 
-##### 13. Antar Muka PHK (`/hr/phk`)
+##### 2.4.2.9 Antar Muka PHK (`/hr/phk`)
 
 **Deskripsi :** Antrian dan alur PHK multi-tanda tangan (HR mengajukan, lalu pemegang `LEGAL_ROLE` menyetujui, HR mengeksekusi), termasuk pembatalan proposal. Halaman ini satu-satunya UI untuk kedua langkah persetujuan — lihat §2.4.5 untuk penjelasan bahwa `LEGAL_ROLE` di-auto-grant ke HR Admin sendiri, sehingga kedua langkah dijalankan dari sesi HR Admin yang sama.
 
@@ -2832,7 +2832,7 @@ sequenceDiagram
 
 **Catatan arsitektur:** Bila HR sebelumnya menetapkan `legalAddress` terpisah lewat `/hr/settings` (yang di-`grantRole(LEGAL_ROLE, legalAddress)` on-chain), alamat tersebut tetap dapat memanggil `approveTermination()` langsung terhadap kontrak dari luar aplikasi (mis. Etherscan). Namun karena `useRole()` tidak mendeteksi `LEGAL_ROLE` dan `useRoleGuard` pada layout `/hr/*` hanya meloloskan `role === "hr"`, alamat legal terpisah tersebut tidak bisa membuka halaman `/hr/phk` ini melalui produk — role guard akan mengarahkannya ke `/onboarding` sebelum sempat melihat antrian proposal.
 
-##### 14. Antar Muka Audit HR (`/hr/audit`)
+##### 2.4.2.10 Antar Muka Audit HR (`/hr/audit`)
 
 **Deskripsi :** Riwayat aksi backend yang relevan dengan perusahaan (relay, ekspor kepatuhan, likuidasi, platform fee, peringatan saldo).
 
@@ -2867,7 +2867,7 @@ sequenceDiagram
 1. Ambil entri `audit_logs` yang aktor/metanya terkait perusahaan HR.
 2. Render tabel terurut waktu dengan tautan transaksi.
 
-##### 15. Antar Muka Pengaturan HR (`/hr/settings`)
+##### 2.4.2.11 Antar Muka Pengaturan HR (`/hr/settings`)
 
 > **[Diperbaiki]** Subbab ini sebelumnya hanya mendokumentasikan tab konfigurasi ON-CHAIN
 > (`setCompanyConfig`). Halaman ini sebenarnya juga memiliki tab "Profil" dan "Aturan" yang
@@ -2933,7 +2933,7 @@ sequenceDiagram
 *On 'Simpan (off-chain)'*
 1. Simpan tab Profil atau Aturan secara independen via `PUT /company-settings` (upsert parsial — hanya field yang diubah dikirim).
 
-##### 16. Antar Muka Direktori Karyawan (`/hr/directory`) `[BARU]`
+##### 2.4.2.12 Antar Muka Direktori Karyawan (`/hr/directory`) `[BARU]`
 
 **Deskripsi :** Daftar seluruh karyawan perusahaan beserta departemen dan jabatan, dengan kemampuan meng-assign/memperbarui keduanya per karyawan.
 
@@ -2973,7 +2973,7 @@ sequenceDiagram
 *On 'Edit Departemen/Jabatan'*
 1. `PATCH /directory/:address` menyimpan department/position; hasilnya langsung tercermin di baris tabel tanpa reload penuh.
 
-##### 17. Antar Muka Surat Keterangan Kerja — HR (`/hr/employment-letters`) `[BARU]`
+##### 2.4.2.13 Antar Muka Surat Keterangan Kerja — HR (`/hr/employment-letters`) `[BARU]`
 
 **Deskripsi :** Antrian permohonan surat keterangan kerja dari karyawan, dengan aksi setujui/tolak.
 
@@ -3017,7 +3017,7 @@ sequenceDiagram
 
 Seluruh halaman portal karyawan dibungkus oleh layout `employee/layout.tsx` dengan navigasi sisi karyawan dan role guard `useRole`. Karyawan diidentifikasi melalui stream aktif/paused pada Ponder.
 
-##### 18. Antar Muka EWA Dashboard (`/employee/ewa`)
+##### 2.4.3.1 Antar Muka EWA Dashboard (`/employee/ewa`)
 
 **Deskripsi :** Halaman utama karyawan yang menampilkan saldo gaji terakumulasi real-time, saldo Smart Account, vesting mendatang, dan riwayat klaim; menyediakan tombol "Tarik Gaji" gasless.
 
@@ -3071,7 +3071,7 @@ sequenceDiagram
 *On 'Klik Tarik Gaji'*
 1. `handleClaim`: panggil `claimSalary()` melalui jalur write (gasless), tampilkan banner sukses, lalu refresh `getAccrued` dan `balanceOf`.
 
-##### 19. Antar Muka Reimburse Karyawan (`/employee/reimburse`)
+##### 2.4.3.2 Antar Muka Reimburse Karyawan (`/employee/reimburse`)
 
 **Deskripsi :** Formulir pengajuan reimbursement dan pemantauan status persetujuan HR.
 
@@ -3107,7 +3107,7 @@ sequenceDiagram
 *On 'Buka Halaman'*
 1. Pantau status persetujuan dari HR.
 
-##### 20. Antar Muka Bounty Karyawan (`/employee/bounty`)
+##### 2.4.3.3 Antar Muka Bounty Karyawan (`/employee/bounty`)
 
 **Deskripsi :** Daftar program bounty yang tersedia beserta tombol klaim hadiah IDRX setelah tugas selesai.
 
@@ -3143,7 +3143,7 @@ sequenceDiagram
 *On 'Klik Klaim'*
 1. Ajukan klaim hadiah; tunggu verifikasi HR.
 
-##### 21. Antar Muka Kasbon Karyawan (`/employee/kasbon`)
+##### 2.4.3.4 Antar Muka Kasbon Karyawan (`/employee/kasbon`)
 
 **Deskripsi :** Status kasbon aktif beserta sisa yang harus dilunasi, tombol pengajuan kasbon baru, dan rincian potongan PPh21/BPJS pada setiap klaim gaji.
 
@@ -3189,7 +3189,7 @@ sequenceDiagram
 *On 'Klik Ajukan'*
 1. Tombol ajukan memanggil `requestAdvance(amount)` (gasless, ditandatangani Privy), lalu `refreshData`.
 
-##### 22. Antar Muka Vesting Karyawan (`/employee/vesting`)
+##### 2.4.3.5 Antar Muka Vesting Karyawan (`/employee/vesting`)
 
 **Deskripsi :** Daftar cliff vest milik karyawan beserta tombol klaim setelah cliff tercapai.
 
@@ -3232,7 +3232,7 @@ sequenceDiagram
 1. Tombol klaim aktif jika `block.timestamp >= cliffTs` dan status `Locked`.
 2. Panggil `claimCliffVest(vestId)`; perbarui status.
 
-##### 23. Antar Muka Transfer (`/employee/transfer`)
+##### 2.4.3.6 Antar Muka Transfer (`/employee/transfer`)
 
 **Deskripsi :** Transfer IDRX dari Smart Account karyawan ke alamat EVM eksternal menggunakan fungsi standar ERC-20.
 
@@ -3272,7 +3272,7 @@ sequenceDiagram
 1. Baca `balanceOf(address)` untuk validasi kecukupan saldo.
 2. Konversi nominal ke wei; panggil `transfer(recipient, amountWei)` pada IDRX.
 
-##### 24. Antar Muka Pesangon (`/employee/severance`)
+##### 2.4.3.7 Antar Muka Pesangon (`/employee/severance`)
 
 **Deskripsi :** Tampilan saldo pesangon yang terakumulasi on-chain (2% dari setiap klaim) beserta status dan estimasi besaran berdasarkan masa kerja.
 
@@ -3311,7 +3311,7 @@ sequenceDiagram
 1. Baca `getSeveranceBalance(address)` on-chain dan `severance_vault` terindeks.
 2. Tampilkan status (Locked/Released/Returned) dan estimasi statutori berdasarkan `tenureMonths`.
 
-##### 25. Antar Muka Audit Karyawan (`/employee/audit`)
+##### 2.4.3.8 Antar Muka Audit Karyawan (`/employee/audit`)
 
 **Deskripsi :** Riwayat klaim gaji dan transaksi kasbon milik karyawan yang login.
 
@@ -3346,7 +3346,7 @@ sequenceDiagram
 1. Ambil `ponder.getClaims(address)`; render terurut waktu.
 2. Sertakan tautan transaksi ke Basescan.
 
-##### 26. Antar Muka Pengaturan Karyawan (`/employee/settings`)
+##### 2.4.3.9 Antar Muka Pengaturan Karyawan (`/employee/settings`)
 
 **Deskripsi :** Pembaruan profil PII karyawan (nama, NIK 16 digit, telepon) yang disimpan terenkripsi.
 
@@ -3390,7 +3390,7 @@ sequenceDiagram
 *On 'Klik Simpan'*
 1. Validasi NIK 16 digit; submit `POST /auth/profile` (server mengenkripsi AES-256-GCM).
 
-##### 27. Antar Muka Notifikasi (`/employee/notifications`) `[BARU]`
+##### 2.4.3.10 Antar Muka Notifikasi (`/employee/notifications`) `[BARU]`
 
 **Deskripsi :** Daftar notifikasi peristiwa signifikan milik karyawan (maks 50 terbaru), dengan aksi tandai telah dibaca.
 
@@ -3430,7 +3430,7 @@ sequenceDiagram
 *On 'Klik Notifikasi / Tandai Semua'*
 1. Klik satu notifikasi memanggil `PATCH /notifications/:id/read`; tombol massal memanggil `/read-all`.
 
-##### 28. Antar Muka Slip Gaji (`/employee/payslip`) `[BARU]`
+##### 2.4.3.11 Antar Muka Slip Gaji (`/employee/payslip`) `[BARU]`
 
 **Deskripsi :** Rincian breakdown satu transaksi klaim gaji, ditampilkan sebagai slip gaji digital yang dapat dicetak/disimpan.
 
@@ -3466,7 +3466,7 @@ sequenceDiagram
 1. `GET /payslip/:claimId` mengembalikan breakdown lengkap satu klaim.
 2. Halaman dirender sebagai layout printable; unduh PDF dilakukan lewat dialog cetak browser.
 
-##### 29. Antar Muka Bukti Potong Pajak (`/employee/tax-cert`) `[BARU]`
+##### 2.4.3.12 Antar Muka Bukti Potong Pajak (`/employee/tax-cert`) `[BARU]`
 
 **Deskripsi :** Agregasi tahunan gaji dan potongan untuk keperluan pelaporan SPT pribadi karyawan.
 
@@ -3502,7 +3502,7 @@ sequenceDiagram
 1. `GET /tax-cert/:year` mengagregasi `salary_claim` milik caller pada tahun tsb.
 2. Validasi tahun di sisi backend (400 jika di luar 2020–2100).
 
-##### 30. Antar Muka Surat Keterangan Kerja — Karyawan (`/employee/employment-letter`) `[BARU]`
+##### 2.4.3.13 Antar Muka Surat Keterangan Kerja — Karyawan (`/employee/employment-letter`) `[BARU]`
 
 **Deskripsi :** Formulir pengajuan permohonan surat keterangan kerja dan pemantauan status, serta pengunduhan dokumen setelah disetujui.
 
@@ -3557,7 +3557,7 @@ sequenceDiagram
 > (`app/owner/layout.tsx`): Overview, Tenants, Detail Perusahaan (drill-down dari Tenants),
 > Pendaftaran, Keamanan, dan Monetisasi & Freeze — didokumentasikan satu per satu di bawah.
 
-##### 31. Antar Muka Overview Owner SaaS (`/owner`)
+##### 2.4.4.1 Antar Muka Overview Owner SaaS (`/owner`)
 
 **Deskripsi :** Dashboard agregat operator platform: Total Value Locked (TVL), platform fee terkumpul + tren bulanan, jumlah klien aktif, total karyawan lintas tenant, saldo gas Paymaster gabungan, grafik pertumbuhan pendapatan, daftar tenant terbaru, dan panel "Perlu Perhatian" (vault Paused/Frozen atau gas Paymaster rendah).
 
@@ -3607,7 +3607,7 @@ sequenceDiagram
 3. Untuk tiap company, resolve alamat vault via `PayrollFactory.companyVaults()` lalu baca `getGasBalance()`; akumulasi total gas dan tandai company dengan status non-`Active` atau gas di bawah `GAS_POOL_MIN_WEI` sebagai item "Perlu Perhatian".
 4. Hitung tren pendapatan bulanan dari `platform_fee_payment` yang di-bucket per bulan, dan pertumbuhan klien dari `company.createdAt`.
 
-##### 32. Antar Muka Tenants (`/owner/tenants`)
+##### 2.4.4.2 Antar Muka Tenants (`/owner/tenants`)
 
 **Deskripsi :** Daftar seluruh perusahaan (tenant) yang memiliki vault on-chain, dengan saldo dan status masing-masing, sebagai pintu masuk ke halaman detail per perusahaan.
 
@@ -3644,7 +3644,7 @@ sequenceDiagram
 *On 'Klik Tenant'*
 1. Navigasi ke `/owner/companies/[hrAddress]`.
 
-##### 33. Antar Muka Detail Perusahaan (`/owner/companies/[hrAddress]`)
+##### 2.4.4.3 Antar Muka Detail Perusahaan (`/owner/companies/[hrAddress]`)
 
 **Deskripsi :** Detail satu tenant: KPI (saldo vault, jumlah karyawan, platform fee terbayar, gas Paymaster), alamat vault on-chain, tabel karyawan/stream, riwayat platform fee, serta kontrol penangguhan akses HR ke antarmuka (tidak memengaruhi status vault on-chain).
 
@@ -3699,7 +3699,7 @@ sequenceDiagram
 *On 'Klik Aktifkan Kembali'*
 1. `DELETE /suspension/:hrAddress` — menghapus baris blocklist; HR harus login ulang karena sesi lamanya sudah dicabut saat suspend.
 
-##### 34. Antar Muka Pendaftaran Perusahaan Baru (`/owner/registrations`)
+##### 2.4.4.4 Antar Muka Pendaftaran Perusahaan Baru (`/owner/registrations`)
 
 **Deskripsi :** Antrian tinjauan pendaftaran perusahaan baru (bukan karyawan — itu ditangani HR masing-masing), dengan tab Pending/Approved/Rejected, pencarian, modal detail dokumen perusahaan, dan aksi setujui/tolak.
 
@@ -3748,7 +3748,7 @@ sequenceDiagram
 *On 'Klik Tolak'*
 1. `DELETE /registration/:address`; refresh daftar.
 
-##### 35. Antar Muka Portal Owner — Keamanan Vault (`/owner/security`) `[BARU — lihat SKPL UC-27, FR-PAYANA-1901 s.d. 1904]`
+##### 2.4.4.5 Antar Muka Portal Owner — Keamanan Vault (`/owner/security`) `[BARU — lihat SKPL UC-27, FR-PAYANA-1901 s.d. 1904]`
 
 **Deskripsi :** Daftar alert keamanan yang dihasilkan `anomalyDetector.ts` (lihat Lampiran B.6) lintas seluruh tenant — penarikan vault tidak wajar, perubahan peran tak terduga, dan aktivitas beruntun — dengan tab "Belum Ditangani"/"Semua" dan tombol tandai selesai per alert.
 
@@ -3791,7 +3791,7 @@ sequenceDiagram
 *On 'Klik Tandai Selesai'*
 1. `useResolveAlert(token)` — `PATCH` lalu `invalidateQueries(["securityAlerts"])`.
 
-##### 36. Antar Muka Monetisasi & Freeze (`/owner/fees`)
+##### 2.4.4.6 Antar Muka Monetisasi & Freeze (`/owner/fees`)
 
 **Deskripsi :** Konfigurasi platform fee protokol (basis poin dipotong dari setiap klaim gaji, maks 100 bps/1%) dan kontrol darurat `emergencyFreezeAll()` yang membekukan seluruh tenant sekaligus secara permanen.
 
