@@ -2179,11 +2179,15 @@ Pembacaan data terbagi menjadi dua sumber: (a) pembacaan agregat historis melalu
 
 #### 2.4.1 Halaman Autentikasi dan Onboarding
 
-##### 2.4.1.1 Halaman Landing (`/`)
+##### 1. Antar Muka Halaman Landing (`/`)
 
-**Deskripsi:** Halaman pemasaran publik yang memperkenalkan proposisi nilai Payana (penggajian real-time, gasless, zero Web3 knowledge) dan menyediakan jalur masuk ke aplikasi.
-**Aktor:** Publik (tanpa autentikasi).
-**FR Terkait:** — (halaman informatif; pendukung FR-PAYANA-101).
+**Deskripsi :** Halaman pemasaran publik yang memperkenalkan proposisi nilai Payana (penggajian real-time, gasless, zero Web3 knowledge) dan menyediakan jalur masuk ke aplikasi.
+
+**Input :** Klik tombol "Masuk" (tidak ada input data — halaman murni informatif).
+
+**Output :** Navigasi ke halaman `/login`.
+
+**Aktor:** Publik (tanpa autentikasi). **FR Terkait:** — (halaman informatif; pendukung FR-PAYANA-101).
 
 **Alur Interaksi:**
 
@@ -2205,16 +2209,23 @@ sequenceDiagram
 | Tombol "Masuk" | Tautan (`<Link>`) | Mengarahkan ke `/login`. |
 | Bagian Fitur | Grid kartu | Menjelaskan EWA real-time, gasless, dan kepatuhan otomatis. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Buka Halaman'*
 1. Render konten statis tanpa pemanggilan kontrak atau backend.
-2. Saat tombol "Masuk" ditekan, navigasi App Router ke `/login`.
 
-##### 2.4.1.2 Halaman Login (`/login`)
+*On 'Klik Masuk'*
+1. Navigasi App Router ke `/login`.
 
-**Deskripsi:** Autentikasi tanpa kata sandi berbasis tanda tangan kriptografi EIP-191 menggunakan embedded wallet Privy.
-**Aktor:** Seluruh pengguna (HR Admin, Karyawan, Owner SaaS).
-**FR Terkait:** FR-PAYANA-101, FR-PAYANA-102, FR-PAYANA-106.
+##### 2. Antar Muka Halaman Login (`/login`)
+
+**Deskripsi :** Autentikasi tanpa kata sandi berbasis tanda tangan kriptografi EIP-191 menggunakan embedded wallet Privy.
+
+**Input :** Klik tombol "Masuk" (memicu login Privy via email/social — tidak ada input teks manual; identitas berasal dari tanda tangan wallet, bukan password).
+
+**Output :** Redirect ke portal sesuai peran hasil resolusi (`/owner`, `/hr/vault`, atau `/employee/ewa`); token akses dan refresh token tersimpan di client.
+
+**Aktor:** Seluruh pengguna (HR Admin, Karyawan, Owner SaaS). **FR Terkait:** FR-PAYANA-101, FR-PAYANA-102, FR-PAYANA-106.
 
 **Alur Interaksi:**
 
@@ -2250,24 +2261,29 @@ sequenceDiagram
 | Indikator status | Teks/spinner | Menampilkan progres "menandatangani" dan "memverifikasi". |
 | Redirect handler | Efek samping | Mengarahkan ke portal berdasarkan hasil `useRole`. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Klik Masuk'*
 1. Panggil `login()` Privy; tunggu `authenticated` dan ketersediaan `walletAddress`.
 2. Jika ada `payana_refresh_token` di `localStorage`, coba `POST /auth/refresh` terlebih dahulu untuk menghindari tanda tangan ulang.
 3. Jika refresh gagal, bentuk pesan `Sign in to Payana\nTimestamp: <unix_seconds>`, panggil `switchChain(84532)`, lalu `personal_sign`.
 4. Kirim `{address, message, signature, timestamp}` ke `POST /auth/login`; simpan `token` (akses) dan `refreshToken`.
 5. Jalankan `useRole()` untuk menentukan peran dan mengarahkan ke `/owner`, `/hr/vault` (termasuk akses ke `/hr/phk` untuk langkah persetujuan LEGAL_ROLE, lihat §2.4.5), atau `/employee/ewa`.
 
-##### 2.4.1.3 Halaman Onboarding Karyawan (`/onboarding`) — invitation-only
+##### 3. Antar Muka Halaman Onboarding Karyawan (`/onboarding`) — invitation-only
 
 > **[Diperbaiki]** Subbab ini sebelumnya mendeskripsikan `/onboarding` sebagai formulir
 > registrasi HR/company (arsitektur lama, sebelum invitation-only). Sejak perubahan arsitektur
 > registrasi karyawan (lihat SKPL UC-18, PDHUPL AU-02-02/06..09), `/onboarding` adalah halaman
 > **karyawan**, bukan HR — registrasi company sekarang ada di `/hr/onboarding` (lihat 2.4.2.1).
 
-**Deskripsi:** Halaman registrasi karyawan yang **wajib** diakses melalui link undangan berisi `inviteToken` (`?invite=<token>`) yang dibuat oleh HR — tidak ada lagi jalur "pilih perusahaan bebas" dari dropdown tak terfilter. `hrAddress` di-resolve server-side dari token, tidak pernah diambil langsung dari input karyawan.
-**Aktor:** Calon Karyawan.
-**FR Terkait:** FR-PAYANA-107.
+**Deskripsi :** Halaman registrasi karyawan yang **wajib** diakses melalui link undangan berisi `inviteToken` (`?invite=<token>`) yang dibuat oleh HR — tidak ada lagi jalur "pilih perusahaan bebas" dari dropdown tak terfilter. `hrAddress` di-resolve server-side dari token, tidak pernah diambil langsung dari input karyawan.
+
+**Input :** Query param `?invite=<token>` (dari link undangan HR); form profil: nama, NIK (16 digit), nomor telepon.
+
+**Output :** Badge status pendaftaran (`pending`/`approved`/`rejected`).
+
+**Aktor:** Calon Karyawan. **FR Terkait:** FR-PAYANA-107.
 
 **Alur Interaksi:**
 
@@ -2306,18 +2322,25 @@ sequenceDiagram
 | Tombol "Daftar" | Tombol | Memanggil `POST /registration/request` dengan `inviteToken` disertakan otomatis dari query param. |
 | Badge status | Komponen status | Menampilkan `pending`/`approved`/`rejected`. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Buka Halaman (?invite=token)'*
 1. Baca `inviteToken` dari query param `?invite=`; jika tidak ada, tampilkan layar blokir langsung (tidak render form).
 2. `GET /invitations/:token` — validasi token ada, `status=pending`, belum melewati `expiresAt` (7 hari). Jika gagal, tampilkan layar blokir dengan alasan spesifik.
-3. Jika valid, submit `POST /registration/request {address, type:"employee", inviteToken}` — backend me-resolve `hrAddress` dari token, lalu menandai token `used` (sekali pakai, tidak bisa dipakai ulang oleh pendaftar lain).
-4. Polling/`GET /registration/status/:address` untuk menampilkan status terkini setelah submit.
 
-##### 2.4.1.4 Halaman Verifikasi SBT (`/verify`)
+*On 'Klik Daftar'*
+1. Submit `POST /registration/request {address, type:"employee", inviteToken}` — backend me-resolve `hrAddress` dari token, lalu menandai token `used` (sekali pakai, tidak bisa dipakai ulang oleh pendaftar lain).
+2. Polling `GET /registration/status/:address` untuk menampilkan status terkini setelah submit.
 
-**Deskripsi:** Verifikasi publik keaslian Sertifikat Ketenagakerjaan (Employment SBT) oleh pihak ketiga.
-**Aktor:** Publik (verifikator eksternal, mis. bank, calon pemberi kerja).
-**FR Terkait:** FR-PAYANA-905, FR-PAYANA-904.
+##### 4. Antar Muka Halaman Verifikasi SBT (`/verify`)
+
+**Deskripsi :** Verifikasi publik keaslian Sertifikat Ketenagakerjaan (Employment SBT) oleh pihak ketiga.
+
+**Input :** Alamat dompet (wallet address) karyawan yang akan diverifikasi.
+
+**Output :** Kartu sertifikat berisi `companyName`, `startTs`, `hrAuthority`; badge "Soulbound".
+
+**Aktor:** Publik (verifikator eksternal, mis. bank, calon pemberi kerja). **FR Terkait:** FR-PAYANA-905, FR-PAYANA-904.
 
 **Alur Interaksi:**
 
@@ -2356,8 +2379,9 @@ sequenceDiagram
 | Kartu sertifikat | Panel hasil | Menampilkan `companyName`, `startTs`, `hrAuthority`. |
 | Badge "Soulbound" | Indikator | Menegaskan token non-transferable (`locked == true`). |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Submit Alamat'*
 1. Baca `employeeTokenId(address)`; jika 0, tampilkan "sertifikat tidak ditemukan".
 2. Baca `employmentRecords(tokenId)` — hasil berupa **array 3 elemen** `[hrAuthority, companyName, startTs]` (destructuring array, bukan objek) untuk metadata perusahaan dan tanggal mulai.
 3. Baca `locked(tokenId)` (selalu `true`) untuk mengonfirmasi sifat soulbound.
@@ -2366,14 +2390,18 @@ sequenceDiagram
 
 Seluruh halaman portal HR dibungkus oleh layout `hr/layout.tsx` yang menyediakan navigasi sisi dan role guard berbasis `useRole`. Pengguna yang bukan HR diarahkan keluar dari portal ini.
 
-##### 2.4.2.1 Dashboard HR Onboarding (`/hr/onboarding`)
+##### 5. Antar Muka Dashboard HR Onboarding (`/hr/onboarding`)
 
 > Signature saat ini: `deployVault(hrAuthority, companyName, sbtContract)`, 3 parameter. Lihat
 > SKPL UC-18 untuk spesifikasi penuh alur registrasi company yang mendahului wizard ini.
 
-**Deskripsi:** Wizard yang mencakup registrasi profil company (ditinjau Owner SaaS, lihat UC-18) diikuti deploy `CompanyVault`, konfigurasi parameter potongan (BPS), dan deposit awal IDRX.
-**Aktor:** HR Admin.
-**FR Terkait:** FR-PAYANA-107, FR-PAYANA-108, FR-PAYANA-109, FR-PAYANA-201, FR-PAYANA-202, FR-PAYANA-901.
+**Deskripsi :** Wizard yang mencakup registrasi profil company (ditinjau Owner SaaS, lihat UC-18) diikuti deploy `CompanyVault`, konfigurasi parameter potongan (BPS), dan deposit awal IDRX.
+
+**Input :** Langkah 1 — nama, NPWP, NIB, nama & NIK direktur, dokumen akta, email; Langkah 2 — BPS BPJS/pesangon; Langkah 3 — nominal deposit IDRX.
+
+**Output :** Alamat vault yang berhasil di-deploy (kartu hasil + tombol salin); status "Sistem Siap Digunakan" pada langkah akhir.
+
+**Aktor:** HR Admin. **FR Terkait:** FR-PAYANA-107, FR-PAYANA-108, FR-PAYANA-109, FR-PAYANA-201, FR-PAYANA-202, FR-PAYANA-901.
 
 **Alur Interaksi:**
 
@@ -2420,18 +2448,25 @@ sequenceDiagram
 | Input Deposit (IDRX) | Field angka | Nominal deposit awal. |
 | Tombol "Approve & Deposit" | Tombol tulis | Memanggil `approve` lalu `fundVault`. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Klik Deploy Vault'*
 1. `handleDeploy`: panggil `deployVault(address, companyName, EMPLOYMENT_SBT)` via `useContractWrite`.
 2. Polling `ponder.getCompany(address)` hingga 20 kali (interval 3 detik) sampai alamat vault terindeks; simpan ke `deployedVault`.
-3. `handleDeposit`: konversi nominal ke wei (`BigInt(amount) * 1e18`), panggil `approve(deployedVault, amountWei)` pada IDRX, lalu `fundVault(amountWei)` pada vault.
-4. Tampilkan langkah selesai dengan tautan ke `/hr/vault`.
 
-##### 2.4.2.2 Manajemen Karyawan (`/hr/employees` dan `/hr/employees/[id]`)
+*On 'Klik Approve & Deposit'*
+1. `handleDeposit`: konversi nominal ke wei (`BigInt(amount) * 1e18`), panggil `approve(deployedVault, amountWei)` pada IDRX, lalu `fundVault(amountWei)` pada vault.
+2. Tampilkan langkah selesai dengan tautan ke `/hr/vault`.
 
-**Deskripsi:** Daftar seluruh karyawan beserta status stream, flow rate, dan saldo terakumulasi; halaman detail menyediakan kontrol penuh atas stream individual.
-**Aktor:** HR Admin.
-**FR Terkait:** FR-PAYANA-301 s.d. FR-PAYANA-306, FR-PAYANA-505.
+##### 6. Antar Muka Manajemen Karyawan (`/hr/employees` dan `/hr/employees/[id]`)
+
+**Deskripsi :** Daftar seluruh karyawan beserta status stream, flow rate, dan saldo terakumulasi; halaman detail menyediakan kontrol penuh atas stream individual.
+
+**Input :** Pilihan karyawan dari daftar; pada detail — aksi kontrol (pause/resume/update flow rate/update split/cancel/resign) beserta nilai baru flow rate atau split bila relevan.
+
+**Output :** Tabel status stream seluruh karyawan; saldo terakumulasi real-time per karyawan.
+
+**Aktor:** HR Admin. **FR Terkait:** FR-PAYANA-301 s.d. FR-PAYANA-306, FR-PAYANA-505.
 
 **Alur Interaksi:**
 
@@ -2463,17 +2498,24 @@ sequenceDiagram
 | Input flow rate / split | Field angka | Nilai baru untuk pembaruan stream. |
 | Tombol Resign | Tombol tulis | `resignEmployee(employee)` (pesangon kembali ke vault). |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Buka Halaman'*
 1. Muat daftar via `ponder.getStreams(hrAuthority)`; render tabel.
 2. Pada detail `[id]`, baca `getAccrued(employee)` on-chain untuk saldo real-time.
-3. Aksi kontrol memanggil fungsi kontrak terkait melalui `useContractWrite`; validasi split = 10.000 bps sebelum `updateStreamSplits`.
 
-##### 2.4.2.3 Manajemen Vault (`/hr/vault`)
+*On 'Klik Aksi Kontrol'*
+1. Aksi kontrol memanggil fungsi kontrak terkait melalui `useContractWrite`; validasi split = 10.000 bps sebelum `updateStreamSplits`.
 
-**Deskripsi:** Manajemen treasury perusahaan: pemantauan saldo, peringatan saldo rendah real-time, deposit, dan penarikan.
-**Aktor:** HR Admin.
-**FR Terkait:** FR-PAYANA-202, FR-PAYANA-203, FR-PAYANA-205, FR-PAYANA-207.
+##### 7. Antar Muka Manajemen Vault (`/hr/vault`)
+
+**Deskripsi :** Manajemen treasury perusahaan: pemantauan saldo, peringatan saldo rendah real-time, deposit, dan penarikan.
+
+**Input :** Nominal deposit; nominal + alamat penerima untuk penarikan; klik pause/resume vault.
+
+**Output :** Saldo vault dan estimasi burn rate bulanan; banner peringatan saldo rendah real-time.
+
+**Aktor:** HR Admin. **FR Terkait:** FR-PAYANA-202, FR-PAYANA-203, FR-PAYANA-205, FR-PAYANA-207.
 
 **Alur Interaksi:**
 
@@ -2505,17 +2547,24 @@ sequenceDiagram
 | Form penarikan | Field + tombol | `withdrawVault(amount, recipient)`. |
 | Tombol pause/resume vault | Tombol tulis | `pauseVault()` / `resumeVault()`. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Buka Halaman'*
 1. Baca `getVaultBalance()` dan `totalFlowRate` untuk estimasi kebutuhan bulanan.
 2. Berlangganan WebSocket; tampilkan banner saat tipe `LOW_VAULT_BALANCE` diterima.
-3. Deposit: `approve(vault, amount)` → `fundVault(amount)`. Penarikan: `withdrawVault(amount, recipient)`.
 
-##### 2.4.2.4 Reimburse HR (`/hr/reimburse`)
+*On 'Submit Deposit/Penarikan'*
+1. Deposit: `approve(vault, amount)` → `fundVault(amount)`. Penarikan: `withdrawVault(amount, recipient)`.
 
-**Deskripsi:** Manajemen klaim reimbursement yang diajukan karyawan: daftar, persetujuan, dan pencatatan pembayaran.
-**Aktor:** HR Admin.
-**FR Terkait:** — (fitur pelengkap antarmuka tingkat aplikasi).
+##### 8. Antar Muka Reimburse HR (`/hr/reimburse`)
+
+**Deskripsi :** Manajemen klaim reimbursement yang diajukan karyawan: daftar, persetujuan, dan pencatatan pembayaran.
+
+**Input :** Keputusan setuju/tolak per klaim.
+
+**Output :** Tabel klaim (keterangan, jumlah, status, bukti) dengan status yang diperbarui.
+
+**Aktor:** HR Admin. **FR Terkait:** — (fitur pelengkap antarmuka tingkat aplikasi).
 
 **Alur Interaksi:**
 
@@ -2535,16 +2584,23 @@ sequenceDiagram
 | Daftar klaim | Tabel data | Keterangan, jumlah, status, bukti. |
 | Tombol setujui/tolak | Grup tombol | Memutuskan klaim reimbursement. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Buka Halaman'*
 1. Muat daftar klaim reimbursement tingkat aplikasi.
-2. Aksi persetujuan/penolakan memperbarui status klaim dan mencatat pembayaran.
 
-##### 2.4.2.5 Bounty HR (`/hr/bounty`)
+*On 'Klik Setujui/Tolak'*
+1. Aksi persetujuan/penolakan memperbarui status klaim dan mencatat pembayaran.
 
-**Deskripsi:** Manajemen program bounty/insentif kinerja: pembuatan papan bounty, penetapan hadiah IDRX, dan pencatatan klaim disetujui.
-**Aktor:** HR Admin.
-**FR Terkait:** — (fitur pelengkap antarmuka tingkat aplikasi).
+##### 9. Antar Muka Bounty HR (`/hr/bounty`)
+
+**Deskripsi :** Manajemen program bounty/insentif kinerja: pembuatan papan bounty, penetapan hadiah IDRX, dan pencatatan klaim disetujui.
+
+**Input :** Judul, deskripsi tugas, dan hadiah IDRX (form bounty baru); keputusan tinjau klaim penyelesaian.
+
+**Output :** Daftar bounty dengan status (terbuka/diklaim/selesai).
+
+**Aktor:** HR Admin. **FR Terkait:** — (fitur pelengkap antarmuka tingkat aplikasi).
 
 **Alur Interaksi:**
 
@@ -2564,16 +2620,23 @@ sequenceDiagram
 | Form bounty | Field + tombol | Judul, deskripsi tugas, hadiah IDRX. |
 | Daftar bounty | Tabel data | Status: terbuka/diklaim/selesai. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Klik Buat Bounty'*
 1. Buat papan bounty dengan hadiah IDRX.
-2. Tinjau klaim penyelesaian dan catat pembayaran hadiah.
 
-##### 2.4.2.6 Compliance HR (`/hr/compliance`)
+*On 'Tinjau Klaim'*
+1. Tinjau klaim penyelesaian dan catat pembayaran hadiah.
 
-**Deskripsi:** Laporan kepatuhan BPJS/PPh21: pratinjau ringkasan bulanan, unduhan CSV, dan penarikan akumulasi dana kepatuhan.
-**Aktor:** HR Admin.
-**FR Terkait:** FR-PAYANA-801, FR-PAYANA-803, FR-PAYANA-804, FR-PAYANA-805.
+##### 10. Antar Muka Compliance HR (`/hr/compliance`)
+
+**Deskripsi :** Laporan kepatuhan BPJS/PPh21: pratinjau ringkasan bulanan, unduhan CSV, dan penarikan akumulasi dana kepatuhan.
+
+**Input :** Bulan yang dipilih; nominal + penerima penarikan dana kepatuhan.
+
+**Output :** Ringkasan kepatuhan bulanan (di layar dan berkas CSV terunduh); saldo `complianceBalance` on-chain.
+
+**Aktor:** HR Admin. **FR Terkait:** FR-PAYANA-801, FR-PAYANA-803, FR-PAYANA-804, FR-PAYANA-805.
 
 **Alur Interaksi:**
 
@@ -2606,17 +2669,26 @@ sequenceDiagram
 | Tombol Unduh CSV | Tombol | Memanggil `GET /compliance/export`. |
 | Form tarik kepatuhan | Field + tombol | `withdrawCompliance(amount, recipient)` ke agen pajak. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Pilih Bulan'*
 1. Ambil ringkasan via `backend.getComplianceSummary(hr, month, token)`.
-2. Tombol unduh memanggil endpoint export; berkas CSV dikembalikan sebagai attachment.
-3. Penarikan memanggil `withdrawCompliance(amount, recipient)` (hanya `complianceBalance`).
 
-##### 2.4.2.7 Kasbon HR (`/hr/kasbon`)
+*On 'Klik Unduh CSV'*
+1. Tombol unduh memanggil endpoint export; berkas CSV dikembalikan sebagai attachment.
 
-**Deskripsi:** Daftar pengajuan kasbon karyawan (Pending/Active/Rejected/Repaid), tombol setujui/tolak, dan riwayat pemotongan pajak (PPh21 + BPJS) per klaim gaji.
-**Aktor:** HR Admin.
-**FR Terkait:** FR-PAYANA-703, FR-PAYANA-705.
+*On 'Submit Penarikan'*
+1. Penarikan memanggil `withdrawCompliance(amount, recipient)` (hanya `complianceBalance`).
+
+##### 11. Antar Muka Kasbon HR (`/hr/kasbon`)
+
+**Deskripsi :** Daftar pengajuan kasbon karyawan (Pending/Active/Rejected/Repaid), tombol setujui/tolak, dan riwayat pemotongan pajak (PPh21 + BPJS) per klaim gaji.
+
+**Input :** Keputusan setuju/tolak per pengajuan kasbon.
+
+**Output :** Tabel kasbon pending + riwayat status; panel riwayat pemotongan pajak (`TaxWithheld`).
+
+**Aktor:** HR Admin. **FR Terkait:** FR-PAYANA-703, FR-PAYANA-705.
 
 **Alur Interaksi:**
 
@@ -2648,17 +2720,24 @@ sequenceDiagram
 | Tabel riwayat kasbon | Tabel data | Kasbon `Active`/`Rejected`/`Repaid` beserta sisa yang harus dilunasi. |
 | Panel riwayat pajak | Panel data | Ringkasan `TaxWithheld` (PPh21 + BPJS) per klaim gaji, terindeks Ponder. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Buka Halaman'*
 1. Baca `ponder.getSalaryAdvances(vaultAddress)` untuk daftar kasbon terindeks (status diturunkan dari riwayat event, lihat catatan `AdvanceStatus`).
-2. Tombol Setujui memanggil `approveAdvance(employee)`; Tolak memanggil `rejectAdvance(employee)`.
-3. Render riwayat `TaxWithheld` per karyawan dari data Ponder untuk transparansi potongan pajak.
+2. Render riwayat `TaxWithheld` per karyawan dari data Ponder untuk transparansi potongan pajak.
 
-##### 2.4.2.8 Vesting HR (`/hr/vesting`)
+*On 'Klik Setujui/Tolak'*
+1. Tombol Setujui memanggil `approveAdvance(employee)`; Tolak memanggil `rejectAdvance(employee)`.
 
-**Deskripsi:** Manajemen cliff vest: pembuatan vest baru bertipe Retention/Probation/ESOP dan pembatalan vest yang belum matang.
-**Aktor:** HR Admin.
-**FR Terkait:** FR-PAYANA-601, FR-PAYANA-603, FR-PAYANA-604, FR-PAYANA-605.
+##### 12. Antar Muka Vesting HR (`/hr/vesting`)
+
+**Deskripsi :** Manajemen cliff vest: pembuatan vest baru bertipe Retention/Probation/ESOP dan pembatalan vest yang belum matang.
+
+**Input :** Form vest baru — alamat karyawan, jumlah, tanggal cliff, tipe vest; pilihan vest untuk dibatalkan.
+
+**Output :** Daftar vest (jumlah, tanggal cliff, status Locked/Claimed/Forfeited).
+
+**Aktor:** HR Admin. **FR Terkait:** FR-PAYANA-601, FR-PAYANA-603, FR-PAYANA-604, FR-PAYANA-605.
 
 **Alur Interaksi:**
 
@@ -2687,17 +2766,27 @@ sequenceDiagram
 | Daftar vest | Tabel data | Jumlah, cliff, status (Locked/Claimed/Forfeited). |
 | Tombol batalkan | Tombol tulis | `cancelCliffVest(employee, vestId)`. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Buka Halaman'*
+1. Daftar vest dibaca dari `ponder.getVests`.
+
+*On 'Klik Buat Vest'*
 1. Validasi `cliffTs` di masa depan dan saldo vault mencukupi.
 2. Panggil `createCliffVest(employee, amount, cliffTs, vestType)`.
-3. Daftar vest dibaca dari `ponder.getVests`; pembatalan memanggil `cancelCliffVest`.
 
-##### 2.4.2.9 PHK (`/hr/phk`)
+*On 'Klik Batalkan'*
+1. Pembatalan memanggil `cancelCliffVest`.
 
-**Deskripsi:** Antrian dan alur PHK multi-tanda tangan (HR mengajukan, lalu pemegang `LEGAL_ROLE` menyetujui, HR mengeksekusi), termasuk pembatalan proposal. Halaman ini satu-satunya UI untuk kedua langkah persetujuan — lihat §2.4.5 untuk penjelasan bahwa `LEGAL_ROLE` di-auto-grant ke HR Admin sendiri, sehingga kedua langkah dijalankan dari sesi HR Admin yang sama.
-**Aktor:** HR Admin (menjalankan kedua langkah persetujuan: `HR_ROLE` dan `LEGAL_ROLE`).
-**FR Terkait:** FR-PAYANA-501, FR-PAYANA-502, FR-PAYANA-503, FR-PAYANA-504.
+##### 13. Antar Muka PHK (`/hr/phk`)
+
+**Deskripsi :** Antrian dan alur PHK multi-tanda tangan (HR mengajukan, lalu pemegang `LEGAL_ROLE` menyetujui, HR mengeksekusi), termasuk pembatalan proposal. Halaman ini satu-satunya UI untuk kedua langkah persetujuan — lihat §2.4.5 untuk penjelasan bahwa `LEGAL_ROLE` di-auto-grant ke HR Admin sendiri, sehingga kedua langkah dijalankan dari sesi HR Admin yang sama.
+
+**Input :** Alamat karyawan + alasan PHK (proposal); klik setujui (langkah Legal); klik eksekusi.
+
+**Output :** Status proposal PHK terkini (proposed/approved/executed); jumlah pesangon yang dibayarkan.
+
+**Aktor:** HR Admin (menjalankan kedua langkah persetujuan: `HR_ROLE` dan `LEGAL_ROLE`). **FR Terkait:** FR-PAYANA-501, FR-PAYANA-502, FR-PAYANA-503, FR-PAYANA-504.
 
 **Alur Interaksi:**
 
@@ -2727,20 +2816,31 @@ sequenceDiagram
 | Tombol eksekusi | Tombol tulis | `executeTermination(employee)`. |
 | Tombol batalkan | Tombol tulis | `cancelProposal(employee)` sebelum langkah persetujuan LEGAL_ROLE dilakukan. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Klik Ajukan Proposal'*
 1. HR: hash alasan ke `reasonHash` (keccak256), panggil `proposeTermination(employee, reasonHash)`.
-2. HR (sebagai pemegang `LEGAL_ROLE`): panggil `approveTermination(employee)` — kontrak memvalidasi `hasRole(LEGAL_ROLE, msg.sender)`, yang bernilai `true` untuk alamat HR karena auto-grant saat onboarding.
-3. HR: panggil `executeTermination(employee)` (memerlukan kedua persetujuan dan belum kadaluarsa).
-4. Pembatalan memanggil `cancelProposal(employee)` selama langkah persetujuan LEGAL_ROLE belum dilakukan.
+
+*On 'Klik Setujui (LEGAL_ROLE)'*
+1. HR (sebagai pemegang `LEGAL_ROLE`): panggil `approveTermination(employee)` — kontrak memvalidasi `hasRole(LEGAL_ROLE, msg.sender)`, yang bernilai `true` untuk alamat HR karena auto-grant saat onboarding.
+
+*On 'Klik Eksekusi'*
+1. HR: panggil `executeTermination(employee)` (memerlukan kedua persetujuan dan belum kadaluarsa).
+
+*On 'Klik Batalkan'*
+1. Pembatalan memanggil `cancelProposal(employee)` selama langkah persetujuan LEGAL_ROLE belum dilakukan.
 
 **Catatan arsitektur:** Bila HR sebelumnya menetapkan `legalAddress` terpisah lewat `/hr/settings` (yang di-`grantRole(LEGAL_ROLE, legalAddress)` on-chain), alamat tersebut tetap dapat memanggil `approveTermination()` langsung terhadap kontrak dari luar aplikasi (mis. Etherscan). Namun karena `useRole()` tidak mendeteksi `LEGAL_ROLE` dan `useRoleGuard` pada layout `/hr/*` hanya meloloskan `role === "hr"`, alamat legal terpisah tersebut tidak bisa membuka halaman `/hr/phk` ini melalui produk — role guard akan mengarahkannya ke `/onboarding` sebelum sempat melihat antrian proposal.
 
-##### 2.4.2.10 Audit HR (`/hr/audit`)
+##### 14. Antar Muka Audit HR (`/hr/audit`)
 
-**Deskripsi:** Riwayat aksi backend yang relevan dengan perusahaan (relay, ekspor kepatuhan, likuidasi, platform fee, peringatan saldo).
-**Aktor:** HR Admin.
-**FR Terkait:** FR-PAYANA-1002.
+**Deskripsi :** Riwayat aksi backend yang relevan dengan perusahaan (relay, ekspor kepatuhan, likuidasi, platform fee, peringatan saldo).
+
+**Input :** — (halaman baca saja, tidak ada input pengguna).
+
+**Output :** Tabel audit log (aksi, waktu, hash transaksi) dengan tautan Basescan.
+
+**Aktor:** HR Admin. **FR Terkait:** FR-PAYANA-1002.
 
 **Alur Interaksi:**
 
@@ -2761,20 +2861,25 @@ sequenceDiagram
 | Tabel audit | Tabel data | Aksi (`BUNDLER_RELAY`, `COMPLIANCE_EXPORT`, `LOAN_LIQUIDATED`, `PLATFORM_FEE_PAID`, `LOW_VAULT_BALANCE_ALERT`), waktu, hash. |
 | Tautan transaksi | OnChainLink | Tautan ke Basescan untuk `txHash`. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Buka Halaman'*
 1. Ambil entri `audit_logs` yang aktor/metanya terkait perusahaan HR.
 2. Render tabel terurut waktu dengan tautan transaksi.
 
-##### 2.4.2.11 Pengaturan HR (`/hr/settings`)
+##### 15. Antar Muka Pengaturan HR (`/hr/settings`)
 
 > **[Diperbaiki]** Subbab ini sebelumnya hanya mendokumentasikan tab konfigurasi ON-CHAIN
 > (`setCompanyConfig`). Halaman ini sebenarnya juga memiliki tab "Profil" dan "Aturan" yang
 > murni OFF-CHAIN (`GET`/`PUT /company-settings`, lihat B.16/SKPL UC-26) — ditambahkan di bawah.
 
-**Deskripsi:** Konfigurasi parameter vault ON-CHAIN (BPS BPJS, BPS PPh21, threshold peringatan saldo rendah) sekaligus preferensi branding OFF-CHAIN (nama tampilan, negara, logo, batas EWA, tarif yield) dalam satu halaman.
-**Aktor:** HR Admin.
-**FR Terkait:** FR-PAYANA-204, FR-PAYANA-802, FR-PAYANA-1801.
+**Deskripsi :** Konfigurasi parameter vault ON-CHAIN (BPS BPJS, BPS PPh21, threshold peringatan saldo rendah) sekaligus preferensi branding OFF-CHAIN (nama tampilan, negara, logo, batas EWA, tarif yield) dalam satu halaman.
+
+**Input :** BPS BPJS/PPh21/threshold saldo rendah (tab on-chain); nama, negara, logo, batas EWA, tarif yield (tab Profil/Aturan, off-chain).
+
+**Output :** Konfirmasi konfigurasi tersimpan (baik on-chain maupun off-chain).
+
+**Aktor:** HR Admin. **FR Terkait:** FR-PAYANA-204, FR-PAYANA-802, FR-PAYANA-1801.
 
 **Alur Interaksi (bagian on-chain):**
 
@@ -2816,18 +2921,27 @@ sequenceDiagram
 | Tab "Aturan" — Batas EWA/Tarif Yield | Field angka (%) | Off-chain, `company_settings.ewaLimitBps/yieldRateBps` — dikonversi persen↔bps (×100). |
 | Tombol Simpan (off-chain) | Tombol tulis | `PUT /company-settings`. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Buka Halaman'*
 1. Baca konfigurasi saat ini dari kontrak untuk prapengisian form on-chain.
-2. Panggil `setCompanyConfig(bpjsBps, pph21Bps, lowBalanceThresholdBps)` via `useContractWrite`.
-3. `useCompanySettings()` memanggil `GET /company-settings` untuk prapengisian tab Profil/Aturan; `null` berarti belum pernah disimpan (field kosong).
-4. Simpan tab Profil atau Aturan secara independen via `PUT /company-settings` (upsert parsial — hanya field yang diubah dikirim).
+2. `useCompanySettings()` memanggil `GET /company-settings` untuk prapengisian tab Profil/Aturan; `null` berarti belum pernah disimpan (field kosong).
 
-##### 2.4.2.12 Direktori Karyawan (`/hr/directory`) `[BARU]`
+*On 'Simpan (on-chain)'*
+1. Panggil `setCompanyConfig(bpjsBps, pph21Bps, lowBalanceThresholdBps)` via `useContractWrite`.
 
-**Deskripsi:** Daftar seluruh karyawan perusahaan beserta departemen dan jabatan, dengan kemampuan meng-assign/memperbarui keduanya per karyawan.
-**Aktor:** HR Admin.
-**FR Terkait:** FR-PAYANA-1701.
+*On 'Simpan (off-chain)'*
+1. Simpan tab Profil atau Aturan secara independen via `PUT /company-settings` (upsert parsial — hanya field yang diubah dikirim).
+
+##### 16. Antar Muka Direktori Karyawan (`/hr/directory`) `[BARU]`
+
+**Deskripsi :** Daftar seluruh karyawan perusahaan beserta departemen dan jabatan, dengan kemampuan meng-assign/memperbarui keduanya per karyawan.
+
+**Input :** Departemen dan jabatan (inline edit per baris karyawan).
+
+**Output :** Tabel direktori (nama, departemen, jabatan, status stream, flow rate).
+
+**Aktor:** HR Admin. **FR Terkait:** FR-PAYANA-1701.
 
 **Alur Interaksi:**
 
@@ -2851,16 +2965,23 @@ sequenceDiagram
 | Tabel direktori | Tabel data | Nama, departemen, jabatan, status stream, flow rate per karyawan. |
 | Input Departemen / Jabatan | Field teks (inline edit) | Ditugaskan per baris karyawan. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Buka Halaman'*
 1. `GET /directory/:hrAddress` memuat daftar karyawan (join data stream Ponder dengan `employee_profiles`).
-2. `PATCH /directory/:address` menyimpan department/position; hasilnya langsung tercermin di baris tabel tanpa reload penuh.
 
-##### 2.4.2.13 Surat Keterangan Kerja — HR (`/hr/employment-letters`) `[BARU]`
+*On 'Edit Departemen/Jabatan'*
+1. `PATCH /directory/:address` menyimpan department/position; hasilnya langsung tercermin di baris tabel tanpa reload penuh.
 
-**Deskripsi:** Antrian permohonan surat keterangan kerja dari karyawan, dengan aksi setujui/tolak.
-**Aktor:** HR Admin.
-**FR Terkait:** FR-PAYANA-1601.
+##### 17. Antar Muka Surat Keterangan Kerja — HR (`/hr/employment-letters`) `[BARU]`
+
+**Deskripsi :** Antrian permohonan surat keterangan kerja dari karyawan, dengan aksi setujui/tolak.
+
+**Input :** Keputusan setuju/tolak per permohonan.
+
+**Output :** Daftar permohonan (karyawan pemohon, tujuan, tanggal, status) dengan status terkini.
+
+**Aktor:** HR Admin. **FR Terkait:** FR-PAYANA-1601.
 
 **Alur Interaksi:**
 
@@ -2884,20 +3005,27 @@ sequenceDiagram
 | Daftar permohonan | Tabel data | Karyawan pemohon, tujuan (purpose), tanggal pengajuan, status. |
 | Tombol Setujui/Tolak | Grup tombol | Memutuskan permohonan. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Buka Halaman'*
 1. Muat daftar `employment_letters` milik `hrAddress` caller.
-2. `PATCH /employment-letter/:id/approve|reject` mengubah status; karyawan dapat mengunduh dokumen setelah `approved`.
+
+*On 'Klik Setujui/Tolak'*
+1. `PATCH /employment-letter/:id/approve|reject` mengubah status; karyawan dapat mengunduh dokumen setelah `approved`.
 
 #### 2.4.3 Portal Karyawan (`/employee/*`)
 
 Seluruh halaman portal karyawan dibungkus oleh layout `employee/layout.tsx` dengan navigasi sisi karyawan dan role guard `useRole`. Karyawan diidentifikasi melalui stream aktif/paused pada Ponder.
 
-##### 2.4.3.1 EWA Dashboard (`/employee/ewa`)
+##### 18. Antar Muka EWA Dashboard (`/employee/ewa`)
 
-**Deskripsi:** Halaman utama karyawan yang menampilkan saldo gaji terakumulasi real-time, saldo Smart Account, vesting mendatang, dan riwayat klaim; menyediakan tombol "Tarik Gaji" gasless.
-**Aktor:** Karyawan.
-**FR Terkait:** FR-PAYANA-401, FR-PAYANA-402, FR-PAYANA-403, FR-PAYANA-405.
+**Deskripsi :** Halaman utama karyawan yang menampilkan saldo gaji terakumulasi real-time, saldo Smart Account, vesting mendatang, dan riwayat klaim; menyediakan tombol "Tarik Gaji" gasless.
+
+**Input :** Klik tombol "Tarik Gaji" (tidak ada input data manual — jumlah klaim dihitung otomatis dari saldo terakumulasi on-chain).
+
+**Output :** Saldo terakumulasi real-time, saldo Smart Account, status vesting, riwayat klaim; banner konfirmasi setelah klaim berhasil.
+
+**Aktor:** Karyawan. **FR Terkait:** FR-PAYANA-401, FR-PAYANA-402, FR-PAYANA-403, FR-PAYANA-405.
 
 **Alur Interaksi:**
 
@@ -2934,17 +3062,24 @@ sequenceDiagram
 | Aktivitas Terakhir | Daftar | Lima klaim terakhir dari `getClaims`. |
 | Banner sukses | Alert + OnChainLink | Konfirmasi klaim + tautan transaksi. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Buka Halaman'*
 1. Muat paralel `ponder.getStream`, `ponder.getClaims`, `ponder.getVests`; baca `balanceOf` IDRX.
 2. `fetchAccrued`: baca `getAccrued(address)` on-chain sebagai seed `StreamCounter`; polling tiap 10 detik (NFR-10).
-3. `handleClaim`: panggil `claimSalary()` melalui jalur write (gasless), tampilkan banner sukses, lalu refresh `getAccrued` dan `balanceOf`.
 
-##### 2.4.3.2 Reimburse Karyawan (`/employee/reimburse`)
+*On 'Klik Tarik Gaji'*
+1. `handleClaim`: panggil `claimSalary()` melalui jalur write (gasless), tampilkan banner sukses, lalu refresh `getAccrued` dan `balanceOf`.
 
-**Deskripsi:** Formulir pengajuan reimbursement dan pemantauan status persetujuan HR.
-**Aktor:** Karyawan.
-**FR Terkait:** — (fitur pelengkap antarmuka tingkat aplikasi).
+##### 19. Antar Muka Reimburse Karyawan (`/employee/reimburse`)
+
+**Deskripsi :** Formulir pengajuan reimbursement dan pemantauan status persetujuan HR.
+
+**Input :** Keterangan biaya, jumlah IDRX, bukti (unggah).
+
+**Output :** Status persetujuan HR (daftar klaim beserta status).
+
+**Aktor:** Karyawan. **FR Terkait:** — (fitur pelengkap antarmuka tingkat aplikasi).
 
 **Alur Interaksi:**
 
@@ -2964,16 +3099,23 @@ sequenceDiagram
 | Form klaim | Field + unggah | Keterangan biaya, jumlah IDRX, bukti. |
 | Daftar status | Tabel data | Status persetujuan HR. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Submit Klaim'*
 1. Submit klaim reimbursement tingkat aplikasi.
-2. Pantau status persetujuan dari HR.
 
-##### 2.4.3.3 Bounty Karyawan (`/employee/bounty`)
+*On 'Buka Halaman'*
+1. Pantau status persetujuan dari HR.
 
-**Deskripsi:** Daftar program bounty yang tersedia beserta tombol klaim hadiah IDRX setelah tugas selesai.
-**Aktor:** Karyawan.
-**FR Terkait:** — (fitur pelengkap antarmuka tingkat aplikasi).
+##### 20. Antar Muka Bounty Karyawan (`/employee/bounty`)
+
+**Deskripsi :** Daftar program bounty yang tersedia beserta tombol klaim hadiah IDRX setelah tugas selesai.
+
+**Input :** Klik "Klaim" pada bounty yang telah diselesaikan.
+
+**Output :** Daftar bounty (judul, deskripsi, hadiah IDRX) beserta status klaim.
+
+**Aktor:** Karyawan. **FR Terkait:** — (fitur pelengkap antarmuka tingkat aplikasi).
 
 **Alur Interaksi:**
 
@@ -2993,16 +3135,23 @@ sequenceDiagram
 | Daftar bounty | Grid kartu | Judul, deskripsi, hadiah IDRX. |
 | Tombol klaim | Tombol | Mengajukan klaim penyelesaian. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Buka Halaman'*
 1. Muat daftar bounty terbuka.
-2. Ajukan klaim hadiah; tunggu verifikasi HR.
 
-##### 2.4.3.4 Kasbon Karyawan (`/employee/kasbon`)
+*On 'Klik Klaim'*
+1. Ajukan klaim hadiah; tunggu verifikasi HR.
 
-**Deskripsi:** Status kasbon aktif beserta sisa yang harus dilunasi, tombol pengajuan kasbon baru, dan rincian potongan PPh21/BPJS pada setiap klaim gaji.
-**Aktor:** Karyawan.
-**FR Terkait:** FR-PAYANA-703, FR-PAYANA-704, FR-PAYANA-706.
+##### 21. Antar Muka Kasbon Karyawan (`/employee/kasbon`)
+
+**Deskripsi :** Status kasbon aktif beserta sisa yang harus dilunasi, tombol pengajuan kasbon baru, dan rincian potongan PPh21/BPJS pada setiap klaim gaji.
+
+**Input :** Nominal kasbon yang diajukan (dibatasi `maxAdvance`, 80% dari estimasi gaji bulanan).
+
+**Output :** Status kasbon terkini (Pending/Active/Rejected/Repaid), sisa yang harus dilunasi, riwayat potongan pajak (`TaxWithheld`).
+
+**Aktor:** Karyawan. **FR Terkait:** FR-PAYANA-703, FR-PAYANA-704, FR-PAYANA-706.
 
 **Alur Interaksi:**
 
@@ -3030,18 +3179,25 @@ sequenceDiagram
 | Panel riwayat pajak | Panel data | Rincian `TaxWithheld` (PPh21 + BPJS) per klaim gaji. |
 | Tombol aksi | Tombol tulis | `requestAdvance(amount)`. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Buka Halaman'*
 1. Muat paralel `getSalaryAdvance(employee)` dan `getStream(employee)` dari Ponder.
 2. Hitung `maxAdvance = floor(monthlySalary * 0.8)` dengan `monthlySalary = (flowRate/1e18) * 2.592.000`.
-3. Tombol ajukan memanggil `requestAdvance(amount)` (gasless, ditandatangani Privy), lalu `refreshData`.
-4. Render riwayat `TaxWithheld` dari data Ponder untuk transparansi potongan pajak per klaim.
+3. Render riwayat `TaxWithheld` dari data Ponder untuk transparansi potongan pajak per klaim.
 
-##### 2.4.3.5 Vesting Karyawan (`/employee/vesting`)
+*On 'Klik Ajukan'*
+1. Tombol ajukan memanggil `requestAdvance(amount)` (gasless, ditandatangani Privy), lalu `refreshData`.
 
-**Deskripsi:** Daftar cliff vest milik karyawan beserta tombol klaim setelah cliff tercapai.
-**Aktor:** Karyawan.
-**FR Terkait:** FR-PAYANA-602, FR-PAYANA-604.
+##### 22. Antar Muka Vesting Karyawan (`/employee/vesting`)
+
+**Deskripsi :** Daftar cliff vest milik karyawan beserta tombol klaim setelah cliff tercapai.
+
+**Input :** Klik "Klaim" pada vest yang cliff-nya sudah tercapai.
+
+**Output :** Daftar vest (jumlah, cliff, status), status berubah jadi Claimed + transfer IDRX setelah klaim berhasil.
+
+**Aktor:** Karyawan. **FR Terkait:** FR-PAYANA-602, FR-PAYANA-604.
 
 **Alur Interaksi:**
 
@@ -3067,17 +3223,24 @@ sequenceDiagram
 | Badge status | Indikator | Locked / Claimed / Forfeited. |
 | Tombol klaim | Tombol tulis | `claimCliffVest(vestId)`; aktif hanya setelah cliff. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Buka Halaman'*
 1. Muat `ponder.getVests(address)`; tampilkan status dan tanggal cliff.
-2. Tombol klaim aktif jika `block.timestamp >= cliffTs` dan status `Locked`.
-3. Panggil `claimCliffVest(vestId)`; perbarui status.
 
-##### 2.4.3.6 Transfer (`/employee/transfer`)
+*On 'Klik Klaim'*
+1. Tombol klaim aktif jika `block.timestamp >= cliffTs` dan status `Locked`.
+2. Panggil `claimCliffVest(vestId)`; perbarui status.
 
-**Deskripsi:** Transfer IDRX dari Smart Account karyawan ke alamat EVM eksternal menggunakan fungsi standar ERC-20.
-**Aktor:** Karyawan.
-**FR Terkait:** FR-PAYANA-401 (pendukung pencairan).
+##### 23. Antar Muka Transfer (`/employee/transfer`)
+
+**Deskripsi :** Transfer IDRX dari Smart Account karyawan ke alamat EVM eksternal menggunakan fungsi standar ERC-20.
+
+**Input :** Alamat tujuan (EVM eksternal) dan nominal IDRX.
+
+**Output :** Konfirmasi pengiriman transfer setelah transaksi berhasil.
+
+**Aktor:** Karyawan. **FR Terkait:** FR-PAYANA-401 (pendukung pencairan).
 
 **Alur Interaksi:**
 
@@ -3103,16 +3266,21 @@ sequenceDiagram
 | Kartu saldo | Panel data | Saldo IDRX terkini. |
 | Tombol kirim | Tombol tulis | `transfer(recipient, amountWei)`. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Submit Transfer'*
 1. Baca `balanceOf(address)` untuk validasi kecukupan saldo.
 2. Konversi nominal ke wei; panggil `transfer(recipient, amountWei)` pada IDRX.
 
-##### 2.4.3.7 Pesangon (`/employee/severance`)
+##### 24. Antar Muka Pesangon (`/employee/severance`)
 
-**Deskripsi:** Tampilan saldo pesangon yang terakumulasi on-chain (2% dari setiap klaim) beserta status dan estimasi besaran berdasarkan masa kerja.
-**Aktor:** Karyawan.
-**FR Terkait:** FR-PAYANA-505, FR-PAYANA-506.
+**Deskripsi :** Tampilan saldo pesangon yang terakumulasi on-chain (2% dari setiap klaim) beserta status dan estimasi besaran berdasarkan masa kerja.
+
+**Input :** — (halaman baca saja, tidak ada input pengguna).
+
+**Output :** Saldo pesangon terakumulasi, status (Locked/Released/Returned), estimasi statutori berdasarkan masa kerja.
+
+**Aktor:** Karyawan. **FR Terkait:** FR-PAYANA-505, FR-PAYANA-506.
 
 **Alur Interaksi:**
 
@@ -3137,16 +3305,21 @@ sequenceDiagram
 | Badge status | Indikator | Locked / Released / Returned. |
 | Estimasi pesangon | Panel info | Estimasi berdasarkan masa kerja (UU Cipta Kerja). |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Buka Halaman'*
 1. Baca `getSeveranceBalance(address)` on-chain dan `severance_vault` terindeks.
 2. Tampilkan status (Locked/Released/Returned) dan estimasi statutori berdasarkan `tenureMonths`.
 
-##### 2.4.3.8 Audit Karyawan (`/employee/audit`)
+##### 25. Antar Muka Audit Karyawan (`/employee/audit`)
 
-**Deskripsi:** Riwayat klaim gaji dan transaksi kasbon milik karyawan yang login.
-**Aktor:** Karyawan.
-**FR Terkait:** FR-PAYANA-1002 (transparansi pribadi).
+**Deskripsi :** Riwayat klaim gaji dan transaksi kasbon milik karyawan yang login.
+
+**Input :** — (halaman baca saja, tidak ada input pengguna).
+
+**Output :** Tabel riwayat klaim gaji + transaksi kasbon (waktu, jumlah IDRX) dengan tautan Basescan.
+
+**Aktor:** Karyawan. **FR Terkait:** FR-PAYANA-1002 (transparansi pribadi).
 
 **Alur Interaksi:**
 
@@ -3167,16 +3340,21 @@ sequenceDiagram
 | Tabel riwayat | Tabel data | Klaim gaji + transaksi kasbon, waktu, jumlah IDRX. |
 | Tautan transaksi | OnChainLink | Tautan Basescan per transaksi. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Buka Halaman'*
 1. Ambil `ponder.getClaims(address)`; render terurut waktu.
 2. Sertakan tautan transaksi ke Basescan.
 
-##### 2.4.3.9 Pengaturan Karyawan (`/employee/settings`)
+##### 26. Antar Muka Pengaturan Karyawan (`/employee/settings`)
 
-**Deskripsi:** Pembaruan profil PII karyawan (nama, NIK 16 digit, telepon) yang disimpan terenkripsi.
-**Aktor:** Karyawan.
-**FR Terkait:** FR-PAYANA-104, FR-PAYANA-105.
+**Deskripsi :** Pembaruan profil PII karyawan (nama, NIK 16 digit, telepon) yang disimpan terenkripsi.
+
+**Input :** Nama, NIK (16 digit), nomor telepon.
+
+**Output :** Konfirmasi profil tersimpan (`{success: true}`).
+
+**Aktor:** Karyawan. **FR Terkait:** FR-PAYANA-104, FR-PAYANA-105.
 
 **Alur Interaksi:**
 
@@ -3204,16 +3382,23 @@ sequenceDiagram
 | Input telepon | Field teks | Nomor telepon. |
 | Tombol simpan | Tombol | `POST /auth/profile`. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Buka Halaman'*
 1. Ambil profil terkini via `backend.getProfile(token)`; prapengisian form.
-2. Validasi NIK 16 digit; submit `POST /auth/profile` (server mengenkripsi AES-256-GCM).
 
-##### 2.4.3.10 Notifikasi (`/employee/notifications`) `[BARU]`
+*On 'Klik Simpan'*
+1. Validasi NIK 16 digit; submit `POST /auth/profile` (server mengenkripsi AES-256-GCM).
 
-**Deskripsi:** Daftar notifikasi peristiwa signifikan milik karyawan (maks 50 terbaru), dengan aksi tandai telah dibaca.
-**Aktor:** Karyawan (endpoint juga dapat dipanggil HR, namun hanya karyawan yang punya halaman khusus di frontend saat ini).
-**FR Terkait:** FR-PAYANA-1301.
+##### 27. Antar Muka Notifikasi (`/employee/notifications`) `[BARU]`
+
+**Deskripsi :** Daftar notifikasi peristiwa signifikan milik karyawan (maks 50 terbaru), dengan aksi tandai telah dibaca.
+
+**Input :** Klik notifikasi individual atau "Tandai semua dibaca".
+
+**Output :** Daftar notifikasi (judul, isi, waktu, indikator belum dibaca).
+
+**Aktor:** Karyawan (endpoint juga dapat dipanggil HR, namun hanya karyawan yang punya halaman khusus di frontend saat ini). **FR Terkait:** FR-PAYANA-1301.
 
 **Alur Interaksi:**
 
@@ -3237,16 +3422,23 @@ sequenceDiagram
 | Daftar notifikasi | List item | Judul, isi, waktu, indikator belum dibaca. |
 | Tombol "Tandai semua dibaca" | Tombol | `PATCH /notifications/read-all`. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Buka Halaman'*
 1. `GET /notifications` memuat maksimum 50 notifikasi terbaru milik caller.
-2. Klik satu notifikasi memanggil `PATCH /notifications/:id/read`; tombol massal memanggil `/read-all`.
 
-##### 2.4.3.11 Slip Gaji (`/employee/payslip`) `[BARU]`
+*On 'Klik Notifikasi / Tandai Semua'*
+1. Klik satu notifikasi memanggil `PATCH /notifications/:id/read`; tombol massal memanggil `/read-all`.
 
-**Deskripsi:** Rincian breakdown satu transaksi klaim gaji, ditampilkan sebagai slip gaji digital yang dapat dicetak/disimpan.
-**Aktor:** Karyawan (HR terkait juga dapat mengakses via `claimId`).
-**FR Terkait:** FR-PAYANA-1401.
+##### 28. Antar Muka Slip Gaji (`/employee/payslip`) `[BARU]`
+
+**Deskripsi :** Rincian breakdown satu transaksi klaim gaji, ditampilkan sebagai slip gaji digital yang dapat dicetak/disimpan.
+
+**Input :** Pilihan klaim dari riwayat (`claimId`).
+
+**Output :** Breakdown slip gaji (gaji bruto, potongan fee/kasbon/pajak/severance, gaji bersih); layout printable.
+
+**Aktor:** Karyawan (HR terkait juga dapat mengakses via `claimId`). **FR Terkait:** FR-PAYANA-1401.
 
 **Alur Interaksi:**
 
@@ -3268,16 +3460,21 @@ sequenceDiagram
 | Kartu breakdown | Panel hasil | Gaji bruto, potongan fee/kasbon/pajak/severance, gaji bersih. |
 | Tombol Cetak | Tombol | `window.print()` — tidak ada generasi PDF sisi server. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Pilih Klaim'*
 1. `GET /payslip/:claimId` mengembalikan breakdown lengkap satu klaim.
 2. Halaman dirender sebagai layout printable; unduh PDF dilakukan lewat dialog cetak browser.
 
-##### 2.4.3.12 Bukti Potong Pajak (`/employee/tax-cert`) `[BARU]`
+##### 29. Antar Muka Bukti Potong Pajak (`/employee/tax-cert`) `[BARU]`
 
-**Deskripsi:** Agregasi tahunan gaji dan potongan untuk keperluan pelaporan SPT pribadi karyawan.
-**Aktor:** Karyawan.
-**FR Terkait:** FR-PAYANA-1501.
+**Deskripsi :** Agregasi tahunan gaji dan potongan untuk keperluan pelaporan SPT pribadi karyawan.
+
+**Input :** Pilihan tahun pajak (2020–2100).
+
+**Output :** Agregat tahunan (total bruto, kepatuhan, severance, bersih) + breakdown bulanan.
+
+**Aktor:** Karyawan. **FR Terkait:** FR-PAYANA-1501.
 
 **Alur Interaksi:**
 
@@ -3299,16 +3496,21 @@ sequenceDiagram
 | Pemilih tahun | Dropdown | Tahun pajak (2020–2100). |
 | Kartu agregat | Panel hasil | Total bruto, kepatuhan, severance, bersih untuk tahun tsb. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Pilih Tahun'*
 1. `GET /tax-cert/:year` mengagregasi `salary_claim` milik caller pada tahun tsb.
 2. Validasi tahun di sisi backend (400 jika di luar 2020–2100).
 
-##### 2.4.3.13 Surat Keterangan Kerja — Karyawan (`/employee/employment-letter`) `[BARU]`
+##### 30. Antar Muka Surat Keterangan Kerja — Karyawan (`/employee/employment-letter`) `[BARU]`
 
-**Deskripsi:** Formulir pengajuan permohonan surat keterangan kerja dan pemantauan status, serta pengunduhan dokumen setelah disetujui.
-**Aktor:** Karyawan.
-**FR Terkait:** FR-PAYANA-1601.
+**Deskripsi :** Formulir pengajuan permohonan surat keterangan kerja dan pemantauan status, serta pengunduhan dokumen setelah disetujui.
+
+**Input :** Tujuan penggunaan surat (purpose, mis. KPR/Kredit/Visa/Umum/Lainnya).
+
+**Output :** Status permohonan (pending/approved/rejected); dokumen surat setelah disetujui.
+
+**Aktor:** Karyawan. **FR Terkait:** FR-PAYANA-1601.
 
 **Alur Interaksi:**
 
@@ -3338,17 +3540,26 @@ sequenceDiagram
 | Badge status | Komponen status | `pending`/`approved`/`rejected`. |
 | Tombol Unduh | Tombol | Aktif hanya jika `approved`. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Klik Ajukan'*
 1. Validasi `purpose` terhadap whitelist di sisi backend (400 jika di luar daftar).
 2. Backend memverifikasi caller punya `employee_stream` `Active` di bawah `hrAddress` yang dituju (400 `NOT_EMPLOYEE` jika tidak).
-3. Dokumen hanya dapat diunduh setelah `status: approved` (400 `NOT_APPROVED` jika belum).
+
+*On 'Klik Unduh'*
+1. Dokumen hanya dapat diunduh setelah `status: approved` (400 `NOT_APPROVED` jika belum).
 
 #### 2.4.4 Portal Owner SaaS (`/owner`)
 
-**Deskripsi:** Dashboard agregat operator platform: TVL, jumlah tenant aktif, estimasi pendapatan platform fee, antrian registrasi HR, serta konfigurasi platform fee dan fungsi darurat.
-**Aktor:** Owner SaaS.
-**FR Terkait:** FR-PAYANA-1002, FR-PAYANA-1004, FR-PAYANA-1006, FR-PAYANA-1008, FR-PAYANA-108, FR-PAYANA-109.
+##### 31. Antar Muka Dashboard Owner SaaS (`/owner`)
+
+**Deskripsi :** Dashboard agregat operator platform: TVL, jumlah tenant aktif, estimasi pendapatan platform fee, antrian registrasi HR, serta konfigurasi platform fee dan fungsi darurat.
+
+**Input :** Persetujuan/penolakan registrasi HR; nilai platform fee baru; klik "Emergency Freeze".
+
+**Output :** TVL, jumlah tenant aktif, estimasi pendapatan platform fee, antrian registrasi HR.
+
+**Aktor:** Owner SaaS. **FR Terkait:** FR-PAYANA-1002, FR-PAYANA-1004, FR-PAYANA-1006, FR-PAYANA-1008, FR-PAYANA-108, FR-PAYANA-109.
 
 **Alur Interaksi:**
 
@@ -3383,18 +3594,27 @@ sequenceDiagram
 | Form platform fee | Field + tombol | `setPlatformFee(bps)` (maks 100 bps). |
 | Tombol freeze darurat | Tombol tulis | `emergencyFreezeAll()`. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Buka Halaman'*
 1. Owner guard: bandingkan `address` dengan `NEXT_PUBLIC_OWNER_ADDRESS`; jika tidak cocok, redirect ke `/login`.
 2. Muat `registration.getPending(token)` dan `ponder.getCompanies()`/`ponder.getPlatformFees()`.
-3. `handleApprove`/`handleReject` memanggil endpoint registrasi lalu refresh.
-4. Konfigurasi fee via `setPlatformFee(bps)`; pembekuan via `emergencyFreezeAll()`.
 
-##### 2.4.4.1 Portal Owner — Keamanan Vault (`/owner/security`) `[BARU — lihat SKPL UC-27, FR-PAYANA-1901 s.d. 1904]`
+*On 'Klik Setujui/Tolak Registrasi'*
+1. `handleApprove`/`handleReject` memanggil endpoint registrasi lalu refresh.
 
-**Deskripsi:** Daftar alert keamanan yang dihasilkan `anomalyDetector.ts` (lihat Lampiran B.6) lintas seluruh tenant — penarikan vault tidak wajar, perubahan peran tak terduga, dan aktivitas beruntun — dengan tab "Belum Ditangani"/"Semua" dan tombol tandai selesai per alert.
-**Aktor:** Owner SaaS.
-**FR Terkait:** FR-PAYANA-1901, FR-PAYANA-1902, FR-PAYANA-1903, FR-PAYANA-1904.
+*On 'Submit Platform Fee / Freeze'*
+1. Konfigurasi fee via `setPlatformFee(bps)`; pembekuan via `emergencyFreezeAll()`.
+
+##### 32. Antar Muka Portal Owner — Keamanan Vault (`/owner/security`) `[BARU — lihat SKPL UC-27, FR-PAYANA-1901 s.d. 1904]`
+
+**Deskripsi :** Daftar alert keamanan yang dihasilkan `anomalyDetector.ts` (lihat Lampiran B.6) lintas seluruh tenant — penarikan vault tidak wajar, perubahan peran tak terduga, dan aktivitas beruntun — dengan tab "Belum Ditangani"/"Semua" dan tombol tandai selesai per alert.
+
+**Input :** Pilihan tab filter ("Belum Ditangani"/"Semua"); klik "Tandai Selesai" per alert.
+
+**Output :** Daftar alert (severity, judul, detail, alamat vault, waktu, tautan BaseScan bila ada `txHash`); jumlah alert belum ditangani.
+
+**Aktor:** Owner SaaS. **FR Terkait:** FR-PAYANA-1901, FR-PAYANA-1902, FR-PAYANA-1903, FR-PAYANA-1904.
 
 **Alur Interaksi:**
 
@@ -3420,11 +3640,14 @@ sequenceDiagram
 | Kartu alert | Panel data | Badge severity (`medium`/`high`/`critical`), judul, detail, alamat vault (dengan salin), waktu, tautan BaseScan bila ada `txHash`. |
 | Tombol tandai selesai | Tombol tulis | `PATCH /security/alerts/:id/resolve`, disembunyikan untuk alert yang sudah `resolved`. |
 
-**Method/Algoritma Utama:**
+**Method/Algoritma :**
 
+*On 'Buka Halaman'*
 1. `useSecurityAlerts(token)` — React Query, `refetchInterval: 30_000` (bukan WebSocket — alert juga sudah didorong sebagai notifikasi in-app terpisah untuk kebutuhan real-time, lihat B.6).
 2. Filter client-side: `resolved === false` untuk tab default, seluruh array untuk tab "Semua".
-3. `useResolveAlert(token)` — `PATCH` lalu `invalidateQueries(["securityAlerts"])`.
+
+*On 'Klik Tandai Selesai'*
+1. `useResolveAlert(token)` — `PATCH` lalu `invalidateQueries(["securityAlerts"])`.
 
 #### 2.4.5 Portal Legal Officer — TIDAK DIIMPLEMENTASIKAN (dokumentasi status & keterbatasan)
 
