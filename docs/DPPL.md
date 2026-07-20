@@ -1195,6 +1195,24 @@ Data dalam sistem Payana didistribusikan ke dalam tiga lapisan penyimpanan yang 
 
 3. **Ponder Indexed PostgreSQL (skema `public`).** Menyimpan salinan terindeks dari event on-chain dalam bentuk tabel relasional yang dapat dikueri cepat: `company`, `employee_stream`, `salary_claim`, `severance_vault`, `termination_proposal`, `cliff_vest`, `compliance_vault`, `salary_advance`, `employment_certificate`, `platform_fee_payment`, dan `low_balance_alert`. Lapisan ini menghindarkan frontend dan backend dari kebutuhan iterasi RPC langsung untuk pembacaan agregat.
 
+Setiap komponen basis data pada ketiga lapisan di atas didokumentasikan menggunakan format tabel berikut:
+
+**Format :**
+
+**Tabel N : Struktur Tabel XX**
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| | | | | | | |
+
+- **Nama Field** : nama atribut dalam tabel
+- **Tipe Data** : tipe data atribut
+- **Null** : apakah diperbolehkan bernilai *Null* atau tidak. *Yes* berarti boleh bernilai null, *No* berarti tidak boleh bernilai null.
+- **Konstrain** : konstrain yang dimiliki atribut
+- **Range Nilai** : jangkauan atau enumerasi nilai yang valid (diijinkan)
+- **Default** : nilai default atribut
+- **Keterangan** : deskripsi tambahan (jika diperlukan) dari atribut
+
 ##### ERD On-Chain (Solidity Structs & Mappings)
 
 State on-chain disimpan dalam struct dan mapping pada masing-masing kontrak. Diagram berikut menggambarkan relasi konseptual antar entitas on-chain (kunci pemetaan adalah alamat Ethereum).
@@ -1435,67 +1453,67 @@ erDiagram
 
 Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh Drizzle ORM. Semua data PII dienkripsi dengan AES-256-GCM sebelum disimpan.
 
-**Tabel `sessions`**
+**Tabel 1 : Struktur Tabel `sessions`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `jti` | `text` | NOT NULL | PRIMARY KEY | UUID v4 | — | JWT unique identifier; digunakan untuk revokasi token |
-| `address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Wallet address karyawan/HR (lowercase) |
-| `expires_at` | `timestamp` | NOT NULL | — | > created_at | — | Waktu kedaluwarsa token JWT |
-| `created_at` | `timestamp` | NOT NULL | — | — | `now()` | Waktu token dibuat |
+| `jti` | `text` | No | PRIMARY KEY | UUID v4 | — | JWT unique identifier; digunakan untuk revokasi token |
+| `address` | `text` | No | — | Hex 0x + 40 char | — | Wallet address karyawan/HR (lowercase) |
+| `expires_at` | `timestamp` | No | — | > created_at | — | Waktu kedaluwarsa token JWT |
+| `created_at` | `timestamp` | No | — | — | `now()` | Waktu token dibuat |
 
-**Tabel `employees`**
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `address` | `text` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Wallet address karyawan (lowercase) |
-| `name` | `text` | NOT NULL | — | — | — | Nama lengkap, terenkripsi AES-256-GCM |
-| `nik` | `text` | NOT NULL | — | 16 digit | — | Nomor Induk Kependudukan, terenkripsi AES-256-GCM |
-| `phone` | `text` | NOT NULL | — | — | — | Nomor telepon, terenkripsi AES-256-GCM |
-| `created_at` | `timestamp` | NOT NULL | — | — | `now()` | Waktu record dibuat |
-| `updated_at` | `timestamp` | NOT NULL | — | — | `now()` | Waktu record terakhir diperbarui |
-
-**Tabel `audit_logs`**
+**Tabel 2 : Struktur Tabel `employees`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `bigint` | NOT NULL | PRIMARY KEY GENERATED ALWAYS AS IDENTITY | ≥ 1 | auto | Auto-increment log ID |
-| `action` | `text` | NOT NULL | — | `BUNDLER_RELAY` \| `COMPLIANCE_EXPORT` \| dll. | — | Jenis aksi yang diaudit |
-| `actor` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Alamat wallet pelaku (HR atau karyawan) |
-| `tx_hash` | `text` | NULL | — | Hex 0x + 64 char | `NULL` | Hash transaksi on-chain (null jika belum on-chain) |
-| `meta` | `text` | NULL | — | JSON string | `NULL` | Konteks tambahan dalam format JSON |
-| `created_at` | `timestamp` | NOT NULL | — | — | `now()` | Waktu log dicatat |
+| `address` | `text` | No | PRIMARY KEY | Hex 0x + 40 char | — | Wallet address karyawan (lowercase) |
+| `name` | `text` | No | — | — | — | Nama lengkap, terenkripsi AES-256-GCM |
+| `nik` | `text` | No | — | 16 digit | — | Nomor Induk Kependudukan, terenkripsi AES-256-GCM |
+| `phone` | `text` | No | — | — | — | Nomor telepon, terenkripsi AES-256-GCM |
+| `created_at` | `timestamp` | No | — | — | `now()` | Waktu record dibuat |
+| `updated_at` | `timestamp` | No | — | — | `now()` | Waktu record terakhir diperbarui |
 
-**Tabel `webhook_events`**
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `text` | NOT NULL | PRIMARY KEY | — | — | Alchemy webhook event ID (digunakan untuk deduplikasi) |
-| `type` | `text` | NOT NULL | — | — | — | Tipe event Alchemy (mis. `ADDRESS_ACTIVITY`) |
-| `processed` | `boolean` | NOT NULL | — | `true` \| `false` | `false` | Flag apakah event sudah diproses |
-| `received_at` | `timestamp` | NOT NULL | — | — | `now()` | Waktu event diterima backend |
-
-**Tabel `rate_limits`**
+**Tabel 3 : Struktur Tabel `audit_logs`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `employee_address` | `text` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Alamat karyawan (lowercase) |
-| `claim_count` | `integer` | NOT NULL | — | ≥ 0 | `0` | Jumlah klaim dalam jendela aktif (maks 10 per jam) |
-| `window_start` | `timestamp` | NOT NULL | — | — | `now()` | Waktu mulai jendela 1 jam saat ini |
+| `id` | `bigint` | No | PRIMARY KEY GENERATED ALWAYS AS IDENTITY | ≥ 1 | auto | Auto-increment log ID |
+| `action` | `text` | No | — | `BUNDLER_RELAY` \| `COMPLIANCE_EXPORT` \| dll. | — | Jenis aksi yang diaudit |
+| `actor` | `text` | No | — | Hex 0x + 40 char | — | Alamat wallet pelaku (HR atau karyawan) |
+| `tx_hash` | `text` | Yes | — | Hex 0x + 64 char | `NULL` | Hash transaksi on-chain (null jika belum on-chain) |
+| `meta` | `text` | Yes | — | JSON string | `NULL` | Konteks tambahan dalam format JSON |
+| `created_at` | `timestamp` | No | — | — | `now()` | Waktu log dicatat |
 
-**Tabel `pending_registrations`**
+**Tabel 4 : Struktur Tabel `webhook_events`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `address` | `text` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Wallet address calon tenant HR (lowercase) |
-| `email` | `text` | NULL | — | Format email | `NULL` | Alamat email kontak (opsional) |
-| `name` | `text` | NULL | — | — | `NULL` | Nama tampilan dari form onboarding |
-| `hr_address` | `text` | NULL | — | Hex 0x + 40 char | `NULL` | Alamat HR yang memproses registrasi |
-| `status` | `text` | NOT NULL | — | `pending` \| `approved` \| `rejected` | `'pending'` | Status persetujuan registrasi |
-| `requested_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu pengajuan registrasi |
-| `updated_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu status terakhir diperbarui |
+| `id` | `text` | No | PRIMARY KEY | — | — | Alchemy webhook event ID (digunakan untuk deduplikasi) |
+| `type` | `text` | No | — | — | — | Tipe event Alchemy (mis. `ADDRESS_ACTIVITY`) |
+| `processed` | `boolean` | No | — | `true` \| `false` | `false` | Flag apakah event sudah diproses |
+| `received_at` | `timestamp` | No | — | — | `now()` | Waktu event diterima backend |
 
-**Tabel `employee_invitations`** `[BARU — invitation-only registration, lihat SKPL UC-18]`
+**Tabel 5 : Struktur Tabel `rate_limits`**
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `employee_address` | `text` | No | PRIMARY KEY | Hex 0x + 40 char | — | Alamat karyawan (lowercase) |
+| `claim_count` | `integer` | No | — | ≥ 0 | `0` | Jumlah klaim dalam jendela aktif (maks 10 per jam) |
+| `window_start` | `timestamp` | No | — | — | `now()` | Waktu mulai jendela 1 jam saat ini |
+
+**Tabel 6 : Struktur Tabel `pending_registrations`**
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `address` | `text` | No | PRIMARY KEY | Hex 0x + 40 char | — | Wallet address calon tenant HR (lowercase) |
+| `email` | `text` | Yes | — | Format email | `NULL` | Alamat email kontak (opsional) |
+| `name` | `text` | Yes | — | — | `NULL` | Nama tampilan dari form onboarding |
+| `hr_address` | `text` | Yes | — | Hex 0x + 40 char | `NULL` | Alamat HR yang memproses registrasi |
+| `status` | `text` | No | — | `pending` \| `approved` \| `rejected` | `'pending'` | Status persetujuan registrasi |
+| `requested_at` | `timestamptz` | No | — | — | `now()` | Waktu pengajuan registrasi |
+| `updated_at` | `timestamptz` | No | — | — | `now()` | Waktu status terakhir diperbarui |
+
+**Tabel 7 : Struktur Tabel `employee_invitations`** `[BARU — invitation-only registration, lihat SKPL UC-18]`
 
 > Menutup celah keamanan/integritas data di mana employee sebelumnya dapat memilih `hrAddress`
 > bebas dari dropdown tak terfilter di `/onboarding`. Sekarang `POST /registration/request` untuk
@@ -1505,15 +1523,15 @@ Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `token` | `text` | NOT NULL | PRIMARY KEY | Token acak sulit ditebak | — | Dibagikan via `/onboarding?invite=<token>` |
-| `hr_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | HR pembuat undangan (diisi dari caller, bukan input) |
-| `email` | `text` | NULL | — | Format email | `NULL` | Referensi opsional — email calon karyawan yang dituju HR |
-| `name` | `text` | NULL | — | — | `NULL` | Referensi opsional — nama calon karyawan yang dituju HR |
-| `status` | `text` | NOT NULL | — | `pending` \| `used` \| `revoked` | `'pending'` | Status token |
-| `used_by_address` | `text` | NULL | — | Hex 0x + 40 char | `NULL` | Terisi begitu ada employee yang registrasi dengan token ini |
-| `expires_at` | `timestamptz` | NOT NULL | — | — | — | Token kedaluwarsa 7 hari setelah dibuat |
-| `created_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu token dibuat |
-| `used_at` | `timestamptz` | NULL | — | — | `NULL` | Waktu token dipakai |
+| `token` | `text` | No | PRIMARY KEY | Token acak sulit ditebak | — | Dibagikan via `/onboarding?invite=<token>` |
+| `hr_address` | `text` | No | — | Hex 0x + 40 char | — | HR pembuat undangan (diisi dari caller, bukan input) |
+| `email` | `text` | Yes | — | Format email | `NULL` | Referensi opsional — email calon karyawan yang dituju HR |
+| `name` | `text` | Yes | — | — | `NULL` | Referensi opsional — nama calon karyawan yang dituju HR |
+| `status` | `text` | No | — | `pending` \| `used` \| `revoked` | `'pending'` | Status token |
+| `used_by_address` | `text` | Yes | — | Hex 0x + 40 char | `NULL` | Terisi begitu ada employee yang registrasi dengan token ini |
+| `expires_at` | `timestamptz` | No | — | — | — | Token kedaluwarsa 7 hari setelah dibuat |
+| `created_at` | `timestamptz` | No | — | — | `now()` | Waktu token dibuat |
+| `used_at` | `timestamptz` | Yes | — | — | `NULL` | Waktu token dipakai |
 
 **Endpoint terkait (`backend/src/routes/invitations.ts`):**
 
@@ -1526,177 +1544,177 @@ Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh
 
 ---
 
-**Tabel `reimbursement_claims`** `[BARU — lihat SKPL UC-19, FR-PAYANA-1101/1102]`
+**Tabel 8 : Struktur Tabel `reimbursement_claims`** `[BARU — lihat SKPL UC-19, FR-PAYANA-1101/1102]`
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `bigint` | NOT NULL | PRIMARY KEY, identity | — | auto-increment | ID klaim |
-| `employee_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Karyawan pengaju |
-| `hr_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | HR yang meninjau |
-| `category` | `text` | NOT NULL | — | — | — | Kategori biaya (mis. "Transport") |
-| `amount` | `text` | NOT NULL | — | IDRX wei (string) | — | Disimpan string untuk hindari presisi bigint |
-| `date` | `text` | NOT NULL | — | `YYYY-MM-DD` | — | Tanggal biaya terjadi |
-| `description` | `text` | NOT NULL | — | — | — | Keterangan klaim |
-| `receipt_url` | `text` | NULL | — | URL | `NULL` | Bukti pendukung (opsional) |
-| `status` | `text` | NOT NULL | — | `pending` \| `approved` \| `rejected` | `'pending'` | Status peninjauan |
-| `tx_hash` | `text` | NULL | — | Hex 0x + 64 char | `NULL` | Terisi begitu `approved` — transfer IDRX terverifikasi |
-| `requested_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu pengajuan |
-| `reviewed_at` | `timestamptz` | NULL | — | — | `NULL` | Waktu ditinjau HR |
+| `id` | `bigint` | No | PRIMARY KEY, identity | — | auto-increment | ID klaim |
+| `employee_address` | `text` | No | — | Hex 0x + 40 char | — | Karyawan pengaju |
+| `hr_address` | `text` | No | — | Hex 0x + 40 char | — | HR yang meninjau |
+| `category` | `text` | No | — | — | — | Kategori biaya (mis. "Transport") |
+| `amount` | `text` | No | — | IDRX wei (string) | — | Disimpan string untuk hindari presisi bigint |
+| `date` | `text` | No | — | `YYYY-MM-DD` | — | Tanggal biaya terjadi |
+| `description` | `text` | No | — | — | — | Keterangan klaim |
+| `receipt_url` | `text` | Yes | — | URL | `NULL` | Bukti pendukung (opsional) |
+| `status` | `text` | No | — | `pending` \| `approved` \| `rejected` | `'pending'` | Status peninjauan |
+| `tx_hash` | `text` | Yes | — | Hex 0x + 64 char | `NULL` | Terisi begitu `approved` — transfer IDRX terverifikasi |
+| `requested_at` | `timestamptz` | No | — | — | `now()` | Waktu pengajuan |
+| `reviewed_at` | `timestamptz` | Yes | — | — | `NULL` | Waktu ditinjau HR |
 
-**Tabel `bounties`** `[BARU — lihat SKPL UC-20, FR-PAYANA-1201]`
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `bigint` | NOT NULL | PRIMARY KEY, identity | — | auto-increment | ID bounty |
-| `hr_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | HR pembuat |
-| `title` | `text` | NOT NULL | — | — | — | Judul bounty |
-| `description` | `text` | NOT NULL | — | — | — | Deskripsi tugas |
-| `reward_idrx` | `text` | NOT NULL | — | IDRX wei (string) | — | Hadiah per klaim |
-| `quota` | `integer` | NOT NULL | — | ≥ 1 | — | Jumlah klaim maksimum yang dapat disetujui |
-| `claimed_count` | `integer` | NOT NULL | — | ≥ 0 | `0` | Jumlah klaim yang sudah disetujui/dibayar |
-| `status` | `text` | NOT NULL | — | `open` \| `closed` | `'open'` | Otomatis `closed` saat `claimed_count == quota` |
-| `created_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu dibuat |
-
-**Tabel `bounty_claims`** `[BARU — lihat SKPL UC-20, FR-PAYANA-1201/1202]`
+**Tabel 9 : Struktur Tabel `bounties`** `[BARU — lihat SKPL UC-20, FR-PAYANA-1201]`
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `bigint` | NOT NULL | PRIMARY KEY, identity | — | auto-increment | ID klaim |
-| `bounty_id` | `bigint` | NOT NULL | FK → `bounties.id` | — | — | Bounty yang diklaim |
-| `employee_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Karyawan pengklaim |
-| `proof_url` | `text` | NOT NULL | — | URL | — | Bukti penyelesaian tugas |
-| `status` | `text` | NOT NULL | — | `pending` \| `approved` \| `rejected` \| `paid` | `'pending'` | Status klaim |
-| `paid_tx_hash` | `text` | NULL | — | Hex 0x + 64 char | `NULL` | Terisi begitu `paid` — transfer IDRX terverifikasi |
-| `submitted_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu klaim diajukan |
+| `id` | `bigint` | No | PRIMARY KEY, identity | — | auto-increment | ID bounty |
+| `hr_address` | `text` | No | — | Hex 0x + 40 char | — | HR pembuat |
+| `title` | `text` | No | — | — | — | Judul bounty |
+| `description` | `text` | No | — | — | — | Deskripsi tugas |
+| `reward_idrx` | `text` | No | — | IDRX wei (string) | — | Hadiah per klaim |
+| `quota` | `integer` | No | — | ≥ 1 | — | Jumlah klaim maksimum yang dapat disetujui |
+| `claimed_count` | `integer` | No | — | ≥ 0 | `0` | Jumlah klaim yang sudah disetujui/dibayar |
+| `status` | `text` | No | — | `open` \| `closed` | `'open'` | Otomatis `closed` saat `claimed_count == quota` |
+| `created_at` | `timestamptz` | No | — | — | `now()` | Waktu dibuat |
 
-**Tabel `tips`** `[BARU — lihat SKPL UC-20, FR-PAYANA-1203]`
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `bigint` | NOT NULL | PRIMARY KEY, identity | — | auto-increment | ID tip |
-| `from_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Pengirim |
-| `to_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Penerima |
-| `amount` | `text` | NOT NULL | — | IDRX wei (string) | — | Jumlah tip |
-| `message` | `text` | NULL | — | — | `NULL` | Pesan opsional |
-| `tx_hash` | `text` | NOT NULL | — | Hex 0x + 64 char | — | Transfer sudah terjadi on-chain sebelum dicatat (bukan diverifikasi backend seperti reimburse/bounty) |
-| `created_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu dicatat |
-
-**Tabel `notifications`** `[BARU — lihat SKPL UC-21, FR-PAYANA-1301]`
+**Tabel 10 : Struktur Tabel `bounty_claims`** `[BARU — lihat SKPL UC-20, FR-PAYANA-1201/1202]`
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `bigint` | NOT NULL | PRIMARY KEY, identity | — | auto-increment | ID notifikasi |
-| `recipient_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Penerima |
-| `type` | `text` | NOT NULL | — | mis. `KASBON_APPROVED`, `REIMBURSE_PAID`, `REIMBURSE_REJECTED` | — | Jenis peristiwa |
-| `title` | `text` | NOT NULL | — | — | — | Judul notifikasi |
-| `body` | `text` | NOT NULL | — | — | — | Isi notifikasi |
-| `read` | `boolean` | NOT NULL | — | — | `false` | Status telah dibaca |
-| `meta` | `text` | NULL | — | JSON string | `NULL` | Konteks tambahan (mis. `txHash`, `amount`) |
-| `created_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu diterbitkan |
+| `id` | `bigint` | No | PRIMARY KEY, identity | — | auto-increment | ID klaim |
+| `bounty_id` | `bigint` | No | FK → `bounties.id` | — | — | Bounty yang diklaim |
+| `employee_address` | `text` | No | — | Hex 0x + 40 char | — | Karyawan pengklaim |
+| `proof_url` | `text` | No | — | URL | — | Bukti penyelesaian tugas |
+| `status` | `text` | No | — | `pending` \| `approved` \| `rejected` \| `paid` | `'pending'` | Status klaim |
+| `paid_tx_hash` | `text` | Yes | — | Hex 0x + 64 char | `NULL` | Terisi begitu `paid` — transfer IDRX terverifikasi |
+| `submitted_at` | `timestamptz` | No | — | — | `now()` | Waktu klaim diajukan |
 
-**Tabel `employee_profiles`** `[BARU — lihat SKPL UC-25, FR-PAYANA-1701]`
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `address` | `text` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Karyawan (lowercase) |
-| `hr_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Perusahaan karyawan tsb |
-| `department` | `text` | NULL | — | mis. "Engineering" | `NULL` | Departemen |
-| `position` | `text` | NULL | — | mis. "Software Engineer" | `NULL` | Jabatan |
-| `updated_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu terakhir diperbarui |
-
-**Tabel `employment_letters`** `[BARU — lihat SKPL UC-24, FR-PAYANA-1601]`
+**Tabel 11 : Struktur Tabel `tips`** `[BARU — lihat SKPL UC-20, FR-PAYANA-1203]`
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `bigint` | NOT NULL | PRIMARY KEY, identity | — | auto-increment | ID permohonan |
-| `employee_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Pemohon |
-| `hr_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | HR yang meninjau |
-| `purpose` | `text` | NOT NULL | — | `KPR` \| `Kredit` \| `Visa` \| `Umum` \| `Lainnya` | — | Tujuan penggunaan surat |
-| `status` | `text` | NOT NULL | — | `pending` \| `approved` \| `rejected` | `'pending'` | Status peninjauan |
-| `notes` | `text` | NULL | — | — | `NULL` | Catatan HR / alasan penolakan |
-| `requested_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu pengajuan |
-| `reviewed_at` | `timestamptz` | NULL | — | — | `NULL` | Waktu ditinjau |
+| `id` | `bigint` | No | PRIMARY KEY, identity | — | auto-increment | ID tip |
+| `from_address` | `text` | No | — | Hex 0x + 40 char | — | Pengirim |
+| `to_address` | `text` | No | — | Hex 0x + 40 char | — | Penerima |
+| `amount` | `text` | No | — | IDRX wei (string) | — | Jumlah tip |
+| `message` | `text` | Yes | — | — | `NULL` | Pesan opsional |
+| `tx_hash` | `text` | No | — | Hex 0x + 64 char | — | Transfer sudah terjadi on-chain sebelum dicatat (bukan diverifikasi backend seperti reimburse/bounty) |
+| `created_at` | `timestamptz` | No | — | — | `now()` | Waktu dicatat |
 
-**Tabel `company_settings`** `[BARU — lihat SKPL UC-26, FR-PAYANA-1801]`
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `hr_address` | `text` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | HR pemilik pengaturan |
-| `name` | `text` | NULL | — | — | `NULL` | Nama tampilan perusahaan |
-| `country` | `text` | NULL | — | — | `NULL` | Negara |
-| `logo_url` | `text` | NULL | — | URL | `NULL` | Logo perusahaan |
-| `ewa_limit_bps` | `integer` | NULL | — | 0–10000 | `NULL` | Batas EWA (basis poin, kosmetik/preferensi) |
-| `yield_rate_bps` | `integer` | NULL | — | 0–10000 | `NULL` | Tarif yield (kosmetik/preferensi) |
-| `legal_address` | `text` | NULL | — | Hex 0x + 40 char | `NULL` | Cermin tampilan dari `LEGAL_ROLE` on-chain — bukan sumber otoritatif |
-| `updated_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu terakhir diperbarui |
-
-**Tabel `suspended_clients`** `[BARU — lihat FR-PAYANA-1005]`
+**Tabel 12 : Struktur Tabel `notifications`** `[BARU — lihat SKPL UC-21, FR-PAYANA-1301]`
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `hr_address` | `text` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | HR yang disuspend (lowercase) |
-| `reason` | `text` | NULL | — | — | `NULL` | Alasan suspend, mis. "Menunggak biaya SaaS bulan Juni" |
-| `suspended_by` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Alamat Owner yang men-suspend |
-| `suspended_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu suspend |
+| `id` | `bigint` | No | PRIMARY KEY, identity | — | auto-increment | ID notifikasi |
+| `recipient_address` | `text` | No | — | Hex 0x + 40 char | — | Penerima |
+| `type` | `text` | No | — | mis. `KASBON_APPROVED`, `REIMBURSE_PAID`, `REIMBURSE_REJECTED` | — | Jenis peristiwa |
+| `title` | `text` | No | — | — | — | Judul notifikasi |
+| `body` | `text` | No | — | — | — | Isi notifikasi |
+| `read` | `boolean` | No | — | — | `false` | Status telah dibaca |
+| `meta` | `text` | Yes | — | JSON string | `NULL` | Konteks tambahan (mis. `txHash`, `amount`) |
+| `created_at` | `timestamptz` | No | — | — | `now()` | Waktu diterbitkan |
+
+**Tabel 13 : Struktur Tabel `employee_profiles`** `[BARU — lihat SKPL UC-25, FR-PAYANA-1701]`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `address` | `text` | No | PRIMARY KEY | Hex 0x + 40 char | — | Karyawan (lowercase) |
+| `hr_address` | `text` | No | — | Hex 0x + 40 char | — | Perusahaan karyawan tsb |
+| `department` | `text` | Yes | — | mis. "Engineering" | `NULL` | Departemen |
+| `position` | `text` | Yes | — | mis. "Software Engineer" | `NULL` | Jabatan |
+| `updated_at` | `timestamptz` | No | — | — | `now()` | Waktu terakhir diperbarui |
+
+**Tabel 14 : Struktur Tabel `employment_letters`** `[BARU — lihat SKPL UC-24, FR-PAYANA-1601]`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `bigint` | No | PRIMARY KEY, identity | — | auto-increment | ID permohonan |
+| `employee_address` | `text` | No | — | Hex 0x + 40 char | — | Pemohon |
+| `hr_address` | `text` | No | — | Hex 0x + 40 char | — | HR yang meninjau |
+| `purpose` | `text` | No | — | `KPR` \| `Kredit` \| `Visa` \| `Umum` \| `Lainnya` | — | Tujuan penggunaan surat |
+| `status` | `text` | No | — | `pending` \| `approved` \| `rejected` | `'pending'` | Status peninjauan |
+| `notes` | `text` | Yes | — | — | `NULL` | Catatan HR / alasan penolakan |
+| `requested_at` | `timestamptz` | No | — | — | `now()` | Waktu pengajuan |
+| `reviewed_at` | `timestamptz` | Yes | — | — | `NULL` | Waktu ditinjau |
+
+**Tabel 15 : Struktur Tabel `company_settings`** `[BARU — lihat SKPL UC-26, FR-PAYANA-1801]`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `hr_address` | `text` | No | PRIMARY KEY | Hex 0x + 40 char | — | HR pemilik pengaturan |
+| `name` | `text` | Yes | — | — | `NULL` | Nama tampilan perusahaan |
+| `country` | `text` | Yes | — | — | `NULL` | Negara |
+| `logo_url` | `text` | Yes | — | URL | `NULL` | Logo perusahaan |
+| `ewa_limit_bps` | `integer` | Yes | — | 0–10000 | `NULL` | Batas EWA (basis poin, kosmetik/preferensi) |
+| `yield_rate_bps` | `integer` | Yes | — | 0–10000 | `NULL` | Tarif yield (kosmetik/preferensi) |
+| `legal_address` | `text` | Yes | — | Hex 0x + 40 char | `NULL` | Cermin tampilan dari `LEGAL_ROLE` on-chain — bukan sumber otoritatif |
+| `updated_at` | `timestamptz` | No | — | — | `now()` | Waktu terakhir diperbarui |
+
+**Tabel 16 : Struktur Tabel `suspended_clients`** `[BARU — lihat FR-PAYANA-1005]`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `hr_address` | `text` | No | PRIMARY KEY | Hex 0x + 40 char | — | HR yang disuspend (lowercase) |
+| `reason` | `text` | Yes | — | — | `NULL` | Alasan suspend, mis. "Menunggak biaya SaaS bulan Juni" |
+| `suspended_by` | `text` | No | — | Hex 0x + 40 char | — | Alamat Owner yang men-suspend |
+| `suspended_at` | `timestamptz` | No | — | — | `now()` | Waktu suspend |
 
 > **Catatan:** blocklist murni sisi backend — tidak menyentuh status vault on-chain (vault tetap `Active`, karyawan tetap bisa klaim gaji normal). Dicek di `/auth/login` dan di dalam middleware `requireAuth`.
 
-**Tabel `compliance_reconciliations`** `[BARU — lihat FR-PAYANA-805]`
+**Tabel 17 : Struktur Tabel `compliance_reconciliations`** `[BARU — lihat FR-PAYANA-805]`
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `hr_address` | `text` | NOT NULL | PRIMARY KEY (composite dengan `month`) | Hex 0x + 40 char | — | HR pelapor (lowercase) |
-| `month` | `text` | NOT NULL | PRIMARY KEY (composite dengan `hr_address`) | `YYYY-MM` | — | Bulan pelaporan |
-| `bpjs_paid` | `text` | NOT NULL | — | IDRX wei (string) | — | Jumlah BPJS yang disetor |
-| `pph21_paid` | `text` | NOT NULL | — | IDRX wei (string) | — | Jumlah PPh21 yang disetor |
-| `notes` | `text` | NULL | — | — | `NULL` | Catatan HR |
-| `recorded_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu dicatat |
+| `hr_address` | `text` | No | PRIMARY KEY (composite dengan `month`) | Hex 0x + 40 char | — | HR pelapor (lowercase) |
+| `month` | `text` | No | PRIMARY KEY (composite dengan `hr_address`) | `YYYY-MM` | — | Bulan pelaporan |
+| `bpjs_paid` | `text` | No | — | IDRX wei (string) | — | Jumlah BPJS yang disetor |
+| `pph21_paid` | `text` | No | — | IDRX wei (string) | — | Jumlah PPh21 yang disetor |
+| `notes` | `text` | Yes | — | — | `NULL` | Catatan HR |
+| `recorded_at` | `timestamptz` | No | — | — | `now()` | Waktu dicatat |
 
 > **Catatan:** tidak ada API pemerintah untuk verifikasi otomatis di MVP — ini sisi "dikonfirmasi manual oleh HR" dari rekonsiliasi; sisi lain adalah estimasi `complianceBalance`/`employeeComplianceAccumulated` on-chain yang dibaca live oleh frontend. Selisih di-diff di UI, bukan di backend — tabel ini hanya menyimpan apa yang HR konfirmasi sudah benar-benar disetor.
 
-**Tabel `salary_advances`** `[BARU — catatan + audit trail kasbon sisi backend, berbeda dari tabel `salary_advance` Ponder]`
+**Tabel 18 : Struktur Tabel `salary_advances`** `[BARU — catatan + audit trail kasbon sisi backend, berbeda dari tabel `salary_advance` Ponder]`
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `employee_address` | `text` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Karyawan pengaju (lowercase) |
-| `hr_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | HR/perusahaan (lowercase) |
-| `vault_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Alamat `CompanyVault` |
-| `amount` | `text` | NOT NULL | — | IDRX wei (string) | — | Jumlah kasbon diajukan |
-| `note` | `text` | NULL | — | — | `NULL` | Catatan opsional dari karyawan |
-| `status` | `text` | NOT NULL | — | `Pending` \| `Active` \| `Rejected` | `'Pending'` | Status |
-| `tx_hash_request` | `text` | NULL | — | Hex 0x + 64 char | `NULL` | Tx hash `requestAdvance()` on-chain |
-| `requested_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu pengajuan |
-| `updated_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu update terakhir |
+| `employee_address` | `text` | No | PRIMARY KEY | Hex 0x + 40 char | — | Karyawan pengaju (lowercase) |
+| `hr_address` | `text` | No | — | Hex 0x + 40 char | — | HR/perusahaan (lowercase) |
+| `vault_address` | `text` | No | — | Hex 0x + 40 char | — | Alamat `CompanyVault` |
+| `amount` | `text` | No | — | IDRX wei (string) | — | Jumlah kasbon diajukan |
+| `note` | `text` | Yes | — | — | `NULL` | Catatan opsional dari karyawan |
+| `status` | `text` | No | — | `Pending` \| `Active` \| `Rejected` | `'Pending'` | Status |
+| `tx_hash_request` | `text` | Yes | — | Hex 0x + 64 char | `NULL` | Tx hash `requestAdvance()` on-chain |
+| `requested_at` | `timestamptz` | No | — | — | `now()` | Waktu pengajuan |
+| `updated_at` | `timestamptz` | No | — | — | `now()` | Waktu update terakhir |
 
 > **Catatan:** data finansial (jumlah, status) sepenuhnya on-chain dan diindeks real-time via Ponder (tabel `salary_advance`). Tabel ini hanya menambahkan hal yang tak bisa hidup on-chain: catatan opsional karyawan + jejak audit sisi backend. Primary key alamat karyawan — hanya satu kasbon aktif per karyawan (dipaksa kontrak `CompanyVault`).
 
-**Tabel `phk_reasons`** `[BARU — lihat modul PHK/Termination]`
+**Tabel 19 : Struktur Tabel `phk_reasons`** `[BARU — lihat modul PHK/Termination]`
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `employee_address` | `text` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Karyawan yang diusulkan PHK (lowercase) |
-| `hr_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | HR pengusul (lowercase) |
-| `reason` | `text` | NOT NULL | — | — | — | Alasan PHK (plaintext) |
-| `created_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu diajukan |
+| `employee_address` | `text` | No | PRIMARY KEY | Hex 0x + 40 char | — | Karyawan yang diusulkan PHK (lowercase) |
+| `hr_address` | `text` | No | — | Hex 0x + 40 char | — | HR pengusul (lowercase) |
+| `reason` | `text` | No | — | — | — | Alasan PHK (plaintext) |
+| `created_at` | `timestamptz` | No | — | — | `now()` | Waktu diajukan |
 
 > **Catatan:** on-chain `proposeTermination()` hanya menyimpan `keccak256(reason)` (hemat gas + hindari PII di chain) — plaintext-nya disimpan di sini supaya Legal Officer punya konteks sebelum approve, bukan approve buta hanya berdasarkan alamat. Di-key per alamat karyawan; re-propose (setelah cancel/expiry) menimpa baris ini.
 
-**Tabel `anomaly_alerts`** `[BARU — lihat SKPL Kelompok H, FR-PAYANA-1901 s.d. 1904]`
+**Tabel 20 : Struktur Tabel `anomaly_alerts`** `[BARU — lihat SKPL Kelompok H, FR-PAYANA-1901 s.d. 1904]`
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `bigint` | NOT NULL | PRIMARY KEY, identity | — | auto-increment | ID alert |
-| `hr_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Perusahaan yang terdampak |
-| `vault_address` | `text` | NOT NULL | — | Hex 0x + 40 char | — | Alamat `CompanyVault` terkait |
-| `type` | `text` | NOT NULL | — | `SUSPICIOUS_WITHDRAWAL` \| `UNEXPECTED_ROLE_GRANT` \| `HIGH_FREQUENCY_ACTIVITY` | — | Jenis anomali |
-| `severity` | `text` | NOT NULL | — | `medium` \| `high` \| `critical` | — | Tingkat keparahan |
-| `title` | `text` | NOT NULL | — | — | — | Judul singkat untuk tampilan daftar |
-| `detail` | `text` | NOT NULL | — | — | — | Penjelasan lengkap, termasuk angka/alamat spesifik |
-| `meta` | `text` | NULL | — | JSON string | `NULL` | Konteks tambahan terstruktur (amount, recipient, role, dll.) |
-| `tx_hash` | `text` | NULL | — | Hex 0x + 64 char | `NULL` | Transaksi on-chain yang memicu alert, jika ada |
-| `resolved` | `boolean` | NOT NULL | — | `true` \| `false` | `false` | Sudah ditinjau Owner atau belum |
-| `detected_at` | `timestamptz` | NOT NULL | — | — | `now()` | Waktu anomali terdeteksi |
-| `resolved_at` | `timestamptz` | NULL | — | — | `NULL` | Waktu ditandai selesai |
+| `id` | `bigint` | No | PRIMARY KEY, identity | — | auto-increment | ID alert |
+| `hr_address` | `text` | No | — | Hex 0x + 40 char | — | Perusahaan yang terdampak |
+| `vault_address` | `text` | No | — | Hex 0x + 40 char | — | Alamat `CompanyVault` terkait |
+| `type` | `text` | No | — | `SUSPICIOUS_WITHDRAWAL` \| `UNEXPECTED_ROLE_GRANT` \| `HIGH_FREQUENCY_ACTIVITY` | — | Jenis anomali |
+| `severity` | `text` | No | — | `medium` \| `high` \| `critical` | — | Tingkat keparahan |
+| `title` | `text` | No | — | — | — | Judul singkat untuk tampilan daftar |
+| `detail` | `text` | No | — | — | — | Penjelasan lengkap, termasuk angka/alamat spesifik |
+| `meta` | `text` | Yes | — | JSON string | `NULL` | Konteks tambahan terstruktur (amount, recipient, role, dll.) |
+| `tx_hash` | `text` | Yes | — | Hex 0x + 64 char | `NULL` | Transaksi on-chain yang memicu alert, jika ada |
+| `resolved` | `boolean` | No | — | `true` \| `false` | `false` | Sudah ditinjau Owner atau belum |
+| `detected_at` | `timestamptz` | No | — | — | `now()` | Waktu anomali terdeteksi |
+| `resolved_at` | `timestamptz` | Yes | — | — | `NULL` | Waktu ditandai selesai |
 
 > **Catatan:** Slip Gaji (Payslip, UC-22/FR-1601) dan Bukti Potong Pajak (Tax Cert, UC-23/FR-1701)
 > TIDAK memiliki tabel tersendiri — keduanya murni membaca dan mengagregasi tabel `salary_claim`
@@ -1709,160 +1727,160 @@ Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh
 
 Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTable` berdasarkan event yang diindeks dari Base Sepolia. Tipe `hex` merujuk pada string alamat Ethereum (0x + 40 char). Tipe `bigint` merujuk pada `BigInt` PostgreSQL untuk representasi nilai wei dan Unix timestamp.
 
-**Tabel `company`**
+**Tabel 21 : Struktur Tabel `company`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `hex` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Alamat `hrAuthority` / key unik per perusahaan |
-| `name` | `text` | NOT NULL | — | — | — | Nama perusahaan yang didaftarkan saat deploy vault |
-| `status` | `text` | NOT NULL | — | `Active` \| `Paused` \| `Frozen` | — | Status vault saat ini |
-| `vault_balance` | `bigint` | NOT NULL | — | ≥ 0 | — | Saldo vault IDRX (wei) |
-| `created_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp saat vault di-deploy |
-| `vault_address` | `hex` | NULL | — | Hex 0x + 40 char | `NULL` | `[BARU]` Alamat kontrak `CompanyVault` — dipakai `role_change` untuk resolve balik ke company (lihat FR-PAYANA-1901 s.d. 1904) |
+| `id` | `hex` | No | PRIMARY KEY | Hex 0x + 40 char | — | Alamat `hrAuthority` / key unik per perusahaan |
+| `name` | `text` | No | — | — | — | Nama perusahaan yang didaftarkan saat deploy vault |
+| `status` | `text` | No | — | `Active` \| `Paused` \| `Frozen` | — | Status vault saat ini |
+| `vault_balance` | `bigint` | No | — | ≥ 0 | — | Saldo vault IDRX (wei) |
+| `created_at` | `bigint` | No | — | ≥ 0 | — | Unix timestamp saat vault di-deploy |
+| `vault_address` | `hex` | Yes | — | Hex 0x + 40 char | `NULL` | `[BARU]` Alamat kontrak `CompanyVault` — dipakai `role_change` untuk resolve balik ke company (lihat FR-PAYANA-1901 s.d. 1904) |
 
-**Tabel `employee_stream`**
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `hex` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Alamat karyawan |
-| `hr_authority` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat HR / vault yang mengelola stream |
-| `flow_rate` | `bigint` | NOT NULL | — | ≥ 0 | — | IDRX wei per detik yang mengalir ke karyawan |
-| `start_ts` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp saat stream dimulai |
-| `status` | `text` | NOT NULL | — | `Active` \| `Paused` \| `Cancelled` | — | Status stream saat ini |
-| `employee_bps` | `integer` | NOT NULL | — | 0–10000 | — | Porsi karyawan dalam basis poin |
-| `compliance_bps` | `integer` | NOT NULL | — | 0–10000 | — | Porsi kepatuhan (BPJS/PPh21) dalam basis poin |
-| `severance_bps` | `integer` | NOT NULL | — | 0–10000 | — | Porsi dana pesangon dalam basis poin |
-
-**Tabel `salary_claim`**
+**Tabel 22 : Struktur Tabel `employee_stream`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `text` | NOT NULL | PRIMARY KEY | `${txHash}-${logIndex}` | — | ID unik klaim gaji per event log |
-| `employee` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat karyawan yang mengklaim |
-| `hr_authority` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat HR vault sumber |
-| `accrued` | `bigint` | NOT NULL | — | ≥ 0 | — | Total IDRX wei yang terakrual pada klaim ini |
-| `net_to_employee` | `bigint` | NOT NULL | — | ≥ 0 | — | IDRX wei yang dikirim ke wallet karyawan |
-| `to_compliance` | `bigint` | NOT NULL | — | ≥ 0 | — | IDRX wei yang dialokasikan ke compliance vault |
-| `to_severance` | `bigint` | NOT NULL | — | ≥ 0 | — | IDRX wei yang ditambahkan ke severance vault |
-| `kasbon_repaid` | `bigint` | NOT NULL | — | ≥ 0 | `0` | IDRX wei yang dipotong sebagai cicilan kasbon pada klaim ini |
-| `block_number` | `bigint` | NOT NULL | — | ≥ 0 | — | Nomor blok saat event ter-emit |
-| `timestamp` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp klaim |
+| `id` | `hex` | No | PRIMARY KEY | Hex 0x + 40 char | — | Alamat karyawan |
+| `hr_authority` | `hex` | No | — | Hex 0x + 40 char | — | Alamat HR / vault yang mengelola stream |
+| `flow_rate` | `bigint` | No | — | ≥ 0 | — | IDRX wei per detik yang mengalir ke karyawan |
+| `start_ts` | `bigint` | No | — | ≥ 0 | — | Unix timestamp saat stream dimulai |
+| `status` | `text` | No | — | `Active` \| `Paused` \| `Cancelled` | — | Status stream saat ini |
+| `employee_bps` | `integer` | No | — | 0–10000 | — | Porsi karyawan dalam basis poin |
+| `compliance_bps` | `integer` | No | — | 0–10000 | — | Porsi kepatuhan (BPJS/PPh21) dalam basis poin |
+| `severance_bps` | `integer` | No | — | 0–10000 | — | Porsi dana pesangon dalam basis poin |
 
-**Tabel `severance_vault`**
+**Tabel 23 : Struktur Tabel `salary_claim`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `hex` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Alamat karyawan |
-| `hr_authority` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat HR vault pemilik dana pesangon |
-| `amount` | `bigint` | NOT NULL | — | ≥ 0 | — | Saldo pesangon IDRX wei |
-| `state` | `text` | NOT NULL | — | `Locked` \| `Returned` \| `Released` | — | Status dana pesangon |
-| `last_updated` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pembaruan terakhir |
+| `id` | `text` | No | PRIMARY KEY | `${txHash}-${logIndex}` | — | ID unik klaim gaji per event log |
+| `employee` | `hex` | No | — | Hex 0x + 40 char | — | Alamat karyawan yang mengklaim |
+| `hr_authority` | `hex` | No | — | Hex 0x + 40 char | — | Alamat HR vault sumber |
+| `accrued` | `bigint` | No | — | ≥ 0 | — | Total IDRX wei yang terakrual pada klaim ini |
+| `net_to_employee` | `bigint` | No | — | ≥ 0 | — | IDRX wei yang dikirim ke wallet karyawan |
+| `to_compliance` | `bigint` | No | — | ≥ 0 | — | IDRX wei yang dialokasikan ke compliance vault |
+| `to_severance` | `bigint` | No | — | ≥ 0 | — | IDRX wei yang ditambahkan ke severance vault |
+| `kasbon_repaid` | `bigint` | No | — | ≥ 0 | `0` | IDRX wei yang dipotong sebagai cicilan kasbon pada klaim ini |
+| `block_number` | `bigint` | No | — | ≥ 0 | — | Nomor blok saat event ter-emit |
+| `timestamp` | `bigint` | No | — | ≥ 0 | — | Unix timestamp klaim |
 
-**Tabel `termination_proposal`**
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `hex` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Alamat karyawan yang diusulkan PHK |
-| `hr_authority` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat HR pengusul |
-| `hr_approved` | `boolean` | NOT NULL | — | `true` \| `false` | — | Status persetujuan HR |
-| `legal_approved` | `boolean` | NOT NULL | — | `true` \| `false` | — | Status persetujuan Legal |
-| `expires_at` | `bigint` | NOT NULL | — | > proposed_at | — | Unix timestamp kadaluarsa proposal (+ 7 hari) |
-| `proposed_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pengajuan proposal |
-| `executed_at` | `bigint` | NULL | — | > proposed_at | `NULL` | Unix timestamp eksekusi PHK (null jika belum) |
-| `cancelled` | `boolean` | NOT NULL | — | `true` \| `false` | — | Flag apakah proposal dibatalkan |
-
-**Tabel `cliff_vest`**
+**Tabel 24 : Struktur Tabel `severance_vault`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `text` | NOT NULL | PRIMARY KEY | `${employee}-${vestId}` | — | ID unik vest |
-| `employee` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat karyawan penerima |
-| `hr_authority` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat HR pembuat vest |
-| `vest_id` | `bigint` | NOT NULL | — | ≥ 0 | — | ID vest unik dalam vault (counter) |
-| `amount` | `bigint` | NOT NULL | — | ≥ 0 | — | IDRX wei yang terkunci dalam vest |
-| `cliff_ts` | `bigint` | NOT NULL | — | > created_at | — | Unix timestamp saat vest dapat diklaim |
-| `vest_type` | `text` | NOT NULL | — | `Retention` \| `Probation` \| `ESOP` | — | Jenis vest |
-| `status` | `text` | NOT NULL | — | `Locked` \| `Claimed` \| `Forfeited` | — | Status vest saat ini |
-| `created_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pembuatan vest |
+| `id` | `hex` | No | PRIMARY KEY | Hex 0x + 40 char | — | Alamat karyawan |
+| `hr_authority` | `hex` | No | — | Hex 0x + 40 char | — | Alamat HR vault pemilik dana pesangon |
+| `amount` | `bigint` | No | — | ≥ 0 | — | Saldo pesangon IDRX wei |
+| `state` | `text` | No | — | `Locked` \| `Returned` \| `Released` | — | Status dana pesangon |
+| `last_updated` | `bigint` | No | — | ≥ 0 | — | Unix timestamp pembaruan terakhir |
 
-**Tabel `compliance_vault`**
+**Tabel 25 : Struktur Tabel `termination_proposal`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `hex` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Alamat `hrAuthority` / satu per perusahaan |
-| `accumulated` | `bigint` | NOT NULL | — | ≥ 0 | — | Total akumulasi dana compliance IDRX wei |
-| `last_updated` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pembaruan terakhir |
+| `id` | `hex` | No | PRIMARY KEY | Hex 0x + 40 char | — | Alamat karyawan yang diusulkan PHK |
+| `hr_authority` | `hex` | No | — | Hex 0x + 40 char | — | Alamat HR pengusul |
+| `hr_approved` | `boolean` | No | — | `true` \| `false` | — | Status persetujuan HR |
+| `legal_approved` | `boolean` | No | — | `true` \| `false` | — | Status persetujuan Legal |
+| `expires_at` | `bigint` | No | — | > proposed_at | — | Unix timestamp kadaluarsa proposal (+ 7 hari) |
+| `proposed_at` | `bigint` | No | — | ≥ 0 | — | Unix timestamp pengajuan proposal |
+| `executed_at` | `bigint` | Yes | — | > proposed_at | `NULL` | Unix timestamp eksekusi PHK (null jika belum) |
+| `cancelled` | `boolean` | No | — | `true` \| `false` | — | Flag apakah proposal dibatalkan |
 
-**Tabel `salary_advance`**
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `hex` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Alamat karyawan pengaju kasbon |
-| `hr_authority` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat HR vault sumber dana |
-| `amount` | `bigint` | NOT NULL | — | ≥ 0 | — | Jumlah kasbon yang disetujui IDRX wei |
-| `repaid` | `bigint` | NOT NULL | — | ≥ 0 | `0` | Jumlah yang sudah dilunasi via auto-repay IDRX wei |
-| `status` | `text` | NOT NULL | — | `Pending` \| `Active` \| `Rejected` \| `Repaid` | — | Status kasbon (diturunkan dari riwayat event, lihat catatan `AdvanceStatus`) |
-| `requested_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pengajuan |
-| `updated_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp update status terakhir |
-
-**Tabel `employment_certificate`**
+**Tabel 26 : Struktur Tabel `cliff_vest`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `hex` | NOT NULL | PRIMARY KEY | Hex 0x + 40 char | — | Alamat karyawan pemegang SBT |
-| `token_id` | `bigint` | NOT NULL | — | ≥ 1 | — | ID token ERC-721 SBT |
-| `hr_authority` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat HR penerbit sertifikat |
-| `company_name` | `text` | NOT NULL | — | — | — | Nama perusahaan saat penerbitan |
-| `issued_at` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp penerbitan SBT |
-| `revoked_at` | `bigint` | NULL | — | > issued_at | `NULL` | Unix timestamp pencabutan SBT (null = masih aktif) |
-| `active` | `boolean` | NOT NULL | — | `true` \| `false` | — | Status aktif sertifikat |
+| `id` | `text` | No | PRIMARY KEY | `${employee}-${vestId}` | — | ID unik vest |
+| `employee` | `hex` | No | — | Hex 0x + 40 char | — | Alamat karyawan penerima |
+| `hr_authority` | `hex` | No | — | Hex 0x + 40 char | — | Alamat HR pembuat vest |
+| `vest_id` | `bigint` | No | — | ≥ 0 | — | ID vest unik dalam vault (counter) |
+| `amount` | `bigint` | No | — | ≥ 0 | — | IDRX wei yang terkunci dalam vest |
+| `cliff_ts` | `bigint` | No | — | > created_at | — | Unix timestamp saat vest dapat diklaim |
+| `vest_type` | `text` | No | — | `Retention` \| `Probation` \| `ESOP` | — | Jenis vest |
+| `status` | `text` | No | — | `Locked` \| `Claimed` \| `Forfeited` | — | Status vest saat ini |
+| `created_at` | `bigint` | No | — | ≥ 0 | — | Unix timestamp pembuatan vest |
 
-**Tabel `platform_fee_payment`**
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `text` | NOT NULL | PRIMARY KEY | `${txHash}-${logIndex}` | — | ID unik per event pembayaran fee |
-| `hr_authority` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat HR vault sumber fee |
-| `employee` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat karyawan yang memicu klaim |
-| `amount` | `bigint` | NOT NULL | — | ≥ 0 | — | Jumlah platform fee IDRX wei |
-| `timestamp` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp pembayaran |
-
-**Tabel `low_balance_alert`**
+**Tabel 27 : Struktur Tabel `compliance_vault`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `text` | NOT NULL | PRIMARY KEY | `${txHash}-${logIndex}` | — | ID unik per event alert |
-| `hr_authority` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat HR vault yang memicu alert |
-| `balance` | `bigint` | NOT NULL | — | ≥ 0 | — | Saldo vault IDRX wei saat alert ter-emit |
-| `monthly_need` | `bigint` | NOT NULL | — | ≥ 0 | — | Estimasi kebutuhan payroll bulanan IDRX wei |
-| `timestamp` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp alert |
+| `id` | `hex` | No | PRIMARY KEY | Hex 0x + 40 char | — | Alamat `hrAuthority` / satu per perusahaan |
+| `accumulated` | `bigint` | No | — | ≥ 0 | — | Total akumulasi dana compliance IDRX wei |
+| `last_updated` | `bigint` | No | — | ≥ 0 | — | Unix timestamp pembaruan terakhir |
 
-**Tabel `vault_withdrawal`** `[BARU — lihat SKPL Kelompok H, FR-PAYANA-1901]`
+**Tabel 28 : Struktur Tabel `salary_advance`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `text` | NOT NULL | PRIMARY KEY | `${txHash}-${logIndex}` | — | ID unik per event penarikan |
-| `hr_authority` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Perusahaan pemilik vault |
-| `vault_address` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat kontrak `CompanyVault` |
-| `amount` | `bigint` | NOT NULL | — | ≥ 0 | — | Jumlah IDRX wei yang ditarik |
-| `recipient` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat penerima dana |
-| `block_number` | `bigint` | NOT NULL | — | ≥ 0 | — | Nomor blok event |
-| `timestamp` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp event |
+| `id` | `hex` | No | PRIMARY KEY | Hex 0x + 40 char | — | Alamat karyawan pengaju kasbon |
+| `hr_authority` | `hex` | No | — | Hex 0x + 40 char | — | Alamat HR vault sumber dana |
+| `amount` | `bigint` | No | — | ≥ 0 | — | Jumlah kasbon yang disetujui IDRX wei |
+| `repaid` | `bigint` | No | — | ≥ 0 | `0` | Jumlah yang sudah dilunasi via auto-repay IDRX wei |
+| `status` | `text` | No | — | `Pending` \| `Active` \| `Rejected` \| `Repaid` | — | Status kasbon (diturunkan dari riwayat event, lihat catatan `AdvanceStatus`) |
+| `requested_at` | `bigint` | No | — | ≥ 0 | — | Unix timestamp pengajuan |
+| `updated_at` | `bigint` | No | — | ≥ 0 | — | Unix timestamp update status terakhir |
+
+**Tabel 29 : Struktur Tabel `employment_certificate`**
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `hex` | No | PRIMARY KEY | Hex 0x + 40 char | — | Alamat karyawan pemegang SBT |
+| `token_id` | `bigint` | No | — | ≥ 1 | — | ID token ERC-721 SBT |
+| `hr_authority` | `hex` | No | — | Hex 0x + 40 char | — | Alamat HR penerbit sertifikat |
+| `company_name` | `text` | No | — | — | — | Nama perusahaan saat penerbitan |
+| `issued_at` | `bigint` | No | — | ≥ 0 | — | Unix timestamp penerbitan SBT |
+| `revoked_at` | `bigint` | Yes | — | > issued_at | `NULL` | Unix timestamp pencabutan SBT (null = masih aktif) |
+| `active` | `boolean` | No | — | `true` \| `false` | — | Status aktif sertifikat |
+
+**Tabel 30 : Struktur Tabel `platform_fee_payment`**
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `text` | No | PRIMARY KEY | `${txHash}-${logIndex}` | — | ID unik per event pembayaran fee |
+| `hr_authority` | `hex` | No | — | Hex 0x + 40 char | — | Alamat HR vault sumber fee |
+| `employee` | `hex` | No | — | Hex 0x + 40 char | — | Alamat karyawan yang memicu klaim |
+| `amount` | `bigint` | No | — | ≥ 0 | — | Jumlah platform fee IDRX wei |
+| `timestamp` | `bigint` | No | — | ≥ 0 | — | Unix timestamp pembayaran |
+
+**Tabel 31 : Struktur Tabel `low_balance_alert`**
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `text` | No | PRIMARY KEY | `${txHash}-${logIndex}` | — | ID unik per event alert |
+| `hr_authority` | `hex` | No | — | Hex 0x + 40 char | — | Alamat HR vault yang memicu alert |
+| `balance` | `bigint` | No | — | ≥ 0 | — | Saldo vault IDRX wei saat alert ter-emit |
+| `monthly_need` | `bigint` | No | — | ≥ 0 | — | Estimasi kebutuhan payroll bulanan IDRX wei |
+| `timestamp` | `bigint` | No | — | ≥ 0 | — | Unix timestamp alert |
+
+**Tabel 32 : Struktur Tabel `vault_withdrawal`** `[BARU — lihat SKPL Kelompok H, FR-PAYANA-1901]`
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `id` | `text` | No | PRIMARY KEY | `${txHash}-${logIndex}` | — | ID unik per event penarikan |
+| `hr_authority` | `hex` | No | — | Hex 0x + 40 char | — | Perusahaan pemilik vault |
+| `vault_address` | `hex` | No | — | Hex 0x + 40 char | — | Alamat kontrak `CompanyVault` |
+| `amount` | `bigint` | No | — | ≥ 0 | — | Jumlah IDRX wei yang ditarik |
+| `recipient` | `hex` | No | — | Hex 0x + 40 char | — | Alamat penerima dana |
+| `block_number` | `bigint` | No | — | ≥ 0 | — | Nomor blok event |
+| `timestamp` | `bigint` | No | — | ≥ 0 | — | Unix timestamp event |
 
 > **Catatan:** sebelum penambahan tabel ini, `VaultWithdrawn` hanya memicu resync `company.vault_balance` (lihat `syncVaultBalance()`) — tidak ada riwayat per-penarikan. Tabel ini murni aditif; tidak mengubah perilaku handler yang sudah ada.
 
-**Tabel `role_change`** `[BARU — lihat SKPL Kelompok H, FR-PAYANA-1902]`
+**Tabel 33 : Struktur Tabel `role_change`** `[BARU — lihat SKPL Kelompok H, FR-PAYANA-1902]`
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `id` | `text` | NOT NULL | PRIMARY KEY | `${txHash}-${logIndex}` | — | ID unik per event perubahan peran |
-| `vault_address` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat kontrak `CompanyVault` |
-| `role` | `hex` | NOT NULL | — | `bytes32` | — | Hash peran mentah — lihat catatan interpretasi di §Dekomposisi Data — Ponder Indexed |
-| `account` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat yang diberi/dicabut peran |
-| `sender` | `hex` | NOT NULL | — | Hex 0x + 40 char | — | Alamat pemanggil `grantRole`/`revokeRole` |
-| `granted` | `boolean` | NOT NULL | — | `true` \| `false` | — | `true` = `RoleGranted`, `false` = `RoleRevoked` |
-| `block_number` | `bigint` | NOT NULL | — | ≥ 0 | — | Nomor blok event |
-| `timestamp` | `bigint` | NOT NULL | — | ≥ 0 | — | Unix timestamp event |
+| `id` | `text` | No | PRIMARY KEY | `${txHash}-${logIndex}` | — | ID unik per event perubahan peran |
+| `vault_address` | `hex` | No | — | Hex 0x + 40 char | — | Alamat kontrak `CompanyVault` |
+| `role` | `hex` | No | — | `bytes32` | — | Hash peran mentah — lihat catatan interpretasi di §Dekomposisi Data — Ponder Indexed |
+| `account` | `hex` | No | — | Hex 0x + 40 char | — | Alamat yang diberi/dicabut peran |
+| `sender` | `hex` | No | — | Hex 0x + 40 char | — | Alamat pemanggil `grantRole`/`revokeRole` |
+| `granted` | `boolean` | No | — | `true` \| `false` | — | `true` = `RoleGranted`, `false` = `RoleRevoked` |
+| `block_number` | `bigint` | No | — | ≥ 0 | — | Nomor blok event |
+| `timestamp` | `bigint` | No | — | ≥ 0 | — | Unix timestamp event |
 
 ---
 
@@ -1870,63 +1888,63 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 
 Bagian ini mendokumentasikan struct Solidity yang mendefinisikan state storage dalam smart contract. Kolom "Null" dan "Default" mengacu pada nilai awal variabel Solidity (uninitialized = zero value).
 
-**Struct `EmployeeStream` (CompanyVault)**
+**Tabel 34 : Struktur Tabel `EmployeeStream`** (Struct, kontrak CompanyVault)
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `flowRate` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | IDRX wei per detik; hasil konversi gaji bulanan |
-| `startTs` | `uint256` | NOT NULL | ≥ 0 | Unix timestamp | `0` | Block.timestamp saat stream dimulai |
-| `lastWithdrawnTs` | `uint256` | NOT NULL | ≥ 0 | ≥ startTs | `0` | Timestamp klaim atau settle terakhir |
-| `settledBalance` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Akrual tersimpan saat pause/cancel stream |
-| `status` | `StreamStatus` | NOT NULL | — | `Inactive`\|`Active`\|`Paused`\|`Cancelled` | `Inactive` | Status stream saat ini |
-| `severanceBps` | `uint16` | NOT NULL | 0–10000 | 0–10000 | `200` | Porsi severance per klaim (basis poin). PPh21/BPJS tidak lagi bagian dari struct ini — dihitung dinamis di `claimSalary()` dari `pph21Bps`/`bpjsBps` level-vault (lihat FR-PAYANA-701/702). |
+| `flowRate` | `uint256` | No | ≥ 0 | ≥ 0 | `0` | IDRX wei per detik; hasil konversi gaji bulanan |
+| `startTs` | `uint256` | No | ≥ 0 | Unix timestamp | `0` | Block.timestamp saat stream dimulai |
+| `lastWithdrawnTs` | `uint256` | No | ≥ 0 | ≥ startTs | `0` | Timestamp klaim atau settle terakhir |
+| `settledBalance` | `uint256` | No | ≥ 0 | ≥ 0 | `0` | Akrual tersimpan saat pause/cancel stream |
+| `status` | `StreamStatus` | No | — | `Inactive`\|`Active`\|`Paused`\|`Cancelled` | `Inactive` | Status stream saat ini |
+| `severanceBps` | `uint16` | No | 0–10000 | 0–10000 | `200` | Porsi severance per klaim (basis poin). PPh21/BPJS tidak lagi bagian dari struct ini — dihitung dinamis di `claimSalary()` dari `pph21Bps`/`bpjsBps` level-vault (lihat FR-PAYANA-701/702). |
 
-**Struct `SalaryAdvance` (CompanyVault)**
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `amount` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Total kasbon yang disetujui IDRX wei |
-| `repaid` | `uint256` | NOT NULL | ≤ amount | ≥ 0 | `0` | Total yang sudah dilunasi via auto-repay IDRX wei |
-| `requestedAt` | `uint256` | NOT NULL | ≥ 0 | Unix timestamp | `0` | Block.timestamp saat pengajuan |
-| `status` | `AdvanceStatus` | NOT NULL | — | `None`\|`Pending`\|`Active` | `None` | Status on-chain (lihat catatan `AdvanceStatus` di atas — "Rejected"/"Repaid" hanya ada di level event/off-chain) |
-
-**Struct `SeveranceVault` (CompanyVault)**
+**Tabel 35 : Struktur Tabel `SalaryAdvance`** (Struct, kontrak CompanyVault)
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `amount` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Total pesangon terakumulasi IDRX wei |
-| `state` | `SeveranceState` | NOT NULL | — | `Locked`\|`Returned`\|`Released` | `Locked` | Status dana pesangon |
-| `tenureMonths` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Masa kerja dalam bulan saat klaim terakhir |
-| `lastUpdatedTs` | `uint256` | NOT NULL | ≥ 0 | Unix timestamp | `0` | Block.timestamp pembaruan terakhir |
+| `amount` | `uint256` | No | ≥ 0 | ≥ 0 | `0` | Total kasbon yang disetujui IDRX wei |
+| `repaid` | `uint256` | No | ≤ amount | ≥ 0 | `0` | Total yang sudah dilunasi via auto-repay IDRX wei |
+| `requestedAt` | `uint256` | No | ≥ 0 | Unix timestamp | `0` | Block.timestamp saat pengajuan |
+| `status` | `AdvanceStatus` | No | — | `None`\|`Pending`\|`Active` | `None` | Status on-chain (lihat catatan `AdvanceStatus` di atas — "Rejected"/"Repaid" hanya ada di level event/off-chain) |
 
-**Struct `TerminationProposal` (CompanyVault)**
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `employee` | `address` | NOT NULL | ≠ address(0) | Hex 0x + 40 char | `address(0)` | Alamat karyawan yang diusulkan PHK |
-| `hrApproved` | `bool` | NOT NULL | — | `true`\|`false` | `true` | Selalu `true` saat proposal dibuat oleh HR |
-| `legalApproved` | `bool` | NOT NULL | — | `true`\|`false` | `false` | Di-set `true` oleh LEGAL_ROLE via `approveTermination()` |
-| `expiresAt` | `uint256` | NOT NULL | > block.timestamp saat dibuat | Unix timestamp | `0` | `block.timestamp + TERMINATION_EXPIRY (7 days)` |
-| `reasonHash` | `bytes32` | NOT NULL | — | keccak256 hash | `bytes32(0)` | Hash keccak256 dari alasan PHK (off-chain document) |
-| `flowRateSnapshot` | `uint256` | NOT NULL | ≥ 0 | ≥ 0 | `0` | Flow rate saat proposal diajukan (untuk hitung pesangon) |
-
-**Struct `CliffVest` (CompanyVault)**
+**Tabel 36 : Struktur Tabel `SeveranceVault`** (Struct, kontrak CompanyVault)
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `employee` | `address` | NOT NULL | ≠ address(0) | Hex 0x + 40 char | `address(0)` | Alamat karyawan penerima vest |
-| `amount` | `uint256` | NOT NULL | > 0 | ≥ 0 | `0` | IDRX wei yang terkunci dalam vest |
-| `cliffTs` | `uint256` | NOT NULL | > block.timestamp saat dibuat | Unix timestamp | `0` | Block.timestamp saat vest boleh diklaim |
-| `vestType` | `VestType` | NOT NULL | — | `Retention`\|`Probation`\|`ESOP` | `Retention` | Jenis vest |
-| `status` | `VestStatus` | NOT NULL | — | `Locked`\|`Claimed`\|`Forfeited` | `Locked` | Status vest |
+| `amount` | `uint256` | No | ≥ 0 | ≥ 0 | `0` | Total pesangon terakumulasi IDRX wei |
+| `state` | `SeveranceState` | No | — | `Locked`\|`Returned`\|`Released` | `Locked` | Status dana pesangon |
+| `tenureMonths` | `uint256` | No | ≥ 0 | ≥ 0 | `0` | Masa kerja dalam bulan saat klaim terakhir |
+| `lastUpdatedTs` | `uint256` | No | ≥ 0 | Unix timestamp | `0` | Block.timestamp pembaruan terakhir |
 
-**Struct `EmploymentRecord` (EmploymentSBT)**
+**Tabel 37 : Struktur Tabel `TerminationProposal`** (Struct, kontrak CompanyVault)
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
-| `hrAuthority` | `address` | NOT NULL | ≠ address(0) | Hex 0x + 40 char | `address(0)` | Alamat HR yang menerbitkan sertifikat |
-| `companyName` | `string` | NOT NULL | — | — | `""` | Nama perusahaan saat penerbitan SBT |
-| `startTs` | `uint256` | NOT NULL | ≥ 0 | Unix timestamp | `0` | Block.timestamp saat stream karyawan dimulai |
+| `employee` | `address` | No | ≠ address(0) | Hex 0x + 40 char | `address(0)` | Alamat karyawan yang diusulkan PHK |
+| `hrApproved` | `bool` | No | — | `true`\|`false` | `true` | Selalu `true` saat proposal dibuat oleh HR |
+| `legalApproved` | `bool` | No | — | `true`\|`false` | `false` | Di-set `true` oleh LEGAL_ROLE via `approveTermination()` |
+| `expiresAt` | `uint256` | No | > block.timestamp saat dibuat | Unix timestamp | `0` | `block.timestamp + TERMINATION_EXPIRY (7 days)` |
+| `reasonHash` | `bytes32` | No | — | keccak256 hash | `bytes32(0)` | Hash keccak256 dari alasan PHK (off-chain document) |
+| `flowRateSnapshot` | `uint256` | No | ≥ 0 | ≥ 0 | `0` | Flow rate saat proposal diajukan (untuk hitung pesangon) |
+
+**Tabel 38 : Struktur Tabel `CliffVest`** (Struct, kontrak CompanyVault)
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `employee` | `address` | No | ≠ address(0) | Hex 0x + 40 char | `address(0)` | Alamat karyawan penerima vest |
+| `amount` | `uint256` | No | > 0 | ≥ 0 | `0` | IDRX wei yang terkunci dalam vest |
+| `cliffTs` | `uint256` | No | > block.timestamp saat dibuat | Unix timestamp | `0` | Block.timestamp saat vest boleh diklaim |
+| `vestType` | `VestType` | No | — | `Retention`\|`Probation`\|`ESOP` | `Retention` | Jenis vest |
+| `status` | `VestStatus` | No | — | `Locked`\|`Claimed`\|`Forfeited` | `Locked` | Status vest |
+
+**Tabel 39 : Struktur Tabel `EmploymentRecord`** (Struct, kontrak EmploymentSBT)
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `hrAuthority` | `address` | No | ≠ address(0) | Hex 0x + 40 char | `address(0)` | Alamat HR yang menerbitkan sertifikat |
+| `companyName` | `string` | No | — | — | `""` | Nama perusahaan saat penerbitan SBT |
+| `startTs` | `uint256` | No | ≥ 0 | Unix timestamp | `0` | Block.timestamp saat stream karyawan dimulai |
 
 ---
 
