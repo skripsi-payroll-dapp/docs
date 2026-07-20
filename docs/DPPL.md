@@ -581,10 +581,9 @@ classDiagram
 
 #### 2.2.2 Deskripsi Kelas dan Atribut
 
+Untuk setiap kelas diberikan deskripsi atribut dan deskripsi fungsi sesuai format yang ditetapkan. Seluruh kontrak dikompilasi dengan Solidity 0.8.26 dan OpenZeppelin Contracts v5. Seluruh nilai moneter dinyatakan dalam IDRX (18 desimal, 1 IDRX = 1 IDR). Pustaka `PayrollMath` menyediakan konstanta `SECONDS_PER_MONTH`, fungsi `calcAccrued(flowRate, lastTs)`, `bpsOf(amount, bps)`, `validateSplits(...)`, dan `severanceMultiplier(tenureMonths)`.
 
-Seluruh kontrak dikompilasi dengan Solidity 0.8.26 dan OpenZeppelin Contracts v5. Seluruh nilai moneter dinyatakan dalam IDRX (18 desimal, 1 IDRX = 1 IDR). Pustaka `PayrollMath` menyediakan konstanta `SECONDS_PER_MONTH`, fungsi `calcAccrued(flowRate, lastTs)`, `bpsOf(amount, bps)`, `validateSplits(...)`, dan `severanceMultiplier(tenureMonths)`.
-
-Pola keamanan yang diterapkan secara konsisten:
+Pola keamanan yang diterapkan secara konsisten di seluruh kelas:
 
 - **Checks-Effects-Interactions (CEI):** seluruh perubahan state dilakukan sebelum transfer eksternal.
 - **ReentrancyGuard:** modifier `nonReentrant` pada fungsi yang mentransfer IDRX.
@@ -594,7 +593,7 @@ Pola keamanan yang diterapkan secara konsisten:
 
 ##### 2.2.2.1 PayrollFactory
 
-Kontrak entry-point SaaS yang men-deploy `CompanyVault` terisolasi per tenant (Factory Pattern). Mewarisi `AccessControl`.
+Kelas PayrollFactory : Kontrak entry-point SaaS yang men-deploy `CompanyVault` terisolasi per tenant (Factory Pattern). Mewarisi `AccessControl`.
 
 ```mermaid
 classDiagram
@@ -616,11 +615,24 @@ classDiagram
     }
 ```
 
-**State Variables:** `IDRX` (immutable), `ENTRY_POINT` (immutable, canonical ERC-4337 EntryPoint v0.7 — diteruskan ke setiap vault yang di-deploy), `protocolTreasury`, `platformFeeBps`, `companyVaults` (HR → vault), `allVaults` (array seluruh vault).
+**Deskripsi atribut kelas PayrollFactory**
+
+| Nama atribut | Tipe Data | Deskripsi |
+|---|---|---|
+| `SUPERADMIN_ROLE` | `bytes32` (constant) | Role protokol yang boleh deploy vault dan trigger emergency freeze global |
+| `MAX_PLATFORM_FEE_BPS` | `uint16` (constant = 100) | Batas maksimum platform fee, 1% dari setiap klaim gaji |
+| `IDRX` | `address` (immutable) | Alamat token ERC-20 IDRX, diteruskan ke setiap vault yang di-deploy |
+| `ENTRY_POINT` | `address` (immutable) | Alamat kanonik ERC-4337 EntryPoint v0.7, diteruskan ke setiap vault yang di-deploy |
+| `protocolTreasury` | `address` | Alamat penerima potongan platform fee dari setiap `claimSalary()` |
+| `platformFeeBps` | `uint16` | Platform fee dalam basis poin yang dipotong dari setiap klaim gaji (default 0) |
+| `companyVaults` | `mapping(address => address)` | Memetakan alamat HR authority ke alamat `CompanyVault` miliknya (satu HR = satu vault) |
+| `allVaults` | `address[]` | Daftar berurutan seluruh alamat vault yang pernah di-deploy, dipakai untuk `emergencyFreezeAll()` |
 
 **Events:** `VaultDeployed(hrAuthority, vaultAddress, companyName)`, `PlatformFeeUpdated(newBps)`, `ProtocolTreasuryUpdated(newTreasury)`.
 
-**[deployVault(hrAuthority, companyName, sbtContract)]**
+**Deskripsi fungsi pada kelas PayrollFactory**
+
+**deployVault(hrAuthority, companyName, sbtContract)**
 | | |
 |---|---|
 | Input | hrAuthority: address, companyName: string, sbtContract: address |
@@ -634,7 +646,7 @@ classDiagram
 3. **Effect:** catat alamat ke `companyVaults[hrAuthority]` dan `allVaults.push(vault)`.
 4. **Effect:** emit `VaultDeployed(hrAuthority, vault, companyName)`; kembalikan alamat vault.
 
-**[setPlatformFee(bps)]**
+**setPlatformFee(bps)**
 | | |
 |---|---|
 | Input | newFeeBps: uint16 |
@@ -643,7 +655,7 @@ classDiagram
 
 **Algoritma:** Check `bps <= MAX_PLATFORM_FEE_BPS (100)` (`FeeTooHigh`); set `platformFeeBps = bps`; emit `PlatformFeeUpdated`.
 
-**[setProtocolTreasury(newTreasury)]**
+**setProtocolTreasury(newTreasury)**
 | | |
 |---|---|
 | Input | newTreasury: address |
@@ -652,7 +664,7 @@ classDiagram
 
 **Algoritma:** Check `newTreasury != address(0)`; set `protocolTreasury`; emit `ProtocolTreasuryUpdated`. Memungkinkan migrasi ke multisig.
 
-**[emergencyFreezeAll()]**
+**emergencyFreezeAll()**
 | | |
 |---|---|
 | Input | - |
@@ -661,7 +673,7 @@ classDiagram
 
 **Algoritma:** Iterasi `allVaults`; untuk setiap vault panggil `freezeVault()`. Biaya gas linear terhadap jumlah vault.
 
-**[getTotalVaults()]**
+**getTotalVaults()**
 | | |
 |---|---|
 | Input | - |
@@ -672,7 +684,7 @@ classDiagram
 
 ##### 2.2.2.2 CompanyVault
 
-Kontrak payroll per perusahaan: streaming gaji, split 93/5/2, PHK multi-sig, cliff vesting, dan kepatuhan. Mewarisi `ICompanyVault`, `ReentrancyGuard`, `AccessControl`.
+Kelas CompanyVault : Kontrak payroll per perusahaan: streaming gaji, split 93/5/2, PHK multi-sig, cliff vesting, dan kepatuhan. Mewarisi `ICompanyVault`, `ReentrancyGuard`, `AccessControl`.
 
 ```mermaid
 classDiagram
@@ -697,13 +709,43 @@ classDiagram
     CompanyVault ..> IPayrollFactory : platformFeeBps
 ```
 
-**Konstanta:** `TERMINATION_EXPIRY=7 days`, `MAX_ADVANCE_BPS=8000` (80%), `ADVANCE_REPAY_BPS=2000` (20%).
+**Deskripsi atribut kelas CompanyVault**
+
+| Nama atribut | Tipe Data | Deskripsi |
+|---|---|---|
+| `HR_ROLE` | `bytes32` (constant) | Role admin HR perusahaan pemilik vault |
+| `LEGAL_ROLE` | `bytes32` (constant) | Role Legal Officer untuk persetujuan tahap kedua PHK |
+| `DEFAULT_SEVERANCE_BPS` | `uint16` (constant = 200) | Default rate akumulasi pesangon per klaim (2%) |
+| `TERMINATION_EXPIRY` | `uint256` (constant = 7 days) | Masa berlaku proposal PHK sebelum kadaluarsa |
+| `MAX_ADVANCE_BPS` | `uint256` (constant = 8000) | Batas maksimum kasbon, 80% dari gaji bulanan |
+| `ADVANCE_REPAY_BPS` | `uint256` (constant = 2000) | Porsi auto-repay kasbon per klaim, 20% dari net |
+| `IDRX` | `IERC20` (immutable) | Alamat token ERC-20 IDRX yang dipakai vault ini |
+| `hrAuthority` | `address` (immutable) | Alamat wallet HR pemilik/pengelola vault |
+| `factory` | `address` | Alamat `PayrollFactory` yang men-deploy vault ini |
+| `companyName` | `string` | Nama perusahaan yang tercatat saat vault dibuat |
+| `status` | `VaultStatus` | Status vault saat ini: `Uninitialized`/`Active`/`Paused`/`Frozen` |
+| `sbtContract` | `IEmploymentSBT` | Alamat kontrak `EmploymentSBT` bersama untuk mint/revoke sertifikat |
+| `bpjsBps` | `uint16` | Tarif potongan BPJS dalam basis poin, dikonfigurasi HR |
+| `pph21Bps` | `uint16` | Override tarif PPh21 manual; jika 0, dihitung otomatis via TER |
+| `lowBalanceThresholdBps` | `uint16` | Ambang basis poin dari kebutuhan bulanan untuk trigger `LowVaultBalance` |
+| `vestCounter` | `uint256` | Counter ID berurutan untuk `CliffVest` baru |
+| `totalFlowRate` | `uint256` | Total IDRX wei/detik gabungan seluruh stream aktif |
+| `vaultBalance` | `uint256` | Saldo IDRX yang tersedia untuk payroll |
+| `complianceBalance` | `uint256` | Saldo IDRX terakumulasi untuk kepatuhan PPh21/BPJS |
+| `employeeStreams` | `mapping(address => EmployeeStream)` | Data stream gaji per alamat karyawan |
+| `severanceVaults` | `mapping(address => SeveranceVault)` | Data dana pesangon terakumulasi per karyawan |
+| `terminations` | `mapping(address => TerminationProposal)` | Proposal PHK aktif per karyawan |
+| `cliffVests` | `mapping(address => mapping(uint256 => CliffVest))` | Data cliff vest per karyawan, per ID vest |
+| `employeeComplianceAccumulated` | `mapping(address => uint256)` | Akumulasi kontribusi kepatuhan per karyawan (riwayat) |
+| `salaryAdvances` | `mapping(address => SalaryAdvance)` | Data kasbon aktif/pending per karyawan |
 
 **Custom Errors:** `VaultFrozen`, `InsufficientVaultBalance`, `StreamAlreadyActive`, `StreamNotActive`, `NotWhitelisted`, `NothingToClaim`, `SplitInvalid`, `TerminationAlreadyProposed`, `TerminationNotFound`, `ProposalExpired`, `AlreadyApproved`, `NotVestedYet`, `AlreadyClaimed`, `VestNotFound`, `SeveranceAlreadySettled`, `InsufficientComplianceBalance`, `CliffNotReached`, `VestAlreadySettled`, `Unauthorized`, `NoActiveProposal`.
 
 **Modifier:** `onlyHR` (cek `HR_ROLE`), `vaultActive` (status harus `Active`), `validTermination(employee)` (hrApproved && legalApproved && belum kadaluarsa).
 
-**[constructor(idrx, hrAuthority, companyName, sbtContract, entryPoint)]**
+**Deskripsi fungsi pada kelas CompanyVault**
+
+**constructor(idrx, hrAuthority, companyName, sbtContract, entryPoint)**
 | | |
 |---|---|
 | Input | idrx: address, hrAuthority: address, companyName: string, sbtContract: address, entryPoint: address |
@@ -712,7 +754,7 @@ classDiagram
 
 Algoritma: Disetel oleh `PayrollFactory`. Set `IDRX`, `factory=msg.sender`, `hrAuthority`, `companyName`, `status=Active`, `sbtContract`. Berikan `DEFAULT_ADMIN_ROLE`, `HR_ROLE`, dan `LEGAL_ROLE` ke `hrAuthority`. Emit `VaultInitialized`.
 
-**[fundVault(amount)]**
+**fundVault(amount)**
 | | |
 |---|---|
 | Input | amount: uint256 |
@@ -721,7 +763,7 @@ Algoritma: Disetel oleh `PayrollFactory`. Set `IDRX`, `factory=msg.sender`, `hrA
 
 **Algoritma:** `safeTransferFrom(msg.sender, this, amount)`; `vaultBalance += amount`; emit `VaultFunded`.
 
-**[withdrawVault(amount, recipient)]**
+**withdrawVault(amount, recipient)**
 | | |
 |---|---|
 | Input | amount: uint256, recipient: address |
@@ -734,7 +776,7 @@ Algoritma: Disetel oleh `PayrollFactory`. Set `IDRX`, `factory=msg.sender`, `hrA
 2. **Effect:** `vaultBalance -= amount`; panggil `_checkLowBalance()`.
 3. **Interaction:** `safeTransfer(recipient, amount)`; emit `VaultWithdrawn`.
 
-**[setCompanyConfig(bpjsBps, pph21Bps, lowBalanceThresholdBps)]**
+**setCompanyConfig(bpjsBps, pph21Bps, lowBalanceThresholdBps)**
 | | |
 |---|---|
 | Input | bpjsBps: uint16, pph21Bps: uint16, lowBalanceThresholdBps: uint16 |
@@ -743,7 +785,7 @@ Algoritma: Disetel oleh `PayrollFactory`. Set `IDRX`, `factory=msg.sender`, `hrA
 
 **Algoritma:** Set `bpjsBps`, `pph21Bps`, `lowBalanceThresholdBps`. Nilai BPJS/PPh21 bersifat informatif (tidak memengaruhi split langsung).
 
-**[pauseVault() / resumeVault() / freezeVault()]**
+**pauseVault() / resumeVault() / freezeVault()**
 | | |
 |---|---|
 | Input | - |
@@ -756,7 +798,7 @@ Algoritma: Disetel oleh `PayrollFactory`. Set `IDRX`, `factory=msg.sender`, `hrA
 - `resumeVault`: tolak jika `status == Frozen`; set `status = Active`; emit `VaultResumed`.
 - `freezeVault`: hanya `factory` atau pemegang `DEFAULT_ADMIN_ROLE` (`Unauthorized`); set `status = Frozen` (irreversible); emit `VaultFreeze`.
 
-**[startStream(employee, flowRate, severanceSplitBps)]**
+**startStream(employee, flowRate, severanceSplitBps)**
 | | |
 |---|---|
 | Input | employee: address, flowRate: uint256, severanceSplitBps: uint16 |
@@ -788,7 +830,7 @@ sequenceDiagram
 3. **Effect:** emit `StreamCreated`.
 4. **Interaction:** `sbtContract.mint(employee, companyName, msg.sender)` (try/catch); emit `EmploymentCertified` jika berhasil.
 
-**[pauseStream / resumeStream / updateFlowRate / updateStreamSplits / cancelStream]**
+**pauseStream / resumeStream / updateFlowRate / updateStreamSplits / cancelStream**
 | | |
 |---|---|
 | Input | employee: address (+ parameter tambahan sesuai fungsi) |
@@ -803,7 +845,7 @@ sequenceDiagram
 - `updateStreamSplits(employee, ...)`: stream `Active`/`Paused`; validasi split = 10.000; settle jika `Active`; set splits baru; emit `StreamSplitsUpdated`.
 - `cancelStream(employee)`: tolak jika sudah `Cancelled`/`Inactive`; jika `Active` settle dan kurangi `totalFlowRate`; set `Cancelled`; emit `StreamCancelled`.
 
-**[claimSalary()]**
+**claimSalary()**
 | | |
 |---|---|
 | Input | - |
@@ -845,7 +887,7 @@ sequenceDiagram
 7. **Effect:** tambah `complianceBalance` dan `employeeComplianceAccumulated`; tambah `severanceVaults.amount`; perbarui `tenureMonths = (now - startTs)/SECONDS_PER_MONTH`.
 8. **Interaction:** `safeTransfer(platformCut)` ke treasury (+`PlatformFeePaid`), `safeTransfer(toEmployee)` ke karyawan; emit `SalaryClaimed(..., kasbonRepaid)` dan `TaxWithheld(pph21Amount, bpjsAmount)`.
 
-**[resignEmployee(employee)]**
+**resignEmployee(employee)**
 | | |
 |---|---|
 | Input | employee: address |
@@ -859,7 +901,7 @@ sequenceDiagram
 3. **Effect:** pesangon dikembalikan ke `vaultBalance` (bukan ke karyawan); set state `Returned`.
 4. **Interaction:** `_forfeitAllVests(employee)`; `_revokeSBT(employee)`; emit `StreamCancelled` + `SeveranceReturned`.
 
-**[proposeTermination(employee, reasonHash)]**
+**proposeTermination(employee, reasonHash)**
 | | |
 |---|---|
 | Input | employee: address, reasonHash: bytes32 |
@@ -871,7 +913,7 @@ sequenceDiagram
 1. **Check:** stream tidak `Inactive` (`NotWhitelisted`); tidak ada proposal aktif yang belum kadaluarsa (`TerminationAlreadyProposed`).
 2. **Effect:** buat `TerminationProposal` (`hrApproved=true`, `legalApproved=false`, `expiresAt=now+7 days`, `reasonHash`, `flowRateSnapshot=flowRate`); emit `TerminationProposed`.
 
-**[approveTermination(employee)]**
+**approveTermination(employee)**
 | | |
 |---|---|
 | Input | employee: address |
@@ -883,7 +925,7 @@ sequenceDiagram
 1. **Check:** proposal ada (`TerminationNotFound`) dan belum kadaluarsa (`ProposalExpired`).
 2. **Effect:** jika pemanggil `HR_ROLE` set `hrApproved` (tolak ganda `AlreadyApproved`); jika `LEGAL_ROLE` set `legalApproved`; selain itu `Unauthorized`; emit `TerminationApproved`.
 
-**[executeTermination(employee)]**
+**executeTermination(employee)**
 | | |
 |---|---|
 | Input | employee: address |
@@ -921,7 +963,7 @@ sequenceDiagram
 5. **Effect:** `amount = accumulated + topUp`; set `state = Released`; `_forfeitAllVests(employee)`; `_revokeSBT(employee)`; `delete terminations[employee]`.
 6. **Interaction:** `safeTransfer(employee, amount)`; emit `StreamCancelled`, `SeveranceReleased`, `SeveranceShortfall` (jika ada), `TerminationExecuted`.
 
-**[cancelProposal(employee)]**
+**cancelProposal(employee)**
 | | |
 |---|---|
 | Input | employee: address |
@@ -930,7 +972,7 @@ sequenceDiagram
 
 **Algoritma:** Check proposal masih aktif (hrApproved && !legalApproved && belum kadaluarsa) (`NoActiveProposal`); `delete terminations[employee]`; emit `TerminationCancelled`.
 
-**[withdrawCompliance(amount, recipient)]**
+**withdrawCompliance(amount, recipient)**
 | | |
 |---|---|
 | Input | amount: uint256, recipient: address |
@@ -939,7 +981,7 @@ sequenceDiagram
 
 **Algoritma (CEI):** Check `complianceBalance >= amount` (`InsufficientComplianceBalance`); `complianceBalance -= amount`; `safeTransfer(recipient, amount)`; emit `ComplianceWithdrawn`.
 
-**[createCliffVest(employee, amount, cliffTs, vestType)]**
+**createCliffVest(employee, amount, cliffTs, vestType)**
 | | |
 |---|---|
 | Input | employee: address, amount: uint256, cliffTs: uint256, vestType: VestType |
@@ -951,7 +993,7 @@ sequenceDiagram
 1. **Check:** `cliffTs > now` (`"CliffInPast"`); `vaultBalance >= amount` (`InsufficientVaultBalance`).
 2. **Effect:** `vestId = vestCounter++`; simpan `CliffVest` (`Locked`); `vaultBalance -= amount`; `_checkLowBalance()`; emit `CliffVestCreated`.
 
-**[claimCliffVest(vestId)]**
+**claimCliffVest(vestId)**
 | | |
 |---|---|
 | Input | vestId: uint256 |
@@ -964,7 +1006,7 @@ sequenceDiagram
 2. **Effect:** `amount = vest.amount`; `vest.amount = 0`; `status = Claimed`.
 3. **Interaction:** `safeTransfer(msg.sender, amount)`; emit `CliffVestClaimed`.
 
-**[cancelCliffVest(employee, vestId)]**
+**cancelCliffVest(employee, vestId)**
 | | |
 |---|---|
 | Input | employee: address, vestId: uint256 |
@@ -990,13 +1032,15 @@ sequenceDiagram
 
 ##### 2.2.2.3 Mesin Pajak & Kasbon (terintegrasi di CompanyVault)
 
-Modul ini menyediakan dua kapabilitas yang terintegrasi langsung di `CompanyVault`: (1) perhitungan PPh21/BPJS otomatis saat `claimSalary()` (lihat 2.2.2.2), dan (2) fasilitas kasbon (`SalaryAdvance`) yang dananya bersumber langsung dari `vaultBalance` perusahaan — bukan pool lender pihak ketiga.
+> **Catatan:** modul ini bukan kelas/kontrak terpisah — melainkan kelompok fungsi yang berada di dalam kelas `CompanyVault` (lihat 2.2.2.2 untuk deskripsi atribut, karena modul ini tidak memiliki atribut sendiri di luar yang sudah didokumentasikan pada kelas `CompanyVault`). Dipisahkan ke subbab sendiri agar mudah ditelusuri karena mewakili dua kapabilitas fungsional yang berdiri sendiri: (1) perhitungan PPh21/BPJS otomatis saat `claimSalary()` (lihat 2.2.2.2), dan (2) fasilitas kasbon (`SalaryAdvance`) yang dananya bersumber langsung dari `vaultBalance` perusahaan — bukan pool lender pihak ketiga.
 
-**Konstanta terkait:** `MAX_ADVANCE_BPS = 8000` (80% dari gaji bulanan), `ADVANCE_REPAY_BPS = 2000` (20% dari net setiap klaim).
+**Konstanta terkait (atribut kelas CompanyVault):** `MAX_ADVANCE_BPS = 8000` (80% dari gaji bulanan), `ADVANCE_REPAY_BPS = 2000` (20% dari net setiap klaim).
 
 **Custom Errors:** `AdvancePendingExists`, `ActiveAdvanceExists`, `NoAdvancePending`, `AdvanceAmountTooHigh`.
 
-**[requestAdvance(amount)]**
+**Deskripsi fungsi pada modul Kasbon**
+
+**requestAdvance(amount)**
 | | |
 |---|---|
 | Input | amount: uint256 |
@@ -1009,7 +1053,7 @@ Modul ini menyediakan dua kapabilitas yang terintegrasi langsung di `CompanyVaul
 2. **Check:** `monthlyGross = flowRate * SECONDS_PER_MONTH`; `maxAdvance = bpsOf(monthlyGross, MAX_ADVANCE_BPS)`; tolak jika `amount > maxAdvance` (`AdvanceAmountTooHigh`).
 3. **Effect:** `salaryAdvances[msg.sender] = {amount, repaid: 0, requestedAt: now, status: Pending}`; emit `AdvanceRequested`.
 
-**[approveAdvance(employee)]**
+**approveAdvance(employee)**
 | | |
 |---|---|
 | Input | employee: address |
@@ -1022,7 +1066,7 @@ Modul ini menyediakan dua kapabilitas yang terintegrasi langsung di `CompanyVaul
 2. **Effect:** status = `Active`; `vaultBalance -= adv.amount`; `_checkLowBalance()`.
 3. **Interaction:** `safeTransfer(employee, adv.amount)`; emit `AdvanceApproved`.
 
-**[rejectAdvance(employee)]**
+**rejectAdvance(employee)**
 | | |
 |---|---|
 | Input | employee: address |
@@ -1031,7 +1075,7 @@ Modul ini menyediakan dua kapabilitas yang terintegrasi langsung di `CompanyVaul
 
 **Algoritma:** Check status `Pending` (`NoAdvancePending`); `delete salaryAdvances[employee]`; emit `AdvanceRejected`.
 
-**[_autoRepayAdvance(employee, available) — internal]**
+**_autoRepayAdvance(employee, available) — internal**
 
 Dipanggil dari dalam `claimSalary()` (lihat 2.2.2.2, langkah 5). Bukan fungsi publik.
 
@@ -1045,7 +1089,7 @@ Dipanggil dari dalam `claimSalary()` (lihat 2.2.2.2, langkah 5). Bukan fungsi pu
 
 ##### 2.2.2.4 EmploymentSBT
 
-Sertifikat ketenagakerjaan Soulbound (ERC-5192). Mewarisi `ERC721`, `IERC5192`, `AccessControl`. Nama token: "Finley Employment Certificate" (FEMP).
+Kelas EmploymentSBT : Sertifikat ketenagakerjaan Soulbound (ERC-5192). Mewarisi `ERC721`, `IERC5192`, `AccessControl`. Nama token: "Finley Employment Certificate" (FEMP).
 
 ```mermaid
 classDiagram
@@ -1062,9 +1106,22 @@ classDiagram
     }
 ```
 
+**Deskripsi atribut kelas EmploymentSBT**
+
+| Nama atribut | Tipe Data | Deskripsi |
+|---|---|---|
+| `MINTER_ROLE` | `bytes32` (constant) | Role yang diberikan ke `CompanyVault` agar bisa mint/revoke sertifikat |
+| `_tokenIdCounter` | `uint256` (private) | Counter ID token berurutan, dimulai dari 1 |
+| `_baseTokenURI` | `string` (private) | Base URI metadata token, dapat diperbarui admin |
+| `employmentRecords` | `mapping(uint256 => EmploymentRecord)` | Data riwayat kerja per tokenId (`hrAuthority`, `companyName`, `startTs`) |
+| `employeeTokenId` | `mapping(address => uint256)` | Memetakan alamat karyawan ke tokenId SBT miliknya |
+| `tokenIssuer` | `mapping(uint256 => address)` | Memetakan tokenId ke alamat `CompanyVault` penerbitnya |
+
 **Custom Errors:** `AlreadyHasToken(employee)`, `NoTokenFound(employee)`, `SoulboundTransferNotAllowed`.
 
-**[mint(employee, companyName, hrAuthority)]**
+**Deskripsi fungsi pada kelas EmploymentSBT**
+
+**mint(employee, companyName, hrAuthority)**
 | | |
 |---|---|
 | Input | employee: address, companyName: string, hrAuthority: address |
@@ -1073,7 +1130,7 @@ classDiagram
 
 Algoritma: Tolak jika sudah punya token (`AlreadyHasToken`); tokenId monoton mulai 1; simpan `EmploymentRecord{hrAuthority, companyName, startTs}`; emit `Locked(tokenId)`; kembalikan tokenId.
 
-**[revoke(employee)]**
+**revoke(employee)**
 | | |
 |---|---|
 | Input | employee: address |
@@ -1082,7 +1139,7 @@ Algoritma: Tolak jika sudah punya token (`AlreadyHasToken`); tokenId monoton mul
 
 Algoritma: Hapus `employeeTokenId` dan `employmentRecords`; burn token.
 
-**[locked(tokenId)]**
+**locked(tokenId)**
 | | |
 |---|---|
 | Input | tokenId: uint256 |
@@ -1091,7 +1148,7 @@ Algoritma: Hapus `employeeTokenId` dan `employmentRecords`; burn token.
 
 Algoritma: Selalu `true` (ERC-5192).
 
-**[setBaseURI(newBaseURI)]**
+**setBaseURI(newBaseURI)**
 | | |
 |---|---|
 | Input | newBaseURI: string |
@@ -1100,7 +1157,7 @@ Algoritma: Selalu `true` (ERC-5192).
 
 Algoritma: Perbarui base URI metadata.
 
-**[supportsInterface(interfaceId)]**
+**supportsInterface(interfaceId)**
 | | |
 |---|---|
 | Input | interfaceId: bytes4 |
@@ -1109,7 +1166,7 @@ Algoritma: Perbarui base URI metadata.
 
 Algoritma: Deklarasi dukungan `IERC5192`.
 
-**[_update(to, tokenId, auth)] [internal]**
+**_update(to, tokenId, auth) — internal**
 | | |
 |---|---|
 | Input | to: address, tokenId: uint256, auth: address |
