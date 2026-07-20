@@ -1213,7 +1213,8 @@ Setiap komponen basis data pada ketiga lapisan di atas didokumentasikan mengguna
 - **Default** : nilai default atribut
 - **Keterangan** : deskripsi tambahan (jika diperlukan) dari atribut
 
-##### ERD On-Chain (Solidity Structs & Mappings)
+
+##### 2.3.1.1 Dekomposisi Data On-Chain
 
 State on-chain disimpan dalam struct dan mapping pada masing-masing kontrak. Diagram berikut menggambarkan relasi konseptual antar entitas on-chain (kunci pemetaan adalah alamat Ethereum).
 
@@ -1293,7 +1294,72 @@ erDiagram
 - `VestStatus`: Locked, Claimed, Forfeited.
 - `AdvanceStatus`: None, Pending, Active. Tidak ada nilai enum terpisah untuk "Rejected"/"Repaid" — `rejectAdvance()` dan pelunasan penuh via `_autoRepayAdvance()` sama-sama melakukan `delete salaryAdvances[employee]`, yang mengembalikan status ke `None` secara on-chain. Status "Rejected"/"Repaid" yang ditampilkan di UI berasal dari riwayat event (`AdvanceRejected`/`AdvanceRepaid`) yang diindeks off-chain oleh Ponder, bukan dari pembacaan langsung state kontrak saat ini.
 
-##### ERD Off-Chain (PostgreSQL — skema `app`)
+---
+
+Bagian ini mendokumentasikan struct Solidity yang mendefinisikan state storage dalam smart contract. Kolom "Null" dan "Default" mengacu pada nilai awal variabel Solidity (uninitialized = zero value).
+
+**Tabel 1 : Struktur Tabel `EmployeeStream`** (Struct, kontrak CompanyVault)
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `flowRate` | `uint256` | No | ≥ 0 | ≥ 0 | `0` | IDRX wei per detik; hasil konversi gaji bulanan |
+| `startTs` | `uint256` | No | ≥ 0 | Unix timestamp | `0` | Block.timestamp saat stream dimulai |
+| `lastWithdrawnTs` | `uint256` | No | ≥ 0 | ≥ startTs | `0` | Timestamp klaim atau settle terakhir |
+| `settledBalance` | `uint256` | No | ≥ 0 | ≥ 0 | `0` | Akrual tersimpan saat pause/cancel stream |
+| `status` | `StreamStatus` | No | — | `Inactive`\|`Active`\|`Paused`\|`Cancelled` | `Inactive` | Status stream saat ini |
+| `severanceBps` | `uint16` | No | 0–10000 | 0–10000 | `200` | Porsi severance per klaim (basis poin). PPh21/BPJS tidak lagi bagian dari struct ini — dihitung dinamis di `claimSalary()` dari `pph21Bps`/`bpjsBps` level-vault (lihat FR-PAYANA-701/702). |
+
+**Tabel 2 : Struktur Tabel `SalaryAdvance`** (Struct, kontrak CompanyVault)
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `amount` | `uint256` | No | ≥ 0 | ≥ 0 | `0` | Total kasbon yang disetujui IDRX wei |
+| `repaid` | `uint256` | No | ≤ amount | ≥ 0 | `0` | Total yang sudah dilunasi via auto-repay IDRX wei |
+| `requestedAt` | `uint256` | No | ≥ 0 | Unix timestamp | `0` | Block.timestamp saat pengajuan |
+| `status` | `AdvanceStatus` | No | — | `None`\|`Pending`\|`Active` | `None` | Status on-chain (lihat catatan `AdvanceStatus` di atas — "Rejected"/"Repaid" hanya ada di level event/off-chain) |
+
+**Tabel 3 : Struktur Tabel `SeveranceVault`** (Struct, kontrak CompanyVault)
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `amount` | `uint256` | No | ≥ 0 | ≥ 0 | `0` | Total pesangon terakumulasi IDRX wei |
+| `state` | `SeveranceState` | No | — | `Locked`\|`Returned`\|`Released` | `Locked` | Status dana pesangon |
+| `tenureMonths` | `uint256` | No | ≥ 0 | ≥ 0 | `0` | Masa kerja dalam bulan saat klaim terakhir |
+| `lastUpdatedTs` | `uint256` | No | ≥ 0 | Unix timestamp | `0` | Block.timestamp pembaruan terakhir |
+
+**Tabel 4 : Struktur Tabel `TerminationProposal`** (Struct, kontrak CompanyVault)
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `employee` | `address` | No | ≠ address(0) | Hex 0x + 40 char | `address(0)` | Alamat karyawan yang diusulkan PHK |
+| `hrApproved` | `bool` | No | — | `true`\|`false` | `true` | Selalu `true` saat proposal dibuat oleh HR |
+| `legalApproved` | `bool` | No | — | `true`\|`false` | `false` | Di-set `true` oleh LEGAL_ROLE via `approveTermination()` |
+| `expiresAt` | `uint256` | No | > block.timestamp saat dibuat | Unix timestamp | `0` | `block.timestamp + TERMINATION_EXPIRY (7 days)` |
+| `reasonHash` | `bytes32` | No | — | keccak256 hash | `bytes32(0)` | Hash keccak256 dari alasan PHK (off-chain document) |
+| `flowRateSnapshot` | `uint256` | No | ≥ 0 | ≥ 0 | `0` | Flow rate saat proposal diajukan (untuk hitung pesangon) |
+
+**Tabel 5 : Struktur Tabel `CliffVest`** (Struct, kontrak CompanyVault)
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `employee` | `address` | No | ≠ address(0) | Hex 0x + 40 char | `address(0)` | Alamat karyawan penerima vest |
+| `amount` | `uint256` | No | > 0 | ≥ 0 | `0` | IDRX wei yang terkunci dalam vest |
+| `cliffTs` | `uint256` | No | > block.timestamp saat dibuat | Unix timestamp | `0` | Block.timestamp saat vest boleh diklaim |
+| `vestType` | `VestType` | No | — | `Retention`\|`Probation`\|`ESOP` | `Retention` | Jenis vest |
+| `status` | `VestStatus` | No | — | `Locked`\|`Claimed`\|`Forfeited` | `Locked` | Status vest |
+
+**Tabel 6 : Struktur Tabel `EmploymentRecord`** (Struct, kontrak EmploymentSBT)
+
+| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
+|------------|-----------|------|-----------|-------------|---------|------------|
+| `hrAuthority` | `address` | No | ≠ address(0) | Hex 0x + 40 char | `address(0)` | Alamat HR yang menerbitkan sertifikat |
+| `companyName` | `string` | No | — | — | `""` | Nama perusahaan saat penerbitan SBT |
+| `startTs` | `uint256` | No | ≥ 0 | Unix timestamp | `0` | Block.timestamp saat stream karyawan dimulai |
+
+---
+
+
+##### 2.3.1.2 Dekomposisi Data Off-Chain
 
 Tabel off-chain dikelola Drizzle ORM dalam skema `app`. Tabel-tabel ini independen (tidak ada foreign key relasional formal antar tabel; keterhubungan logis melalui kolom `address`).
 
@@ -1354,102 +1420,7 @@ erDiagram
 | `rate_limits` | `employeeAddress` (PK) | Counter klaim per jam | FR-404 |
 | `pending_registrations` | `address` (PK) | Antrian persetujuan tenant | FR-107, 108, 109 |
 
-##### ERD Ponder Indexed (PostgreSQL — skema `public`)
-
-Tabel terindeks Ponder direpresentasikan dengan `onchainTable`. Kolom yang dipakai langsung oleh SQL backend (mis. `salary_claim`) di-pin secara eksplisit ke snake_case agar kompatibel dengan kueri SQL mentah pada backend compliance dan liquidation.
-
-```mermaid
-erDiagram
-    COMPANY ||--o{ EMPLOYEE_STREAM : hrAuthority
-    COMPANY ||--o{ SALARY_CLAIM : hr_authority
-    COMPANY ||--o{ COMPLIANCE_VAULT : id
-    COMPANY ||--o{ PLATFORM_FEE_PAYMENT : hr_authority
-    EMPLOYEE_STREAM ||--o{ SALARY_CLAIM : employee
-    EMPLOYEE_STREAM ||--o| SEVERANCE_VAULT : id
-    EMPLOYEE_STREAM ||--o{ CLIFF_VEST : employee
-    EMPLOYEE_STREAM ||--o| EMPLOYMENT_CERTIFICATE : id
-    COMPANY ||--o{ SALARY_ADVANCE : hrAuthority
-    COMPANY ||--o{ VAULT_WITHDRAWAL : hr_authority
-    COMPANY ||--o{ ROLE_CHANGE : vault_address
-
-    COMPANY {
-        hex id PK "hrAuthority/vault"
-        text name
-        text status
-        bigint vaultBalance
-        bigint createdAt
-        hex vaultAddress "BARU — resolve role_change ke company"
-    }
-    VAULT_WITHDRAWAL {
-        text id PK
-        hex hr_authority
-        hex vault_address
-        bigint amount
-        hex recipient
-        bigint timestamp
-    }
-    ROLE_CHANGE {
-        text id PK
-        hex vault_address
-        hex role "bytes32 mentah — lihat catatan di bawah"
-        hex account
-        hex sender
-        boolean granted
-        bigint timestamp
-    }
-    SALARY_CLAIM {
-        text id PK
-        hex employee
-        hex hr_authority
-        bigint accrued
-        bigint net_to_employee
-        bigint to_compliance
-        bigint to_severance
-        bigint kasbon_repaid
-        bigint timestamp
-    }
-    SALARY_ADVANCE {
-        hex id PK "employee"
-        hex hrAuthority
-        bigint amount
-        bigint repaid
-        text status
-        bigint requestedAt
-        bigint updatedAt
-    }
-    CLIFF_VEST {
-        text id PK
-        hex employee
-        bigint amount
-        bigint cliffTs
-        text vestType
-        text status
-    }
-```
-
-**Rincian Tabel Ponder Indexed:**
-
-| Tabel | Kunci | Sumber Event | Dipakai oleh |
-|-------|-------|--------------|--------------|
-| `company` | `id` (vault/HR) | `VaultDeployed`, `VaultInitialized` | `useRole`, `/owner`, `/hr/onboarding` |
-| `employee_stream` | `employee` | `StreamCreated`, `FlowRate/Splits/Status` | `/hr/employees`, `/employee/ewa` |
-| `salary_claim` | `id` | `SalaryClaimed` | `/compliance/*`, `/employee/audit` |
-| `severance_vault` | `id` | `SeveranceReleased/Returned` | `/employee/severance` |
-| `cliff_vest` | `id` | `CliffVestCreated/Claimed/Forfeited` | `/hr/vesting`, `/employee/vesting` |
-| `salary_advance` | `employee` | `AdvanceRequested/Approved/Rejected/Repaid` | `/hr/kasbon`, `/employee/kasbon` |
-| `platform_fee_payment` | `id` | `PlatformFeePaid` | `/owner` |
-| `employment_certificate` | `id` | `EmploymentCertified/Revoked` | `/verify` |
-| `low_balance_alert` | `id` | `LowVaultBalance` | `/hr/vault` |
-| `vault_withdrawal` | `id` | `VaultWithdrawn` `[BARU]` | `anomalyDetector.ts` (lihat Lampiran B.6) |
-| `role_change` | `id` | `RoleGranted`/`RoleRevoked` `[BARU]` | `anomalyDetector.ts` (lihat Lampiran B.6) |
-
-> **Catatan (`role_change.role`):** disimpan sebagai hash `bytes32` mentah — `keccak256("HR_ROLE")` = `0xfd70517941c75212b0f9013e45c47a37d6d983c5304288c7af285f2ea40cbba7`, `keccak256("LEGAL_ROLE")` = `0xb9f13ecb5e7f0f859c44b76b3a163e504787b446da95a26bf75e53e1ff4a1e0e`, `DEFAULT_ADMIN_ROLE` = `bytes32(0)`. Interpretasi nama peran dilakukan di `anomalyDetector.ts` (`roleName()`), bukan di handler Ponder — menjaga handler tetap sebagai mirror event yang dumb dan reliable.
->
-> **Catatan (`RoleGranted`/`RoleRevoked`):** kedua event ini adalah event bawaan `AccessControl` OpenZeppelin yang diwarisi `CompanyVault` — sudah diemit sejak kontrak pertama kali di-deploy, hanya saja sebelumnya tidak ada di ABI yang dipakai Ponder (`abis/PayrollContractAbi.ts`) sehingga tidak pernah diindeks. Menambahkannya adalah perubahan murni di lapisan indexing, **tidak memerlukan redeploy kontrak** — backfill otomatis mengindeks ulang seluruh riwayat `RoleGranted` sejak `startBlock`, termasuk grant `HR_ROLE`/`DEFAULT_ADMIN_ROLE` awal saat setiap vault pertama kali dibuat.
-
 ---
-
-##### Dekomposisi Data — Off-Chain (Skema `app`)
 
 Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh Drizzle ORM. Semua data PII dienkripsi dengan AES-256-GCM sebelum disimpan.
 
@@ -1723,11 +1694,105 @@ Tabel-tabel berikut adalah bagian dari skema PostgreSQL `app` yang dikelola oleh
 
 ---
 
-##### Dekomposisi Data — Ponder Indexed (Skema `public`)
+
+##### 2.3.1.3 Dekomposisi Data Ponder Indexed
+
+Tabel terindeks Ponder direpresentasikan dengan `onchainTable`. Kolom yang dipakai langsung oleh SQL backend (mis. `salary_claim`) di-pin secara eksplisit ke snake_case agar kompatibel dengan kueri SQL mentah pada backend compliance dan liquidation.
+
+```mermaid
+erDiagram
+    COMPANY ||--o{ EMPLOYEE_STREAM : hrAuthority
+    COMPANY ||--o{ SALARY_CLAIM : hr_authority
+    COMPANY ||--o{ COMPLIANCE_VAULT : id
+    COMPANY ||--o{ PLATFORM_FEE_PAYMENT : hr_authority
+    EMPLOYEE_STREAM ||--o{ SALARY_CLAIM : employee
+    EMPLOYEE_STREAM ||--o| SEVERANCE_VAULT : id
+    EMPLOYEE_STREAM ||--o{ CLIFF_VEST : employee
+    EMPLOYEE_STREAM ||--o| EMPLOYMENT_CERTIFICATE : id
+    COMPANY ||--o{ SALARY_ADVANCE : hrAuthority
+    COMPANY ||--o{ VAULT_WITHDRAWAL : hr_authority
+    COMPANY ||--o{ ROLE_CHANGE : vault_address
+
+    COMPANY {
+        hex id PK "hrAuthority/vault"
+        text name
+        text status
+        bigint vaultBalance
+        bigint createdAt
+        hex vaultAddress "BARU — resolve role_change ke company"
+    }
+    VAULT_WITHDRAWAL {
+        text id PK
+        hex hr_authority
+        hex vault_address
+        bigint amount
+        hex recipient
+        bigint timestamp
+    }
+    ROLE_CHANGE {
+        text id PK
+        hex vault_address
+        hex role "bytes32 mentah — lihat catatan di bawah"
+        hex account
+        hex sender
+        boolean granted
+        bigint timestamp
+    }
+    SALARY_CLAIM {
+        text id PK
+        hex employee
+        hex hr_authority
+        bigint accrued
+        bigint net_to_employee
+        bigint to_compliance
+        bigint to_severance
+        bigint kasbon_repaid
+        bigint timestamp
+    }
+    SALARY_ADVANCE {
+        hex id PK "employee"
+        hex hrAuthority
+        bigint amount
+        bigint repaid
+        text status
+        bigint requestedAt
+        bigint updatedAt
+    }
+    CLIFF_VEST {
+        text id PK
+        hex employee
+        bigint amount
+        bigint cliffTs
+        text vestType
+        text status
+    }
+```
+
+**Rincian Tabel Ponder Indexed:**
+
+| Tabel | Kunci | Sumber Event | Dipakai oleh |
+|-------|-------|--------------|--------------|
+| `company` | `id` (vault/HR) | `VaultDeployed`, `VaultInitialized` | `useRole`, `/owner`, `/hr/onboarding` |
+| `employee_stream` | `employee` | `StreamCreated`, `FlowRate/Splits/Status` | `/hr/employees`, `/employee/ewa` |
+| `salary_claim` | `id` | `SalaryClaimed` | `/compliance/*`, `/employee/audit` |
+| `severance_vault` | `id` | `SeveranceReleased/Returned` | `/employee/severance` |
+| `cliff_vest` | `id` | `CliffVestCreated/Claimed/Forfeited` | `/hr/vesting`, `/employee/vesting` |
+| `salary_advance` | `employee` | `AdvanceRequested/Approved/Rejected/Repaid` | `/hr/kasbon`, `/employee/kasbon` |
+| `platform_fee_payment` | `id` | `PlatformFeePaid` | `/owner` |
+| `employment_certificate` | `id` | `EmploymentCertified/Revoked` | `/verify` |
+| `low_balance_alert` | `id` | `LowVaultBalance` | `/hr/vault` |
+| `vault_withdrawal` | `id` | `VaultWithdrawn` `[BARU]` | `anomalyDetector.ts` (lihat Lampiran B.6) |
+| `role_change` | `id` | `RoleGranted`/`RoleRevoked` `[BARU]` | `anomalyDetector.ts` (lihat Lampiran B.6) |
+
+> **Catatan (`role_change.role`):** disimpan sebagai hash `bytes32` mentah — `keccak256("HR_ROLE")` = `0xfd70517941c75212b0f9013e45c47a37d6d983c5304288c7af285f2ea40cbba7`, `keccak256("LEGAL_ROLE")` = `0xb9f13ecb5e7f0f859c44b76b3a163e504787b446da95a26bf75e53e1ff4a1e0e`, `DEFAULT_ADMIN_ROLE` = `bytes32(0)`. Interpretasi nama peran dilakukan di `anomalyDetector.ts` (`roleName()`), bukan di handler Ponder — menjaga handler tetap sebagai mirror event yang dumb dan reliable.
+>
+> **Catatan (`RoleGranted`/`RoleRevoked`):** kedua event ini adalah event bawaan `AccessControl` OpenZeppelin yang diwarisi `CompanyVault` — sudah diemit sejak kontrak pertama kali di-deploy, hanya saja sebelumnya tidak ada di ABI yang dipakai Ponder (`abis/PayrollContractAbi.ts`) sehingga tidak pernah diindeks. Menambahkannya adalah perubahan murni di lapisan indexing, **tidak memerlukan redeploy kontrak** — backfill otomatis mengindeks ulang seluruh riwayat `RoleGranted` sejak `startBlock`, termasuk grant `HR_ROLE`/`DEFAULT_ADMIN_ROLE` awal saat setiap vault pertama kali dibuat.
+
+---
 
 Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTable` berdasarkan event yang diindeks dari Base Sepolia. Tipe `hex` merujuk pada string alamat Ethereum (0x + 40 char). Tipe `bigint` merujuk pada `BigInt` PostgreSQL untuk representasi nilai wei dan Unix timestamp.
 
-**Tabel 21 : Struktur Tabel `company`**
+**Tabel 1 : Struktur Tabel `company`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1738,7 +1803,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `created_at` | `bigint` | No | — | ≥ 0 | — | Unix timestamp saat vault di-deploy |
 | `vault_address` | `hex` | Yes | — | Hex 0x + 40 char | `NULL` | `[BARU]` Alamat kontrak `CompanyVault` — dipakai `role_change` untuk resolve balik ke company (lihat FR-PAYANA-1901 s.d. 1904) |
 
-**Tabel 22 : Struktur Tabel `employee_stream`**
+**Tabel 2 : Struktur Tabel `employee_stream`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1751,7 +1816,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `compliance_bps` | `integer` | No | — | 0–10000 | — | Porsi kepatuhan (BPJS/PPh21) dalam basis poin |
 | `severance_bps` | `integer` | No | — | 0–10000 | — | Porsi dana pesangon dalam basis poin |
 
-**Tabel 23 : Struktur Tabel `salary_claim`**
+**Tabel 3 : Struktur Tabel `salary_claim`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1766,7 +1831,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `block_number` | `bigint` | No | — | ≥ 0 | — | Nomor blok saat event ter-emit |
 | `timestamp` | `bigint` | No | — | ≥ 0 | — | Unix timestamp klaim |
 
-**Tabel 24 : Struktur Tabel `severance_vault`**
+**Tabel 4 : Struktur Tabel `severance_vault`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1776,7 +1841,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `state` | `text` | No | — | `Locked` \| `Returned` \| `Released` | — | Status dana pesangon |
 | `last_updated` | `bigint` | No | — | ≥ 0 | — | Unix timestamp pembaruan terakhir |
 
-**Tabel 25 : Struktur Tabel `termination_proposal`**
+**Tabel 5 : Struktur Tabel `termination_proposal`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1789,7 +1854,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `executed_at` | `bigint` | Yes | — | > proposed_at | `NULL` | Unix timestamp eksekusi PHK (null jika belum) |
 | `cancelled` | `boolean` | No | — | `true` \| `false` | — | Flag apakah proposal dibatalkan |
 
-**Tabel 26 : Struktur Tabel `cliff_vest`**
+**Tabel 6 : Struktur Tabel `cliff_vest`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1803,7 +1868,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `status` | `text` | No | — | `Locked` \| `Claimed` \| `Forfeited` | — | Status vest saat ini |
 | `created_at` | `bigint` | No | — | ≥ 0 | — | Unix timestamp pembuatan vest |
 
-**Tabel 27 : Struktur Tabel `compliance_vault`**
+**Tabel 7 : Struktur Tabel `compliance_vault`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1811,7 +1876,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `accumulated` | `bigint` | No | — | ≥ 0 | — | Total akumulasi dana compliance IDRX wei |
 | `last_updated` | `bigint` | No | — | ≥ 0 | — | Unix timestamp pembaruan terakhir |
 
-**Tabel 28 : Struktur Tabel `salary_advance`**
+**Tabel 8 : Struktur Tabel `salary_advance`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1823,7 +1888,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `requested_at` | `bigint` | No | — | ≥ 0 | — | Unix timestamp pengajuan |
 | `updated_at` | `bigint` | No | — | ≥ 0 | — | Unix timestamp update status terakhir |
 
-**Tabel 29 : Struktur Tabel `employment_certificate`**
+**Tabel 9 : Struktur Tabel `employment_certificate`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1835,7 +1900,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `revoked_at` | `bigint` | Yes | — | > issued_at | `NULL` | Unix timestamp pencabutan SBT (null = masih aktif) |
 | `active` | `boolean` | No | — | `true` \| `false` | — | Status aktif sertifikat |
 
-**Tabel 30 : Struktur Tabel `platform_fee_payment`**
+**Tabel 10 : Struktur Tabel `platform_fee_payment`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1845,7 +1910,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `amount` | `bigint` | No | — | ≥ 0 | — | Jumlah platform fee IDRX wei |
 | `timestamp` | `bigint` | No | — | ≥ 0 | — | Unix timestamp pembayaran |
 
-**Tabel 31 : Struktur Tabel `low_balance_alert`**
+**Tabel 11 : Struktur Tabel `low_balance_alert`**
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1855,7 +1920,7 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 | `monthly_need` | `bigint` | No | — | ≥ 0 | — | Estimasi kebutuhan payroll bulanan IDRX wei |
 | `timestamp` | `bigint` | No | — | ≥ 0 | — | Unix timestamp alert |
 
-**Tabel 32 : Struktur Tabel `vault_withdrawal`** `[BARU — lihat SKPL Kelompok H, FR-PAYANA-1901]`
+**Tabel 12 : Struktur Tabel `vault_withdrawal`** `[BARU — lihat SKPL Kelompok H, FR-PAYANA-1901]`
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
@@ -1869,13 +1934,13 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 
 > **Catatan:** sebelum penambahan tabel ini, `VaultWithdrawn` hanya memicu resync `company.vault_balance` (lihat `syncVaultBalance()`) — tidak ada riwayat per-penarikan. Tabel ini murni aditif; tidak mengubah perilaku handler yang sudah ada.
 
-**Tabel 33 : Struktur Tabel `role_change`** `[BARU — lihat SKPL Kelompok H, FR-PAYANA-1902]`
+**Tabel 13 : Struktur Tabel `role_change`** `[BARU — lihat SKPL Kelompok H, FR-PAYANA-1902]`
 
 | Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
 |------------|-----------|------|-----------|-------------|---------|------------|
 | `id` | `text` | No | PRIMARY KEY | `${txHash}-${logIndex}` | — | ID unik per event perubahan peran |
 | `vault_address` | `hex` | No | — | Hex 0x + 40 char | — | Alamat kontrak `CompanyVault` |
-| `role` | `hex` | No | — | `bytes32` | — | Hash peran mentah — lihat catatan interpretasi di §Dekomposisi Data — Ponder Indexed |
+| `role` | `hex` | No | — | `bytes32` | — | Hash peran mentah — lihat catatan interpretasi di §2.3.1.3 Dekomposisi Data Ponder Indexed |
 | `account` | `hex` | No | — | Hex 0x + 40 char | — | Alamat yang diberi/dicabut peran |
 | `sender` | `hex` | No | — | Hex 0x + 40 char | — | Alamat pemanggil `grantRole`/`revokeRole` |
 | `granted` | `boolean` | No | — | `true` \| `false` | — | `true` = `RoleGranted`, `false` = `RoleRevoked` |
@@ -1884,69 +1949,6 @@ Tabel-tabel berikut dikelola secara otomatis oleh Ponder 0.16 melalui `onchainTa
 
 ---
 
-##### Dekomposisi Data — On-Chain (Solidity Structs)
-
-Bagian ini mendokumentasikan struct Solidity yang mendefinisikan state storage dalam smart contract. Kolom "Null" dan "Default" mengacu pada nilai awal variabel Solidity (uninitialized = zero value).
-
-**Tabel 34 : Struktur Tabel `EmployeeStream`** (Struct, kontrak CompanyVault)
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `flowRate` | `uint256` | No | ≥ 0 | ≥ 0 | `0` | IDRX wei per detik; hasil konversi gaji bulanan |
-| `startTs` | `uint256` | No | ≥ 0 | Unix timestamp | `0` | Block.timestamp saat stream dimulai |
-| `lastWithdrawnTs` | `uint256` | No | ≥ 0 | ≥ startTs | `0` | Timestamp klaim atau settle terakhir |
-| `settledBalance` | `uint256` | No | ≥ 0 | ≥ 0 | `0` | Akrual tersimpan saat pause/cancel stream |
-| `status` | `StreamStatus` | No | — | `Inactive`\|`Active`\|`Paused`\|`Cancelled` | `Inactive` | Status stream saat ini |
-| `severanceBps` | `uint16` | No | 0–10000 | 0–10000 | `200` | Porsi severance per klaim (basis poin). PPh21/BPJS tidak lagi bagian dari struct ini — dihitung dinamis di `claimSalary()` dari `pph21Bps`/`bpjsBps` level-vault (lihat FR-PAYANA-701/702). |
-
-**Tabel 35 : Struktur Tabel `SalaryAdvance`** (Struct, kontrak CompanyVault)
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `amount` | `uint256` | No | ≥ 0 | ≥ 0 | `0` | Total kasbon yang disetujui IDRX wei |
-| `repaid` | `uint256` | No | ≤ amount | ≥ 0 | `0` | Total yang sudah dilunasi via auto-repay IDRX wei |
-| `requestedAt` | `uint256` | No | ≥ 0 | Unix timestamp | `0` | Block.timestamp saat pengajuan |
-| `status` | `AdvanceStatus` | No | — | `None`\|`Pending`\|`Active` | `None` | Status on-chain (lihat catatan `AdvanceStatus` di atas — "Rejected"/"Repaid" hanya ada di level event/off-chain) |
-
-**Tabel 36 : Struktur Tabel `SeveranceVault`** (Struct, kontrak CompanyVault)
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `amount` | `uint256` | No | ≥ 0 | ≥ 0 | `0` | Total pesangon terakumulasi IDRX wei |
-| `state` | `SeveranceState` | No | — | `Locked`\|`Returned`\|`Released` | `Locked` | Status dana pesangon |
-| `tenureMonths` | `uint256` | No | ≥ 0 | ≥ 0 | `0` | Masa kerja dalam bulan saat klaim terakhir |
-| `lastUpdatedTs` | `uint256` | No | ≥ 0 | Unix timestamp | `0` | Block.timestamp pembaruan terakhir |
-
-**Tabel 37 : Struktur Tabel `TerminationProposal`** (Struct, kontrak CompanyVault)
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `employee` | `address` | No | ≠ address(0) | Hex 0x + 40 char | `address(0)` | Alamat karyawan yang diusulkan PHK |
-| `hrApproved` | `bool` | No | — | `true`\|`false` | `true` | Selalu `true` saat proposal dibuat oleh HR |
-| `legalApproved` | `bool` | No | — | `true`\|`false` | `false` | Di-set `true` oleh LEGAL_ROLE via `approveTermination()` |
-| `expiresAt` | `uint256` | No | > block.timestamp saat dibuat | Unix timestamp | `0` | `block.timestamp + TERMINATION_EXPIRY (7 days)` |
-| `reasonHash` | `bytes32` | No | — | keccak256 hash | `bytes32(0)` | Hash keccak256 dari alasan PHK (off-chain document) |
-| `flowRateSnapshot` | `uint256` | No | ≥ 0 | ≥ 0 | `0` | Flow rate saat proposal diajukan (untuk hitung pesangon) |
-
-**Tabel 38 : Struktur Tabel `CliffVest`** (Struct, kontrak CompanyVault)
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `employee` | `address` | No | ≠ address(0) | Hex 0x + 40 char | `address(0)` | Alamat karyawan penerima vest |
-| `amount` | `uint256` | No | > 0 | ≥ 0 | `0` | IDRX wei yang terkunci dalam vest |
-| `cliffTs` | `uint256` | No | > block.timestamp saat dibuat | Unix timestamp | `0` | Block.timestamp saat vest boleh diklaim |
-| `vestType` | `VestType` | No | — | `Retention`\|`Probation`\|`ESOP` | `Retention` | Jenis vest |
-| `status` | `VestStatus` | No | — | `Locked`\|`Claimed`\|`Forfeited` | `Locked` | Status vest |
-
-**Tabel 39 : Struktur Tabel `EmploymentRecord`** (Struct, kontrak EmploymentSBT)
-
-| Nama Field | Tipe Data | Null | Konstrain | Range Nilai | Default | Keterangan |
-|------------|-----------|------|-----------|-------------|---------|------------|
-| `hrAuthority` | `address` | No | ≠ address(0) | Hex 0x + 40 char | `address(0)` | Alamat HR yang menerbitkan sertifikat |
-| `companyName` | `string` | No | — | — | `""` | Nama perusahaan saat penerbitan SBT |
-| `startTs` | `uint256` | No | ≥ 0 | Unix timestamp | `0` | Block.timestamp saat stream karyawan dimulai |
-
----
 
 #### 2.3.2 Physical Data Model
 
