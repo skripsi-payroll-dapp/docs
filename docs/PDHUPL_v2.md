@@ -174,11 +174,25 @@ penambahan paragraf ini.
 
 ### 2.4 Sumber Daya Manusia
 
-Pengujian dilakukan oleh satu orang (penulis Tugas Akhir), berperan rangkap Developer, Tester,
-dan pemegang seluruh akun peran uji (Owner, HR, Karyawan) via beberapa wallet Privy/test account
-berbeda, ditambah satu wallet dengan `LEGAL_ROLE` on-chain yang diuji khusus lewat kontrak/API
-langsung (tidak ada login/dashboard Privy tersendiri untuk peran ini — lihat 2.3). Pengujian
-akses-ganda/concurrent disimulasikan berurutan oleh satu orang.
+Sumber daya pengujian ini berupa:
+
+1. **Tester (pengujian teknis, Bab 3.1/4/5/6 dokumen ini):** 1 orang, yaitu penulis Tugas Akhir
+   sendiri, merangkap peran Developer dan Tester, serta pemegang seluruh akun peran uji (Owner,
+   HR, Karyawan) via beberapa wallet Privy/test account berbeda, ditambah satu wallet dengan
+   `LEGAL_ROLE` on-chain yang diuji khusus lewat kontrak/API langsung (tidak ada login/dashboard
+   Privy tersendiri untuk peran ini — lihat 2.3). Pengujian akses-ganda/concurrent disimulasikan
+   berurutan oleh satu orang. Tester ini menjalankan seluruh butir uji AU-xxx (fungsional,
+   keamanan/KU-32, performa/KU-30–31) pada dokumen ini.
+2. **Responden Usability Testing (kegiatan terpisah, di luar cakupan dokumen ini):** 30 orang
+   (15 berperan HR Admin, 15 berperan Karyawan), direkrut purposif dari tiga mitra startup
+   (Startup A/B/C) yang merepresentasikan segmen pengguna target sistem Payana. Sesi
+   dilaksanakan terpisah pada 2026-06-26 (mendahului sesi pengujian teknis 2026-07-17/18 di atas)
+   untuk mengukur kegunaan (*usability*) antarmuka lewat metode *System Usability Scale* (SUS)
+   dan observasi skenario tugas terstruktur — bukan menjalankan butir uji teknis AU-xxx di
+   PDHUPL ini (responden tidak pernah memegang wallet/private key maupun menguji custom error
+   Solidity, rate limit, atau access control secara langsung). Detail lengkap demografi
+   responden, skenario tugas, dan hasil skor SUS ada di `Lampiran SUS.docx` (dokumen evaluasi
+   terpisah, bagian dari laporan Tugas Akhir utama, bukan bagian PDHUPL ini).
 
 ### 2.5 Prosedur Umum Pengujian
 
